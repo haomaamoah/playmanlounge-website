@@ -33,6 +33,7 @@ export function OrderCta() {
           <Button
             size="lg"
             variant="outline"
+            nativeButton={false}
             className="h-12 rounded-full border-black/20 bg-transparent px-6 text-black hover:bg-black/10"
             render={<a href={`tel:${site.phoneTel}`} />}
           >

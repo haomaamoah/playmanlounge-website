@@ -46,6 +46,7 @@ export function VisitSection() {
             <Button
               size="lg"
               className="h-12 rounded-full px-6"
+              nativeButton={false}
               render={<a href={site.mapsUrl} target="_blank" rel="noreferrer" />}
             >
               <Navigation data-icon="inline-start" />
@@ -54,6 +55,7 @@ export function VisitSection() {
             <Button
               size="lg"
               variant="outline"
+              nativeButton={false}
               className="h-12 rounded-full border-white/20 bg-transparent px-6 text-white hover:bg-white/10 hover:text-white"
               render={<a href={`tel:${site.phoneTel}`} />}
             >

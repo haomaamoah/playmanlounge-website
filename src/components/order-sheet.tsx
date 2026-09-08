@@ -88,6 +88,7 @@ export function OrderSheet() {
               </p>
               <Button
                 className="mt-5 rounded-full"
+                nativeButton={false}
                 render={<a href="#menu" />}
                 onClick={() => setCartOpen(false)}
               >
@@ -196,6 +197,7 @@ export function OrderSheet() {
           <Button
             size="lg"
             variant="outline"
+            nativeButton={false}
             className="h-11 w-full rounded-full border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
             render={<a href={`tel:${site.phoneTel}`} />}
           >

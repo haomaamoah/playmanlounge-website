@@ -84,6 +84,7 @@ export function Hero() {
           <Button
             size="lg"
             variant="outline"
+            nativeButton={false}
             className="h-12 rounded-full border-white/20 bg-black/30 px-7 text-base text-white hover:bg-white/10 hover:text-white"
             render={<a href="#visit" />}
           >
