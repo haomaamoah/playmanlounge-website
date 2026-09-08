@@ -20,15 +20,14 @@ type OrderContextValue = {
   clear: () => void;
   count: number;
   total: number;
-  cartOpen: boolean;
-  setCartOpen: (open: boolean) => void;
+  notice: string;
 };
 
 const OrderContext = createContext<OrderContextValue | null>(null);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
-  const [cartOpen, setCartOpen] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const add = useCallback((id: string) => {
     const item = menu.find((m) => m.id === id);
@@ -42,7 +41,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       }
       return [...prev, { item, qty: 1 }];
     });
-    setCartOpen(true);
+    setNotice(`${item.name} added to your order`);
   }, []);
 
   const remove = useCallback((id: string) => {
@@ -56,7 +55,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const clear = useCallback(() => setLines([]), []);
+  const clear = useCallback(() => {
+    setLines([]);
+    setNotice("Order cleared");
+  }, []);
 
   const count = lines.reduce((n, l) => n + l.qty, 0);
   const total = lines.reduce((n, l) => n + l.qty * l.item.price, 0);
@@ -70,10 +72,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       clear,
       count,
       total,
-      cartOpen,
-      setCartOpen,
+      notice,
     }),
-    [lines, add, remove, setQty, clear, count, total, cartOpen]
+    [lines, add, remove, setQty, clear, count, total, notice]
   );
 
   return (

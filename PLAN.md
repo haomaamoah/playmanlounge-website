@@ -1,63 +1,69 @@
-# Playman Lounge website — plan
+# Play Man Lounge — design plan
 
-This is the working plan for **PlayManLoungeWebsite**: a static, high-energy order site for the Kaneshie kiosk. The first slice is already live in this repo. Use this document to extend it without losing the brand.
+Two-pass visual plan, written before code. The site is a single scrolling page for a Kaneshie street-food kiosk that takes orders by email.
 
-## What we know (from Google Business + kiosk boards)
+## Pass 1 (rejected)
 
-| | |
-| --- | --- |
-| Name | Playman Lounge |
-| Tagline | Life is tasty. |
-| Category | Food court / street kiosk |
-| Address | Nikoi Olai Street, Amarboifio Avenue, Kaneshie, Accra (`HQH4+2M`) |
-| Phone | +233 57 814 1242 |
-| Hours on the stall | 12:00 PM – 11:00 PM, every day |
-| Google listing | Currently shows late close around 1 AM; takeout is listed |
-| Rating | 5.0 (new place) |
-| Signature | Hot fried rice with beef |
-| Also selling | Shawarma (GHS 30), crispy spring rolls (GHS 20), fresh juice (GHS 15), drinks (GHS 10) |
-| Listing | https://share.google/dPcVfP2PHKrYpeezE |
+A night-black page, condensed stall lettering, gold CTA, and a centered hero over a video. That is the generic “dark mode plus one accent” restaurant kit, and it is what the previous slice of this repo already looked like. It is also the cream/terracotta or Playfair-menu default if we follow an off-the-shelf restaurant palette. Rejected.
 
-Photos from the listing live in `assets/images/` (source) and `public/media/` (site). The owner’s ~10s kiosk clip is `assets/videos/playman-kiosk.mp4` and already loops muted in the hero.
+## Pass 2 (building this)
 
-Nearby Google Maps thumbnails (other Accra venues) were discarded so the gallery stays on-brand.
+Ground the page in the actual mark `playman_lounge_transparent.png` (a painted bowl of fried rice in a cocoa ring) and in the owner’s claim: **hot fried rice with beef**. The characteristic first frame is the plate, not a slogan lockup.
 
-## Brand system
+### Color (sampled from the logo PNG, then derived)
 
-Lifted from the physical stall, not invented:
+Opaque pixels clustered to:
 
-- **Black field** — kiosk boards and night service
-- **Hot orange / gold** (`#F6A21A` family) — PLAYMAN marks, prices, CTAs
-- **White** — PLAYMAN wordmark
-- **Geometric ticks** — plus signs, triangles, rings from the vinyl
-- **Wood + warm light** — photography only; UI stays matte black
-- **Type**
-  - Display: [Bebas Neue](https://fonts.google.com/specimen/Bebas+Neue) — the condensed stall lettering
-  - Script: [Caveat](https://fonts.google.com/specimen/Caveat) — “Life is tasty.”
-  - Body: [Outfit](https://fonts.google.com/specimen/Outfit)
+| Token | Hex | Role |
+| --- | --- | --- |
+| cocoa | `#3A1A04` | Ink, header, primary buttons |
+| cocoa-deep | `#2A1203` | Primary hover / pressed |
+| palm-oil | `#E54102` | Large prices, a single painted rail — not body text |
+| fried-gold | `#C27B07` | Price tickets, focus-adjacent accents |
+| rice-cream | `#F4E3BD` | Cards, on-cocoa text |
+| husk | `#896F18` | Hairline rules, muted icons |
+| surface | `#FBF6EA` | Page background (cream lightened) |
+| muted | `#6B4A28` | Secondary copy (AA on surface) |
 
-Motion should feel like a night stall, not a SaaS dashboard: slow pattern drift, fade-up on scroll, hover glow on menu cards, no gratuitous parallax on mobile.
+Palm-oil on cream is ~3.3:1 — large text / decoration only. Body copy is cocoa on surface (~14:1). Primary buttons are cream on cocoa (~12:1). Gold on cocoa is ~4.6:1 for price figures.
 
-## Site map (this slice)
+### Type
 
-1. **Hero** — kiosk photo, wordmark, order + maps
-2. **Menu** — priced board, add-to-bag
-3. **Order** — WhatsApp ticket (name, number, notes) or tap-to-call
-4. **Gallery** — listing photos
-5. **Find us** — address, hours, review, Maps
+- **Calistoga** — display. Heavy slab, closer to a painted Accra shop board than Bebas or Playfair.
+- **Figtree** — UI and body. High x-height for phones in sun glare.
+- No script face for the tagline (avoids the Caveat/handwriting cliché). Tagline sits in Figtree italic in cocoa.
 
-No login, no database. The stall already takes orders on the phone; the site writes a WhatsApp message so nothing gets lost in a fake checkout.
+Scale: body 16 / 1.5, section titles ~clamp(2rem, 5vw, 3.25rem), hero line ~clamp(2.4rem, 6vw, 4.5rem). Line length under 40em.
 
-## Next build passes (when you want them)
+### Layout
 
-1. **More owner video** — extra reels beside the 10s kiosk loop already in the hero
-2. **True food stills** — crop or reshoot fried rice, rolls, juice off the boards so menu cards are plates, not only type
-3. **Hours widget** — “Open now / closes 11 PM” from a tiny local schedule
-4. **Delivery notes** — pickup vs a rider, with a map pin
-5. **Menu CMS** — a JSON file or Google Sheet if prices change weekly
-6. **SEO** — LocalBusiness JSON-LD, og:image from `kiosk-hero.png`, Ghana English copy
-7. **PWA** — add-to-home-screen so regulars order in two taps
+Single page with hash links. A kiosk site has one job (see food, send an order). Splitting six marketing sections into routes would add load and break the bag → form relationship. Deep links still work (`#menu`, `#order`).
 
-## Stack
+```
+[ skip ] [ logo | Home Menu Gallery Team Order Contact | call ]
++------------------+-----------------------------------+
+| Left column      | Full-bleed fried rice photograph  |
+| Name + tagline   | cocoa wash from the left          |
+| Hours, street    | [Make an Order]                   |
++------------------+-----------------------------------+
+| FOOD ledger (photo + line + GHS) | DRINKS ledger     |
+| Gallery: irregular photo grid, tap to enlarge        |
+| Two portraits, name / title / bio                    |
+| Bag + email order form                               |
+| Address, map, email contact form                     |
+| Logo · Powered By Amoah Infotech                     |
+```
 
-Next.js (App Router) + TypeScript + Tailwind v4 + shadcn/ui + Framer Motion. Static enough to host on Vercel or any Node host. Dev server: `npm run dev` on port **43123**.
+Alignment: left. The kiosk is a counter, not a cathedral. Do not center the hero stack.
+
+### Principles
+
+1. The plate of fried rice opens the site. The logo is a mark, not a second headline.
+2. Palette only from the PNG. No extra neon, no dark theme.
+3. One non-user motion moment at most (hero photo present on load). No fade-up on every section.
+4. Prices read like a painted board: GHS figure first, then the dish.
+5. Order is email. The bag on the menu is the same bag on the form.
+
+### Navigation
+
+Sticky header, skip link, `scroll-padding` so focus is not hidden. Six section labels, plus a persistent tap-to-call number.

@@ -1,104 +1,66 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { ArrowDown, MapPin, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { GeometricField } from "@/components/geometric-field";
+import Image from "next/image";
 import { site } from "@/lib/content";
-import { useOrder } from "@/components/order-context";
 
 export function Hero() {
-  const { setCartOpen } = useOrder();
-
   return (
     <section
-      id="top"
-      className="relative isolate min-h-[100svh] overflow-hidden bg-black pt-16"
+      id="home"
+      aria-labelledby="home-heading"
+      className="relative isolate min-h-[min(100svh,52rem)] overflow-hidden bg-cocoa"
     >
-      <video
-        className="absolute inset-0 h-full w-full object-cover object-center opacity-50"
-        autoPlay
-        muted
-        loop
-        playsInline
-        poster="/media/kiosk-hero.png"
-        aria-label="Playman Lounge kiosk"
-      >
-        <source src="/media/playman-kiosk.mp4" type="video/mp4" />
-      </video>
-      <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/30" />
-      <GeometricField />
-      <div className="relative mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-end px-4 pb-16 sm:px-6 lg:justify-center">
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-4 flex items-center gap-2 text-sm uppercase tracking-[0.28em] text-primary"
+      <Image
+        src="/media/hero-fried-rice.webp"
+        alt="Takeaway plate of Ghanaian fried rice with beef on a kiosk counter"
+        width={1536}
+        height={1024}
+        priority
+        className="absolute inset-0 h-full w-full object-cover object-[center_40%]"
+      />
+      <div className="absolute inset-0 bg-linear-to-r from-cocoa from-15% via-cocoa/85 to-cocoa/25" />
+      <div className="relative mx-auto flex min-h-[min(100svh,52rem)] max-w-6xl flex-col justify-end px-4 py-16 sm:px-6 lg:justify-center">
+        <p className="font-display text-cream/80 text-sm sm:text-base">
+          Kaneshie kiosk · takeout
+        </p>
+        <h1
+          id="home-heading"
+          className="font-display mt-3 max-w-[14ch] text-[clamp(2.4rem,7vw,4.6rem)] leading-[1.05] text-cream"
         >
-          <Star className="size-3.5 fill-primary text-primary" />
-          {site.rating} on Google · Kaneshie, Accra
-        </motion.p>
-        <motion.h1
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.08 }}
-          className="font-display text-[clamp(3.4rem,12vw,8.5rem)] leading-[0.85] tracking-[0.06em] text-white"
-        >
-          PLAYMAN
-          <span className="block text-primary">LOUNGE</span>
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="font-script mt-4 text-4xl text-white/90 sm:text-5xl"
-        >
+          Hot fried rice with beef.
+        </h1>
+        <p className="mt-4 max-w-md text-xl text-cream italic sm:text-2xl">
           {site.tagline}
-        </motion.p>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.35, duration: 0.6 }}
-          className="mt-6 max-w-xl text-base leading-relaxed text-zinc-300 sm:text-lg"
-        >
-          {site.blurb}
-        </motion.p>
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.5 }}
-          className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
-        >
-          <Button
-            size="lg"
-            className="h-12 rounded-full px-7 text-base"
-            onClick={() => {
-              setCartOpen(true);
-              document.getElementById("menu")?.scrollIntoView({
-                behavior: "smooth",
-              });
-            }}
+        </p>
+        <p className="mt-5 max-w-lg text-base leading-relaxed text-cream/90">
+          {site.ownerNote}
+        </p>
+        <dl className="border-gold/50 mt-8 max-w-md space-y-2 border-l-4 pl-4 text-cream">
+          <div>
+            <dt className="text-cream/70 text-sm">Hours</dt>
+            <dd className="font-medium">
+              {site.hours}, {site.hoursDays}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-cream/70 text-sm">Location</dt>
+            <dd className="font-medium">
+              {site.addressLine}, {site.area}
+            </dd>
+          </div>
+        </dl>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <a
+            href="#order"
+            className="bg-cream text-cocoa hover:bg-card inline-flex min-h-12 items-center justify-center px-6 text-base font-semibold"
           >
-            Order now
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            nativeButton={false}
-            className="h-12 rounded-full border-white/20 bg-black/30 px-7 text-base text-white hover:bg-white/10 hover:text-white"
-            render={<a href="#visit" />}
+            Make an Order
+          </a>
+          <a
+            href={`tel:${site.phoneTel}`}
+            className="border-cream/40 text-cream hover:bg-cream/10 inline-flex min-h-12 items-center justify-center border px-6 text-base font-semibold"
           >
-            <MapPin data-icon="inline-start" />
-            Find the kiosk
-          </Button>
-        </motion.div>
-        <a
-          href="#menu"
-          className="mt-14 inline-flex w-fit items-center gap-2 text-xs uppercase tracking-[0.3em] text-zinc-400 transition hover:text-primary"
-        >
-          Scroll the menu
-          <ArrowDown className="size-3.5 animate-bounce" />
-        </a>
+            Call {site.phoneDisplay}
+          </a>
+        </div>
       </div>
     </section>
   );
