@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { ArrowDown, MapPin, Star } from "lucide-react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { GeometricField } from "@/components/geometric-field";
 import { site } from "@/lib/content";
@@ -16,14 +15,17 @@ export function Hero() {
       id="top"
       className="relative isolate min-h-[100svh] overflow-hidden bg-black pt-16"
     >
-      <Image
-        src="/media/kiosk-hero.png"
-        alt="Playman Lounge kiosk at night"
-        fill
-        priority
-        className="object-cover object-center opacity-45"
-        sizes="100vw"
-      />
+      <video
+        className="absolute inset-0 h-full w-full object-cover object-center opacity-50"
+        autoPlay
+        muted
+        loop
+        playsInline
+        poster="/media/kiosk-hero.png"
+        aria-label="Playman Lounge kiosk"
+      >
+        <source src="/media/playman-kiosk.mp4" type="video/mp4" />
+      </video>
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/30" />
       <GeometricField />
       <div className="relative mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-end px-4 pb-16 sm:px-6 lg:justify-center">

@@ -29,7 +29,7 @@ npm start
 ## What’s in the repo
 
 - `assets/images/` — photos downloaded from the [Google Business listing](https://share.google/dPcVfP2PHKrYpeezE)
-- `assets/videos/` — empty for now (the listing had no public videos)
+- `assets/videos/playman-kiosk.mp4` — 10s owner clip from the Google listing (also in the hero)
 - `public/media/` — the same photos the site serves
 - `PLAN.md` — brand, pages, and the next build passes
 - `src/` — Next.js app (hero, menu, WhatsApp order bag, gallery, map/contact)

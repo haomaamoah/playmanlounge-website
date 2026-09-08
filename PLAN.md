@@ -18,7 +18,7 @@ This is the working plan for **PlayManLoungeWebsite**: a static, high-energy ord
 | Also selling | Shawarma (GHS 30), crispy spring rolls (GHS 20), fresh juice (GHS 15), drinks (GHS 10) |
 | Listing | https://share.google/dPcVfP2PHKrYpeezE |
 
-Photos from the listing live in `assets/images/` (source) and `public/media/` (site). The Videos tab on Google had **no public videos** to download (empty gallery / sign-in wall). Drop owner clips into `assets/videos/` and `public/media/` when they exist, then wire a muted autoplay loop in the hero.
+Photos from the listing live in `assets/images/` (source) and `public/media/` (site). The owner’s ~10s kiosk clip is `assets/videos/playman-kiosk.mp4` and already loops muted in the hero.
 
 Nearby Google Maps thumbnails (other Accra venues) were discarded so the gallery stays on-brand.
 
@@ -50,7 +50,7 @@ No login, no database. The stall already takes orders on the phone; the site wri
 
 ## Next build passes (when you want them)
 
-1. **Owner videos** — hero loop + a “from the stall” reel once files land in `assets/videos/`
+1. **More owner video** — extra reels beside the 10s kiosk loop already in the hero
 2. **True food stills** — crop or reshoot fried rice, rolls, juice off the boards so menu cards are plates, not only type
 3. **Hours widget** — “Open now / closes 11 PM” from a tiny local schedule
 4. **Delivery notes** — pickup vs a rider, with a map pin

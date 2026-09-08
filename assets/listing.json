@@ -21,6 +21,6 @@
     "images/kiosk-side.jpg",
     "images/kiosk-detail.jpg"
   ],
-  "videos": [],
-  "videosNote": "The Google Business listing has a Videos tab, but no downloadable owner videos were publicly available (empty gallery / sign-in wall). No video files were saved."
+  "videos": ["videos/playman-kiosk.mp4"],
+  "videosNote": "Owner clip from the Google Business Videos tab (about 10 seconds, June 2026). Saved as assets/videos/playman-kiosk.mp4 and public/media/playman-kiosk.mp4."
 }
