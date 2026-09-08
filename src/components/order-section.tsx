@@ -132,7 +132,7 @@ export function OrderSection() {
                 {lines.map((line) => (
                   <li
                     key={line.item.id}
-                    className="flex items-center justify-between gap-3 py-3"
+                    className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
                       <p className="font-medium">{line.item.name}</p>

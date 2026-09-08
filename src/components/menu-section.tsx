@@ -71,8 +71,8 @@ function Ledger({
               className="size-20 shrink-0 object-cover sm:size-24"
             />
             <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-3">
-                <h4 className="font-medium">{item.name}</h4>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h4 className="min-w-0 font-medium break-words">{item.name}</h4>
                 <p className="font-display text-palm shrink-0 text-xl">
                   {formatGhs(item.price)}
                 </p>

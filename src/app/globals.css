@@ -104,9 +104,17 @@
   html {
     scroll-behavior: smooth;
     scroll-padding-top: calc(var(--header-height) + 0.75rem);
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: clip;
+    max-width: 100%;
+  }
+  img,
+  iframe,
+  video {
+    max-width: 100%;
   }
   a,
   button {

@@ -127,7 +127,7 @@ export function ContactSection() {
             <iframe
               title="Map of Play Man Lounge in Kaneshie, Accra"
               src={site.mapsEmbed}
-              className="h-64 w-full"
+              className="h-64 w-full max-w-full"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />

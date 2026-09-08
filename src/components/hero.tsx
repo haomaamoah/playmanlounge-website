@@ -19,7 +19,7 @@ export function Hero() {
       <div className="absolute inset-0 bg-linear-to-r from-cocoa from-15% via-cocoa/85 to-cocoa/25" />
       <div className="relative mx-auto flex min-h-[min(100svh,52rem)] max-w-6xl flex-col justify-end px-4 py-16 sm:px-6 lg:justify-center">
         <p className="font-display text-cream/80 text-sm sm:text-base">
-          Kaneshie kiosk · takeout
+          Kaneshie takeout kiosk
         </p>
         <h1
           id="home-heading"

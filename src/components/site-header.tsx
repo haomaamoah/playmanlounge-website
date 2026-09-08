@@ -28,8 +28,12 @@ export function SiteHeader() {
         Skip to main content
       </a>
       <header className="border-border bg-surface/95 sticky top-0 z-40 border-b backdrop-blur-md">
-        <div className="mx-auto flex h-[var(--header-height)] max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <a href="#home" className="flex min-h-11 shrink-0 items-center gap-2">
+        <div className="mx-auto flex h-[var(--header-height)] max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-6">
+          <a
+            href="#home"
+            className="flex min-h-11 shrink-0 items-center gap-2"
+            aria-label={site.name}
+          >
             <Image
               src={site.logo.src}
               alt=""
@@ -38,7 +42,7 @@ export function SiteHeader() {
               className="size-10 object-contain"
               priority
             />
-            <span className="font-display text-lg leading-none text-cocoa sm:text-xl">
+            <span className="font-display hidden text-lg leading-none text-cocoa sm:inline sm:text-xl">
               {site.name}
             </span>
           </a>
@@ -72,7 +76,7 @@ export function SiteHeader() {
               <ShoppingBag className="size-4" aria-hidden="true" />
               <span className="sr-only">Make an Order</span>
               {count > 0 && (
-                <span className="bg-palm text-cream absolute -top-1 -right-1 grid size-5 place-items-center text-[11px] font-bold">
+                <span className="bg-cocoa text-cream absolute -top-1 -right-1 grid size-5 place-items-center text-[11px] font-bold">
                   {count}
                 </span>
               )}
