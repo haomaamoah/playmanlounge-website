@@ -1,31 +1,30 @@
+import Image from "next/image";
 import { site } from "@/lib/content";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-white/10 bg-black py-12">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-end sm:justify-between sm:px-6">
-        <div>
-          <p className="font-display text-3xl tracking-[0.12em] text-white">
-            PLAYMAN <span className="text-primary">LOUNGE</span>
-          </p>
-          <p className="font-script mt-1 text-2xl text-zinc-300">
-            {site.tagline}
-          </p>
-          <p className="mt-3 max-w-sm text-sm text-zinc-500">
-            Street kiosk, Accra. Fried rice, rolls, juice, drinks. Orders by
-            WhatsApp or a phone call.
-          </p>
+    <footer className="bg-cocoa text-cream">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-12 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+        <div className="flex items-start gap-3">
+          <Image
+            src={site.logo.src}
+            alt=""
+            width={56}
+            height={56}
+            className="size-14 object-contain"
+          />
+          <div>
+            <p className="font-display text-2xl">{site.name}</p>
+            <p className="mt-1 italic">{site.tagline}</p>
+            <a
+              href={`tel:${site.phoneTel}`}
+              className="mt-3 inline-flex min-h-11 items-center underline"
+            >
+              {site.phoneDisplay}
+            </a>
+          </div>
         </div>
-        <div className="text-sm text-zinc-500">
-          <a className="hover:text-primary" href={site.shareUrl}>
-            Google Business
-          </a>
-          <span className="mx-2">·</span>
-          <a className="hover:text-primary" href={`tel:${site.phoneTel}`}>
-            {site.phoneDisplay}
-          </a>
-          <p className="mt-2">© {new Date().getFullYear()} Playman Lounge</p>
-        </div>
+        <p className="text-sm text-cream/80">Powered By Amoah Infotech</p>
       </div>
     </footer>
   );
