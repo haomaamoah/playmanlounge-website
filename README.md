@@ -4,27 +4,34 @@ Static website for **Playman Lounge** — a Kaneshie, Accra food kiosk that sell
 
 Tagline from the stall: **Life is tasty.**
 
-## Documents folder
-
-On this machine the project is linked at:
-
-`~/Documents/PlayManLoungeWebsite`
-
-That path points at this repository. After you publish a GitHub repo, clone it into your own Documents folder as `PlayManLoungeWebsite`.
-
-## Run locally
+## Get it on your machine
 
 ```bash
+cd ~/Documents
+origin repo clone haoma/playmanlounge-website
+cd playmanlounge-website
 npm install
 npm run dev
 ```
 
 Open [http://127.0.0.1:43123](http://127.0.0.1:43123).
 
+If `origin` is not installed yet:
+
 ```bash
-npm run build
-npm start
+curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
+origin auth login
 ```
+
+## Run locally
+
+```bash
+npm run dev    # dev server on port 43123
+npm run build  # production build
+npm start      # serve the build
+```
+
+The three design skills in `.cursor/skills/` load automatically when you open this folder in Cursor.
 
 ## What’s in the repo
 
