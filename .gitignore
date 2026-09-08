@@ -45,3 +45,6 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 
+
+# skill script caches
+.cursor/skills/**/__pycache__/
