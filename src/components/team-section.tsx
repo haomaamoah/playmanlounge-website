@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { team } from "@/lib/content";
+import { asset } from "@/lib/asset";
 
 export function TeamSection() {
   return (
@@ -15,7 +16,7 @@ export function TeamSection() {
           {team.map((person) => (
             <li key={person.id} className="flex flex-col gap-4 sm:flex-row sm:gap-6">
               <Image
-                src={person.image}
+                src={asset(person.image)}
                 alt={`Portrait of ${person.name}`}
                 width={person.width}
                 height={person.height}
