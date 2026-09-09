@@ -17,10 +17,14 @@ export function TeamSection() {
             <li key={person.id} className="flex flex-col gap-4 sm:flex-row sm:gap-6">
               <Image
                 src={asset(person.image)}
-                alt={`Portrait of ${person.name}`}
+                alt={person.imageAlt}
                 width={person.width}
                 height={person.height}
-                className="aspect-square w-full max-w-48 object-cover"
+                className={
+                  person.imageFit === "contain"
+                    ? "bg-card aspect-square w-full max-w-48 object-contain p-4"
+                    : "aspect-square w-full max-w-48 object-cover"
+                }
               />
               <div>
                 <h3 className="font-display text-3xl">{person.name}</h3>
