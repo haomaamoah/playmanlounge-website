@@ -2,7 +2,12 @@
 
 import Image from "next/image";
 import { Minus, Plus } from "lucide-react";
-import { drinksMenu, foodMenu, formatGhs, type MenuItem } from "@/lib/content";
+import {
+  formatGhs,
+  menuGroups,
+  type MenuGroup,
+  type MenuItem,
+} from "@/lib/content";
 import { asset } from "@/lib/asset";
 import { useOrder } from "@/lib/order-context";
 
@@ -49,21 +54,16 @@ function Qty({ item }: { item: MenuItem }) {
   );
 }
 
-function Ledger({
-  title,
-  items,
-}: {
-  title: string;
-  items: MenuItem[];
-}) {
+function Ledger({ group }: { group: MenuGroup }) {
   return (
     <div>
-      <h3 className="font-display border-cocoa mb-4 border-b-2 pb-2 text-3xl">
-        {title}
+      <h3 className="font-display border-cocoa border-b-2 pb-2 text-3xl">
+        {group.title}
       </h3>
-      <ul className="divide-border divide-y">
-        {items.map((item) => (
-          <li key={item.id} className="flex gap-3 py-4">
+      <p className="text-muted-foreground mt-2 text-sm">{group.blurb}</p>
+      <ul className="mt-2 grid sm:grid-cols-2 sm:gap-x-10">
+        {group.items.map((item) => (
+          <li key={item.id} className="border-border flex gap-3 border-b py-4">
             <Image
               src={asset(item.image)}
               alt={item.name}
@@ -102,16 +102,20 @@ export function MenuSection() {
           Menu
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base leading-relaxed">
-          Known board prices sit on fried rice, shawarma, spring rolls, juice and
-          drinks. The rest is a fuller Accra menu — swap it when the kitchen
-          prints a new list.
+          Everything here is off our own boards — the shutter board at the kiosk
+          and the printed poster, both in the{" "}
+          <a className="text-foreground underline" href="#gallery">
+            gallery
+          </a>
+          . Prices are in cedis and include the sauce.
         </p>
         <p className="sr-only" aria-live="polite">
           {notice}
         </p>
-        <div className="mt-10 grid gap-12 lg:grid-cols-2 lg:gap-16">
-          <Ledger title="Food" items={foodMenu} />
-          <Ledger title="Drinks" items={drinksMenu} />
+        <div className="mt-10 space-y-12">
+          {menuGroups.map((group) => (
+            <Ledger key={group.id} group={group} />
+          ))}
         </div>
       </div>
     </section>
