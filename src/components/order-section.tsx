@@ -24,7 +24,7 @@ function validate(order: OrderPayload): FieldErrors {
   const phone = order.phone.replace(/\s/g, "");
   if (!phone) errors.phone = "Enter a phone number we can call.";
   else if (!/^\+?[0-9]{9,15}$/.test(phone))
-    errors.phone = "Use a number with country code, like +233578141242.";
+    errors.phone = "Use a number with country code, like +233547539942.";
   if (!order.email.trim()) errors.email = "Enter your email.";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.email))
     errors.email = "Enter an email we can reply to.";

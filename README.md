@@ -45,12 +45,12 @@ Marked clearly so the owner can replace it:
 | What | Where | Notes |
 | --- | --- | --- |
 | Extended menu (jollof, waakye, banku, kelewele, etc.) | `src/lib/content.ts` → `menu` | Known prices are tagged `knownPrice: true` (fried rice 40, shawarma 30, spring rolls 20, juice 15, drinks 10). Everything else is a plausible Accra kiosk guess. |
-| Team portraits & bios | `src/lib/content.ts` → `team`, `public/media/team-*.webp` | Aquilas Ali Baba (Managing Director, shown with the logo mark), Haoma Amoah (IT Director). Bios can still be tightened with their own words. |
+| Team portraits & bios | `src/lib/content.ts` → `team`, `public/media/team-*.webp` | Emmanuel Temeng (Managing Director, shown with the logo mark), Haoma Amoah (IT Director). Bios can still be tightened with their own words. |
 | Contact email and socials | `src/lib/content.ts` → `site.email`, `site.socials` | Placeholder inbox `hello@playmanlounge.gh`. Phone and street address are **real**. |
 | Food, drink, gallery, team photographs | `public/media/*.webp` | Generated / royalty-free stand-ins, not the kiosk’s own shoot. |
 | Logo | `public/playman_lounge_transparent.png` | Also wired as favicon and apple-touch-icon. |
 
-Do **not** replace the real phone (`+233 57 814 1242`), hours (12:00 PM – 11:00 PM, every day), or address (Nikoi Olai Street, off Amarboifio Avenue, Kaneshie; plus code HQH4+2M Accra).
+Do **not** replace the real phone (`+233 54 753 9942`, set by the Managing Director and replacing the older AirtelTigo line on the Google listing), hours (12:00 PM – 11:00 PM, every day), or address (Nikoi Olai Street, off Amarboifio Avenue, Kaneshie; plus code HQH4+2M Accra).
 
 ## Order email
 

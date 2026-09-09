@@ -4,8 +4,8 @@ export const site = {
   tagline: "Life is tasty.",
   blurb:
     "We cook for Accra mainly online. Order fried rice, shawarma and more for delivery, or book the Kaneshie kitchen for a private event. Without a booking the site is our delivery hub — not open to the public.",
-  phoneDisplay: "+233 57 814 1242",
-  phoneTel: "+233578141242",
+  phoneDisplay: "+233 54 753 9942",
+  phoneTel: "+233547539942",
   addressLine: "Nikoi Olai Street, off Amarboifio Avenue",
   area: "Kaneshie, Accra, Ghana",
   plusCode: "HQH4+2M Accra",
@@ -317,11 +317,11 @@ export const gallery = [
 export const team = [
   {
     id: "md",
-    name: "Aquilas Ali Baba",
+    name: "Emmanuel Temeng",
     title: "Managing Director",
-    bio: "Aquilas runs the kitchen day to day — the rice, the delivery bag, and booked events at the hub. He built Play Man Lounge so Accra can get hot fried rice with beef without needing a walk-in counter.",
+    bio: "Emmanuel runs the kitchen day to day — the rice, the delivery bag, and booked events at the hub. He built Play Man Lounge so Accra can get hot fried rice with beef without needing a walk-in counter.",
     image: "/playman_lounge_transparent.png",
-    imageAlt: "Play Man Lounge logo standing in for a portrait of Aquilas Ali Baba",
+    imageAlt: "Play Man Lounge logo standing in for a portrait of Emmanuel Temeng",
     imageFit: "contain",
     width: 994,
     height: 984,
