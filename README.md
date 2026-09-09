@@ -44,13 +44,23 @@ Marked clearly so the owner can replace it:
 
 | What | Where | Notes |
 | --- | --- | --- |
-| Extended menu (jollof, waakye, banku, kelewele, etc.) | `src/lib/content.ts` → `menu` | Known prices are tagged `knownPrice: true` (fried rice 40, shawarma 30, spring rolls 20, juice 15, drinks 10). Everything else is a plausible Accra kiosk guess. |
+| Tray names on the poster | `src/lib/content.ts` → `menuGroups` | The printed poster prices the Playboy and Play Man trays by contents, not by name, so each item is named after its contents (“Playboy — 3 samosa, 1 spring roll”). Rename them if the kitchen settles on shorter names. |
 | Team portraits & bios | `src/lib/content.ts` → `team`, `public/media/team-*.webp` | Emmanuel Temeng (Managing Director, shown with the logo mark), Haoma Amoah (IT Director). Bios can still be tightened with their own words. |
 | Contact email and socials | `src/lib/content.ts` → `site.email`, `site.socials` | Placeholder inbox `hello@playmanlounge.gh`. Phone and street address are **real**. |
-| Food, drink, gallery, team photographs | `public/media/*.webp` | Generated / royalty-free stand-ins, not the kiosk’s own shoot. |
+| Dish photographs | `public/media/food-*.webp`, `public/media/drink-*.webp` | Generated stand-ins shot to match the poster’s look. Swap them for real plates when the kitchen shoots its own. |
+| Gallery photographs | `public/media/gallery-*.webp` | **Real**, sent by the Managing Director; originals kept in `assets/images/director-*.jpg`. |
 | Logo | `public/playman_lounge_transparent.png` | Also wired as favicon and apple-touch-icon. |
 
 Do **not** replace the real phone (`+233 54 753 9942`, set by the Managing Director and replacing the older AirtelTigo line on the Google listing), hours (12:00 PM – 11:00 PM, every day), or address (Nikoi Olai Street, off Amarboifio Avenue, Kaneshie; plus code HQH4+2M Accra).
+
+## Menu source
+
+`menuGroups` in `src/lib/content.ts` is a transcription of the two boards the business uses, both visible in the Gallery section:
+
+- **Kiosk shutter board** (`assets/images/director-storefront.jpg`): fried rice 40, shawarma 30, spring rolls 20, fresh juice 15, drinks 10.
+- **Printed menu poster** (`assets/images/director-menu-poster.jpg`): Ben 10 15, Mini Bite 35, Jumbo Bite 60, the Playboy trays at 20 / 10 / 10, and the Play Man trays at 30 / 50.
+
+When the kitchen prints a new board, edit `menuGroups` — the order form, the running total, and the order email all read from it.
 
 ## Order email
 
