@@ -228,6 +228,20 @@ export const gallery = [
     crop: "center",
   },
   {
+    src: "/media/gallery-takeout-box.webp",
+    alt: "Takeaway box packed with fried rice, two pieces of chicken, coleslaw and sauce cups",
+    width: 1080,
+    height: 810,
+    crop: "center",
+  },
+  {
+    src: "/media/gallery-takeout-bowl.webp",
+    alt: "Kraft bowl of fried rice with two chicken drumsticks, sauce and wrapped cutlery ready for the rider",
+    width: 1080,
+    height: 810,
+    crop: "center",
+  },
+  {
     src: "/media/gallery-kiosk-night.webp",
     alt: "The kiosk lit up at night with the hatch open and the menu board glowing",
     width: 608,

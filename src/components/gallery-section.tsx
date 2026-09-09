@@ -33,8 +33,9 @@ export function GallerySection() {
           Gallery
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base">
-          The kiosk on Nikoi Olai Street after dark, and the boards the menu
-          above is copied from. Tap a photo to enlarge it.
+          Packs going out for delivery, the kiosk on Nikoi Olai Street after
+          dark, and the boards the menu above is copied from. Tap a photo to
+          enlarge it.
         </p>
         <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {gallery.map((photo, index) => (
