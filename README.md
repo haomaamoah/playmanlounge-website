@@ -21,9 +21,22 @@ npm start       # serve the build
 npm run lint
 ```
 
-## Design
+## GitHub Pages
 
-See `PLAN.md` for the two-pass visual plan. Palette tokens are sampled from `public/playman_lounge_transparent.png` (cocoa `#3A1A04`, palm-oil `#E54102`, rice-cream `#F4E3BD`, fried-gold `#C27B07`, husk `#896F18`).
+This project ships a static export (`next.config.ts` → `output: "export"`) and a workflow at `.github/workflows/pages.yml`.
+
+After the repo is on GitHub with Pages enabled (Settings → Pages → Source: GitHub Actions), every push to `main` publishes to:
+
+`https://<your-github-username>.github.io/playmanlounge-website/`
+
+Local static build:
+
+```bash
+npm run build   # writes the site to out/
+```
+
+For local `npm run dev`, leave `NEXT_PUBLIC_BASE_PATH` unset so paths stay at `/`.
+
 
 ## Placeholder data (swap later)
 
