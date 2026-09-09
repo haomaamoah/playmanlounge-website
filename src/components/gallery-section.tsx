@@ -53,7 +53,7 @@ export function GallerySection() {
                   alt={photo.alt}
                   width={photo.width}
                   height={photo.height}
-                  className={`w-full object-cover ${photo.crop === "top" ? "object-top" : "object-center"} ${index === 0 ? "aspect-4/3 sm:aspect-square" : "aspect-4/3"}`}
+                  className={`aspect-4/3 w-full object-cover sm:aspect-square ${photo.crop === "top" ? "object-top" : "object-center"}`}
                 />
               </button>
             </li>
