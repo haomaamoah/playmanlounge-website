@@ -317,11 +317,11 @@ export const gallery = [
 export const team = [
   {
     id: "md",
-    name: "Aquilas Allbaba",
+    name: "Aquilas Ali Baba",
     title: "Managing Director",
     bio: "Aquilas runs the kitchen day to day — the rice, the delivery bag, and booked events at the hub. He built Play Man Lounge so Accra can get hot fried rice with beef without needing a walk-in counter.",
     image: "/playman_lounge_transparent.png",
-    imageAlt: "Play Man Lounge logo standing in for a portrait of Aquilas Allbaba",
+    imageAlt: "Play Man Lounge logo standing in for a portrait of Aquilas Ali Baba",
     imageFit: "contain",
     width: 994,
     height: 984,
