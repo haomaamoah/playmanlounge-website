@@ -37,13 +37,18 @@ export function formatOrderBody(order: OrderPayload) {
     )
     .join("\n");
 
+  const fulfilmentLabel =
+    order.fulfilment === "delivery"
+      ? "Delivery"
+      : "Arranged pickup at the Kaneshie hub (not walk-in)";
+
   return [
     `New order for ${site.name}`,
     "",
     `Name: ${order.name}`,
     `Phone: ${order.phone}`,
     `Email: ${order.email}`,
-    `Fulfilment: ${order.fulfilment}`,
+    `Fulfilment: ${fulfilmentLabel}`,
     `Preferred time: ${order.preferredTime}`,
     "",
     "Items:",

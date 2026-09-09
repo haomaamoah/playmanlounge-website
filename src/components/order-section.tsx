@@ -28,7 +28,7 @@ function validate(order: OrderPayload): FieldErrors {
   if (!order.email.trim()) errors.email = "Enter your email.";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.email))
     errors.email = "Enter an email we can reply to.";
-  if (!order.fulfilment) errors.fulfilment = "Choose pickup or delivery.";
+  if (!order.fulfilment) errors.fulfilment = "Choose delivery or arranged pickup.";
   if (!order.preferredTime) errors.preferredTime = "Choose a time between 12:00 and 23:00.";
   if (order.lines.length === 0) errors.cart = "Add at least one menu item.";
   return errors;
@@ -41,7 +41,7 @@ export function OrderSection() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [fulfilment, setFulfilment] = useState<Fulfilment>("pickup");
+  const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [preferredTime, setPreferredTime] = useState("13:00");
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -113,8 +113,9 @@ export function OrderSection() {
             Make an Order
           </h2>
           <p className="mt-3 max-w-md text-base leading-relaxed">
-            Build a bag from the menu. We take orders by email
-            ({businessEmail()}). If that fails, call{" "}
+            We take orders online by email ({businessEmail()}). Delivery is
+            the usual path; arranged hub pickup is available when we confirm it
+            — the kitchen is not a walk-in counter. If email fails, call{" "}
             <a className="underline" href={`tel:${site.phoneTel}`}>
               {site.phoneDisplay}
             </a>
@@ -204,7 +205,7 @@ export function OrderSection() {
             <div className="border-cocoa mb-6 border p-4" role="status">
               <p className="font-semibold">
                 {status.via === "web3forms"
-                  ? "Order emailed to the kiosk."
+                  ? "Order emailed to the kitchen."
                   : "Your mail app should open with the order filled in. Send it to complete."}
               </p>
               <pre className="mt-3 max-h-48 overflow-auto text-xs whitespace-pre-wrap">
@@ -277,18 +278,8 @@ export function OrderSection() {
               )}
             </div>
             <fieldset id={field("fulfilment")}>
-              <legend className="mb-2 text-sm font-medium">Pickup or delivery</legend>
+              <legend className="mb-2 text-sm font-medium">Delivery or arranged pickup</legend>
               <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-                <label className="inline-flex min-h-11 items-center gap-2">
-                  <input
-                    type="radio"
-                    name="fulfilment"
-                    value="pickup"
-                    checked={fulfilment === "pickup"}
-                    onChange={() => setFulfilment("pickup")}
-                  />
-                  Pickup at the kiosk
-                </label>
                 <label className="inline-flex min-h-11 items-center gap-2">
                   <input
                     type="radio"
@@ -299,7 +290,21 @@ export function OrderSection() {
                   />
                   Delivery
                 </label>
+                <label className="inline-flex min-h-11 items-center gap-2">
+                  <input
+                    type="radio"
+                    name="fulfilment"
+                    value="pickup"
+                    checked={fulfilment === "pickup"}
+                    onChange={() => setFulfilment("pickup")}
+                  />
+                  Arranged pickup at the hub
+                </label>
               </div>
+              <p className="text-muted-foreground mt-2 text-sm">
+                Pickup is by arrangement only. The hub is not open to the public
+                without a booking.
+              </p>
               {errors.fulfilment && (
                 <p className="text-destructive mt-1 text-sm">{errors.fulfilment}</p>
               )}
@@ -328,7 +333,7 @@ export function OrderSection() {
                 className="border-input min-h-11 w-full border bg-background px-3"
               />
               <p id={`${field("preferredTime")}-hint`} className="text-muted-foreground mt-1 text-sm">
-                We cook from noon to 11:00 PM.
+                Kitchen order window is noon to 11:00 PM.
               </p>
               {errors.preferredTime && (
                 <p

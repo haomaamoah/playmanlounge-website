@@ -9,7 +9,7 @@ export function TeamSection() {
           Meet The Team
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base">
-          Two people keep the kiosk moving: the floor, and the inbox.
+          Two people keep Play Man Lounge moving: the kitchen, and the inbox.
         </p>
         <ul className="mt-10 grid gap-10 md:grid-cols-2">
           {team.map((person) => (

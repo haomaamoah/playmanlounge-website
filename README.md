@@ -1,10 +1,10 @@
 # Play Man Lounge
 
-Static marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE), a street-food kiosk on Nikoi Olai Street, Kaneshie, Accra.
+Static marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE) — an Accra kitchen that sells mainly **online**. The Kaneshie site on Nikoi Olai Street is for **booked events**; without a booking it runs as a **delivery hub** and is **not open to the public**.
 
 Tagline: **Life is tasty.**
 
-This is a single scrolling page with six sections (Home, Menu, Gallery, Meet The Team, Make an Order, Contact Us). Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document, which matches how the kiosk actually works: see the board, send an email.
+This is a single scrolling page with six sections (Home, Menu, Gallery, Meet The Team, Make an Order, Contact Us). Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document: see the board, send an email for delivery or arranged hub pickup.
 
 ## Run it
 
@@ -43,7 +43,7 @@ Do **not** replace the real phone (`+233 57 814 1242`), hours (12:00 PM – 11:0
 
 The kiosk takes orders by **email**. The form in Make an Order:
 
-1. Collects name, phone, email, bag + quantities, pickup or delivery, preferred time, and notes.
+1. Collects name, phone, email, bag + quantities, delivery or arranged hub pickup, preferred time, and notes.
 2. Validates inline (errors sit under the field; a summary at the top of the form is focusable).
 3. Sends one of two ways:
 

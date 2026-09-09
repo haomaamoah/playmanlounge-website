@@ -32,7 +32,7 @@ export function GallerySection() {
           Gallery
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base">
-          The kiosk, the wok, the packs. Tap a photo to enlarge it.
+          The kitchen hub, the wok, the packs. Tap a photo to enlarge it.
         </p>
         <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {gallery.map((photo, index) => (

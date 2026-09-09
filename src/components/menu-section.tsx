@@ -101,8 +101,8 @@ export function MenuSection() {
           Menu
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base leading-relaxed">
-          Known kiosk prices sit on fried rice, shawarma, spring rolls, juice and
-          drinks. The rest is a fuller Accra board — swap it when the stall
+          Known board prices sit on fried rice, shawarma, spring rolls, juice and
+          drinks. The rest is a fuller Accra menu — swap it when the kitchen
           prints a new list.
         </p>
         <p className="sr-only" aria-live="polite">

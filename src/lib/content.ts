@@ -3,7 +3,7 @@ export const site = {
   signage: "PLAYMAN LOUNGE",
   tagline: "Life is tasty.",
   blurb:
-    "We sell hot fried rice with beef, a special taste. Come off Amarboifio Avenue, eat at the kiosk, or send an order and pick it up hot.",
+    "We cook for Accra mainly online. Order fried rice, shawarma and more for delivery, or book the Kaneshie kitchen for a private event. Without a booking the site is our delivery hub — not open to the public.",
   phoneDisplay: "+233 57 814 1242",
   phoneTel: "+233578141242",
   addressLine: "Nikoi Olai Street, off Amarboifio Avenue",
@@ -11,6 +11,10 @@ export const site = {
   plusCode: "HQH4+2M Accra",
   hours: "12:00 PM – 11:00 PM",
   hoursDays: "Mondays to Sundays",
+  hoursLabel: "Order hours",
+  locationLabel: "Kitchen hub",
+  locationNote:
+    "Booked events only. On ordinary days this is our delivery hub — not open to walk-in customers.",
   mapsUrl:
     "https://www.google.com/maps/place/Play+man+lounge/@5.5775728,-0.2433083,17z",
   mapsEmbed:
@@ -210,7 +214,7 @@ export const menu: MenuItem[] = [
   {
     id: "coke",
     name: "Coca-Cola",
-    description: "Ice-cold from the kiosk fridge.",
+    description: "Ice-cold from the kitchen fridge.",
     price: 10,
     category: "drinks",
     image: "/media/drink-sodas.webp",
@@ -274,37 +278,37 @@ export const drinksMenu = menu.filter((item) => item.category === "drinks");
 export const gallery = [
   {
     src: "/media/gallery-kiosk-dusk.webp",
-    alt: "Street-food kiosk lit at dusk on a Kaneshie street, people waiting for takeaway",
+    alt: "Kaneshie kitchen hub lit at dusk on Nikoi Olai Street",
     width: 1100,
     height: 733,
   },
   {
     src: "/media/gallery-wok.webp",
-    alt: "Cook tossing fried rice in a wok over high flame at the kiosk",
+    alt: "Cook tossing fried rice in a wok over high flame at the kitchen hub",
     width: 1100,
     height: 733,
   },
   {
     src: "/media/gallery-packs.webp",
-    alt: "Takeaway packs of fried rice lined on the kiosk shelf",
+    alt: "Takeaway packs of fried rice lined up for delivery",
     width: 1100,
     height: 733,
   },
   {
     src: "/media/gallery-lounge.webp",
-    alt: "Customers eating at stools outside the kiosk at night",
+    alt: "Booked evening seating outside the Kaneshie kitchen hub",
     width: 1100,
     height: 733,
   },
   {
     src: "/media/gallery-board.webp",
-    alt: "Handwritten menu board on the wooden kiosk shutters",
+    alt: "Handwritten menu board on the kitchen hub shutters",
     width: 1100,
     height: 733,
   },
   {
     src: "/media/gallery-spread.webp",
-    alt: "Fried rice, sides and juice set on a small metal kiosk table",
+    alt: "Fried rice, sides and juice packed for an online order",
     width: 1100,
     height: 733,
   },
@@ -315,7 +319,7 @@ export const team = [
     id: "md",
     name: "Aquilas Allbaba",
     title: "Managing Director",
-    bio: "Aquilas runs the kiosk day to day — the rice, the hours, and the people at the counter. He built Play Man Lounge so Kaneshie can get a hot plate of fried rice with beef without the guesswork.",
+    bio: "Aquilas runs the kitchen day to day — the rice, the delivery bag, and booked events at the hub. He built Play Man Lounge so Accra can get hot fried rice with beef without needing a walk-in counter.",
     image: "/media/team-aquilas.webp",
     width: 900,
     height: 900,
@@ -324,7 +328,7 @@ export const team = [
     id: "it",
     name: "Haoma Amoah",
     title: "Information Technology Director",
-    bio: "Haoma keeps orders, the phone line, and this site in working order. He makes sure an email from Nikoi Olai Street reaches the kiosk before the rice leaves the wok.",
+    bio: "Haoma keeps online orders, the phone line, and this site in working order. He makes sure an email from anywhere in Accra reaches the Kaneshie hub before the rice leaves the wok.",
     image: "/media/team-haoma.webp",
     width: 900,
     height: 900,

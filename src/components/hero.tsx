@@ -10,7 +10,7 @@ export function Hero() {
     >
       <Image
         src="/media/hero-fried-rice.webp"
-        alt="Takeaway plate of Ghanaian fried rice with beef on a kiosk counter"
+        alt="Takeaway plate of Ghanaian fried rice with beef ready for delivery"
         width={1536}
         height={1024}
         priority
@@ -19,7 +19,7 @@ export function Hero() {
       <div className="absolute inset-0 bg-linear-to-r from-cocoa from-15% via-cocoa/85 to-cocoa/25" />
       <div className="relative mx-auto flex min-h-[min(100svh,52rem)] max-w-6xl flex-col justify-end px-4 py-16 sm:px-6 lg:justify-center">
         <p className="font-display text-cream/80 text-sm sm:text-base">
-          Kaneshie takeout kiosk
+          Online Accra kitchen
         </p>
         <h1
           id="home-heading"
@@ -31,19 +31,22 @@ export function Hero() {
           {site.tagline}
         </p>
         <p className="mt-5 max-w-lg text-base leading-relaxed text-cream/90">
-          {site.ownerNote}
+          {site.blurb}
         </p>
-        <dl className="border-gold/50 mt-8 max-w-md space-y-2 border-l-4 pl-4 text-cream">
+        <dl className="border-gold/50 mt-8 max-w-md space-y-3 border-l-4 pl-4 text-cream">
           <div>
-            <dt className="text-cream/70 text-sm">Hours</dt>
+            <dt className="text-cream/70 text-sm">{site.hoursLabel}</dt>
             <dd className="font-medium">
               {site.hours}, {site.hoursDays}
             </dd>
           </div>
           <div>
-            <dt className="text-cream/70 text-sm">Location</dt>
+            <dt className="text-cream/70 text-sm">{site.locationLabel}</dt>
             <dd className="font-medium">
               {site.addressLine}, {site.area}
+            </dd>
+            <dd className="text-cream/80 mt-1 text-sm leading-relaxed">
+              {site.locationNote}
             </dd>
           </div>
         </dl>

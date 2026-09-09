@@ -1,6 +1,6 @@
 # Play Man Lounge — design plan
 
-Two-pass visual plan, written before code. The site is a single scrolling page for a Kaneshie street-food kiosk that takes orders by email.
+Two-pass visual plan, written before code. The site is a single scrolling page for Play Man Lounge — an Accra kitchen that sells mainly online, uses the Kaneshie site for booked events, and otherwise runs it as a delivery hub (not open to the public). Orders go by email.
 
 ## Pass 1 (rejected)
 
