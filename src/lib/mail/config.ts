@@ -1,9 +1,6 @@
 import { site } from "@/lib/content";
 
-const DEFAULT_STAFF = [
-  "playmanlounge@gmail.com",
-  "amoahinfotech@gmail.com",
-] as const;
+const DEFAULT_STAFF = ["amoahinfotech@gmail.com"] as const;
 
 export function staffOrderEmails() {
   const fromEnv = process.env.ORDER_STAFF_EMAILS?.trim();

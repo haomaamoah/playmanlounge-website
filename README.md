@@ -6,7 +6,7 @@ Tagline: **Life is tasty.**
 
 This is a single scrolling page with six sections (Home, Menu, Gallery, Meet The Team, Make an Order, Contact Us). Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document.
 
-Orders go through a Next.js API route. There is **no database**. Each submit sends three separate HTML receipts: the customer, `playmanlounge@gmail.com`, and `amoahinfotech@gmail.com`.
+Orders go through a Next.js API route. There is **no database**. Each submit sends two separate HTML receipts: the customer, and `amoahinfotech@gmail.com` (kitchen copy). Add `playmanlounge@gmail.com` later if that inbox exists.
 
 ## Run it
 
@@ -35,7 +35,7 @@ Marked clearly so the owner can replace it:
 | --- | --- | --- |
 | Extended menu (jollof, waakye, banku, kelewele, etc.) | `src/lib/content.ts` → `menu` | Known prices are tagged `knownPrice: true` (fried rice 40, shawarma 30, spring rolls 20, juice 15, drinks 10). Everything else is a plausible Accra kiosk guess. |
 | Team names, titles, bios, portraits | `src/lib/content.ts` → `team` | Placeholder people: Kwabena Owusu (Managing Director), Akua Boateng (IT Director). |
-| Contact email and socials | `src/lib/content.ts` → `site.email`, `site.socials` | Public inbox is `playmanlounge@gmail.com`. Phone and street address are **real**. |
+| Contact email and socials | `src/lib/content.ts` → `site.email`, `site.socials` | Public inbox is `amoahinfotech@gmail.com` until a kiosk Gmail exists. Phone and street address are **real**. |
 | Food, drink, gallery, team photographs | `public/media/*.webp` | Generated / royalty-free stand-ins, not the kiosk’s own shoot. |
 | Logo | `public/playman_lounge_transparent.png` | Also wired as favicon and apple-touch-icon. |
 
@@ -43,27 +43,26 @@ Do **not** replace the real phone (`+233 57 814 1242`), hours (12:00 PM – 11:0
 
 ## Order receipts
 
-The kiosk takes orders by **email**. Make an Order posts to `/api/orders`. The server rebuilds prices from `src/lib/content.ts` (the browser cannot fake a cheaper plate), then sends **three** mails — never one CC, so the customer does not see the Amoah Infotech inbox:
+The kiosk takes orders by **email**. Make an Order posts to `/api/orders`. The server rebuilds prices from `src/lib/content.ts` (the browser cannot fake a cheaper plate), then sends **separate** mails — never one CC:
 
 | Recipient | What they get |
 | --- | --- |
 | The address the customer typed | “Your receipt” — logo, bag table with dish photos, total, pickup/delivery time |
-| `playmanlounge@gmail.com` | Kitchen ticket — same table, plus the customer’s phone and email |
-| `amoahinfotech@gmail.com` | Same kitchen ticket |
+| `amoahinfotech@gmail.com` | Kitchen ticket — same table, plus the customer’s phone and email |
 
 Receipt HTML is a cocoa-and-cream takeaway docket (logo stamp, gold ticket ribbon, pictured ledger, GHS total). Small JPEGs live in `public/email/`. A plain-text version is attached for clients that strip HTML.
 
 **Send mail in production (Brevo, preferred)**
 
 1. Create a free [Brevo](https://www.brevo.com) account.
-2. Verify `playmanlounge@gmail.com` as a sender.
+2. Verify `amoahinfotech@gmail.com` as a sender.
 3. Copy `env.example` to `.env.local` (and into Vercel → Settings → Environment Variables):
 
 ```
 BREVO_API_KEY=your_key
-ORDER_FROM_EMAIL=playmanlounge@gmail.com
-ORDER_STAFF_EMAILS=playmanlounge@gmail.com,amoahinfotech@gmail.com
-SITE_URL=https://your-deployment.vercel.app
+ORDER_FROM_EMAIL=amoahinfotech@gmail.com
+ORDER_STAFF_EMAILS=amoahinfotech@gmail.com
+SITE_URL=https://playman-lounge.vercel.app
 ```
 
 Without a key, `npm run dev` still “succeeds” and writes HTML copies to `.order-previews/`. Production without a key returns an error and the form falls back to a `mailto:` draft.
