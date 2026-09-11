@@ -48,3 +48,6 @@ CLAUDE.md
 
 # skill script caches
 .cursor/skills/**/__pycache__/
+
+# local HTML receipts when no mail API key is set
+.order-previews/

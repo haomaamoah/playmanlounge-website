@@ -23,8 +23,7 @@ export const site = {
   },
   ownerNote:
     "We sell hot fried rice with beef, a special taste. We will be introducing amazing shawarma bites for our lovely customers as well.",
-  /* PLACEHOLDER — swap when the business has a real inbox */
-  email: "hello@playmanlounge.gh",
+  email: "playmanlounge@gmail.com",
   socials: {
     instagram: "https://instagram.com/playmanlounge",
     facebook: "https://facebook.com/playmanlounge",

@@ -8,8 +8,6 @@ import {
   formatOrderBody,
   formatOrderSubject,
   mailtoHref,
-  submitViaWeb3Forms,
-  web3formsKey,
   type Fulfilment,
   type OrderPayload,
 } from "@/lib/email";
@@ -48,7 +46,7 @@ export function OrderSection() {
   const [status, setStatus] = useState<
     | { kind: "idle" }
     | { kind: "sending" }
-    | { kind: "success"; summary: string; via: "web3forms" | "mailto" }
+    | { kind: "success"; summary: string; via: "email" | "mailto" | "mock"; orderRef?: string }
     | { kind: "error"; message: string }
   >({ kind: "idle" });
 
@@ -76,27 +74,57 @@ export function OrderSection() {
     const body = formatOrderBody(payload);
     setStatus({ kind: "sending" });
 
-    if (web3formsKey()) {
-      try {
-        const result = await submitViaWeb3Forms({
-          subject,
-          fromName: name,
-          fromEmail: email,
-          message: body,
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phone,
+          email,
+          fulfilment,
+          preferredTime,
+          notes,
+          lines: lines.map((line) => ({ id: line.item.id, qty: line.qty })),
+          company: "",
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        via?: "brevo" | "resend" | "mock";
+        orderRef?: string;
+        reason?: string;
+        errors?: FieldErrors;
+      };
+
+      if (res.ok && data.ok) {
+        setStatus({
+          kind: "success",
+          summary: body,
+          via: data.via === "mock" ? "mock" : "email",
+          orderRef: data.orderRef,
         });
-        if (result.ok) {
-          setStatus({ kind: "success", summary: body, via: "web3forms" });
-          clear();
-          return;
-        }
-      } catch {
+        clear();
+        return;
+      }
+
+      if (res.status === 400 && data.errors) {
+        setErrors(data.errors);
+        setStatus({ kind: "idle" });
+        requestAnimationFrame(() => summaryRef.current?.focus());
+        return;
+      }
+
+      if (res.status === 502) {
         setStatus({
           kind: "error",
           message:
-            "The order email did not send. Call us or try the mail app fallback.",
+            "The order emails did not send. Call us or try again in a minute.",
         });
         return;
       }
+    } catch {
+      /* fall through to mailto */
     }
 
     window.location.href = mailtoHref(businessEmail(), subject, body);
@@ -113,8 +141,8 @@ export function OrderSection() {
             Make an Order
           </h2>
           <p className="mt-3 max-w-md text-base leading-relaxed">
-            Build a bag from the menu. We take orders by email
-            ({businessEmail()}). If that fails, call{" "}
+            Build a bag from the menu. Email this order and we send a pictured
+            receipt to you and to the kiosk ({businessEmail()}). If that fails, call{" "}
             <a className="underline" href={`tel:${site.phoneTel}`}>
               {site.phoneDisplay}
             </a>
@@ -203,9 +231,11 @@ export function OrderSection() {
           {status.kind === "success" && (
             <div className="border-cocoa mb-6 border p-4" role="status">
               <p className="font-semibold">
-                {status.via === "web3forms"
-                  ? "Order emailed to the kiosk."
-                  : "Your mail app should open with the order filled in. Send it to complete."}
+                {status.via === "email"
+                  ? `Receipt ${status.orderRef ?? ""} sent to your inbox. The kiosk got a kitchen copy too.`
+                  : status.via === "mock"
+                    ? `Preview mode — receipts were not emailed. Ticket ${status.orderRef ?? ""} is saved on this machine.`
+                    : "Your mail app should open with the order filled in. Send it to complete."}
               </p>
               <pre className="mt-3 max-h-48 overflow-auto text-xs whitespace-pre-wrap">
                 {status.summary}
@@ -214,6 +244,15 @@ export function OrderSection() {
           )}
 
           <div className="space-y-5">
+            <div aria-hidden="true" className="hidden">
+              <label htmlFor={field("company")}>Company</label>
+              <input
+                id={field("company")}
+                name="company"
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
             <div>
               <label htmlFor={field("name")} className="mb-1 block text-sm font-medium">
                 Name
