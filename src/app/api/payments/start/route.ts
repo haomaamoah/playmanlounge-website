@@ -48,7 +48,24 @@ function fail(status: number, body: Record<string, unknown>) {
  * Hosted checkout sends the customer back to the order page, which reads the
  * reference out of the query string. The URL is built here rather than taken
  * from the request so the merchant account cannot be pointed at another site.
+ * PaySwitch refuses a return address it cannot reach, so a localhost `SITE_URL`
+ * is rejected before the gateway is called.
  */
+function publicReturnUrl() {
+  let url: URL;
+  try {
+    url = new URL(siteUrl());
+  } catch {
+    return null;
+  }
+  const local =
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname.endsWith(".local");
+  if (url.protocol !== "https:" || local) return null;
+  return `${url.origin}/`;
+}
+
 async function startCheckout(
   config: GatewayConfig,
   args: {
@@ -60,12 +77,21 @@ async function startCheckout(
     promptRefusal?: PaymentResult;
   }
 ) {
+  const redirectUrl = publicReturnUrl();
+  if (!redirectUrl) {
+    return fail(503, {
+      error:
+        "Paying online is not available on this address. Choose pay on delivery, or call the kitchen.",
+      gatewayIssue: true,
+    });
+  }
+
   const started = await initiateCheckout(config, {
     transactionId: args.transactionId,
     total: args.total,
     description: `${site.name} order for ${args.name}`,
     email: args.email,
-    redirectUrl: `${siteUrl()}/`,
+    redirectUrl,
   });
 
   if ("error" in started) {
@@ -182,6 +208,17 @@ export async function POST(request: Request) {
       voucherCode: voucherCode || undefined,
     });
   } catch (error) {
+    // The direct endpoint sometimes hangs for this merchant instead of
+    // answering. Hosted checkout is the same money, so try it rather than
+    // sending the customer away.
+    if (config.flow === "auto") {
+      return startCheckout(config, {
+        transactionId: newTransactionId(),
+        total: order.total,
+        name: order.name,
+        email: order.email,
+      });
+    }
     const timedOut = error instanceof Error && error.name === "TimeoutError";
     return fail(502, {
       error: timedOut

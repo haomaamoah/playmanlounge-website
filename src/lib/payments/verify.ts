@@ -43,7 +43,11 @@ export async function verifyPayment(request: PaymentRequest): Promise<PaymentInf
 
   try {
     const result = await fetchStatus(config, request.reference);
-    return { ...unconfirmed, state: result.state };
+    // "Transaction not found" and credential problems are not a refusal by the
+    // customer's wallet. Calling those a failure would tell the kitchen to
+    // collect cash for money that may already have left the wallet, so they
+    // stay unconfirmed and a human checks the PaySwitch dashboard.
+    return { ...unconfirmed, state: result.gatewayIssue ? "pending" : result.state };
   } catch {
     return unconfirmed;
   }

@@ -84,7 +84,11 @@ The PaySwitch credentials must never reach the browser — anyone could then cha
 
 - `prompt` — the direct API (`/v1.1/transaction/process`, `processing_code 000200`) pushes a mobile money prompt straight to the customer's phone; the page polls until they approve. This is the nicer flow, but PaySwitch enables it per merchant.
 - `checkout` — PaySwitch's hosted page (`/initiate`) takes the payment and redirects back with the result.
-- `auto` (default) — asks for the prompt, and falls back to hosted checkout if PaySwitch refuses direct debit, so the customer is never told the order failed for a reason on our side.
+- `auto` — asks for the prompt, and falls back to hosted checkout when PaySwitch refuses direct debit **or does not answer at all**, so the customer is never told the order failed for a reason on our side.
+
+Use `checkout` while the merchant is in its current state (see below): under `auto` the customer waits for the direct endpoint to time out before the payment page opens.
+
+Hosted checkout only works from a public HTTPS address, because PaySwitch has to be able to reach the return URL — `/initiate` answers `code 999` for a `SITE_URL` on `127.0.0.1`. The route checks for that first and tells the customer to pay on delivery instead, so **Pay now cannot be exercised against a local dev server**; test it on a deployed URL.
 
 Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side, sends the receipts, and clears the bag. If the payment cannot be confirmed the bag comes back so the customer can retry or pay the rider — the site never claims a payment PaySwitch has not confirmed.
 
@@ -117,6 +121,8 @@ THETELLER_API_USER=your_api_user
 THETELLER_API_KEY=your_api_key
 THETELLER_MERCHANT_ID=TTM-00011795
 THETELLER_MODE=live          # "test" for the sandbox
+THETELLER_FLOW=checkout      # "auto" once direct debit is enabled
+SITE_URL=https://playman-lounge.vercel.app
 ```
 
 Until they are set, **Pay now** is disabled with a note on the form and the site keeps taking pay-on-delivery orders. No PaySwitch value is ever a `NEXT_PUBLIC_` variable, and none of them are committed. **Rotate any key that has been pasted into a chat, an issue or a commit.**

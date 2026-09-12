@@ -191,6 +191,19 @@ function authHeader(config: GatewayConfig) {
   return `Basic ${Buffer.from(`${config.apiUser}:${config.apiKey}`).toString("base64")}`;
 }
 
+/** theTeller answers with `reason` as a string on some routes, an object on others. */
+function readReason(data: Record<string, unknown>) {
+  const raw = data.reason ?? data.description ?? data.message;
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object") {
+    const parts = Object.values(raw as Record<string, unknown>)
+      .flatMap((value) => (Array.isArray(value) ? value : [value]))
+      .filter((value): value is string => typeof value === "string");
+    if (parts.length) return parts.join(" ");
+  }
+  return "";
+}
+
 async function readJson(response: Response) {
   const text = await response.text();
   try {
@@ -237,7 +250,7 @@ export async function chargeMomo(
 
   const data = await readJson(response);
   const code = String(data.code ?? "");
-  const reason = String(data.reason ?? data.description ?? "");
+  const reason = readReason(data);
   return {
     transactionId: String(data.transaction_id ?? input.transactionId),
     code,
@@ -285,7 +298,7 @@ export async function initiateCheckout(
   const checkoutUrl = typeof data.checkout_url === "string" ? data.checkout_url : "";
   if (checkoutUrl) return { checkoutUrl };
   return {
-    error: String(data.reason ?? data.description ?? "Could not open a payment page."),
+    error: readReason(data) || "Could not open a payment page.",
     code: String(data.code ?? ""),
   };
 }
@@ -309,7 +322,7 @@ export async function fetchStatus(
   const data = await readJson(response);
   const code = String(data.code ?? "");
   const status = String(data.status ?? "");
-  const reason = String(data.reason ?? data.description ?? "");
+  const reason = readReason(data);
   const state = describeStatus(status, code, reason);
   const described = describeCode(code, reason);
   return {
