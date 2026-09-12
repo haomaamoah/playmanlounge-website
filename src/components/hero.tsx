@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { site } from "@/lib/content";
-import { asset } from "@/lib/asset";
 
 export function Hero() {
   return (
@@ -10,7 +9,7 @@ export function Hero() {
       className="relative isolate min-h-[min(100svh,52rem)] overflow-hidden bg-cocoa"
     >
       <Image
-        src={asset("/media/hero-fried-rice.webp")}
+        src="/media/hero-fried-rice.webp"
         alt="Takeaway plate of Ghanaian fried rice with beef ready for delivery"
         width={1536}
         height={1024}

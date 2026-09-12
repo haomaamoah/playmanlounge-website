@@ -8,7 +8,6 @@ import {
   type MenuGroup,
   type MenuItem,
 } from "@/lib/content";
-import { asset } from "@/lib/asset";
 import { useOrder } from "@/lib/order-context";
 
 function Qty({ item }: { item: MenuItem }) {
@@ -65,7 +64,7 @@ function Ledger({ group }: { group: MenuGroup }) {
         {group.items.map((item) => (
           <li key={item.id} className="border-border flex gap-3 border-b py-4">
             <Image
-              src={asset(item.image)}
+              src={item.image}
               alt={item.name}
               width={item.width}
               height={item.height}

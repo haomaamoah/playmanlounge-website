@@ -2,25 +2,18 @@
  * PaySwitch (theTeller) mobile money collection.
  *
  * Docs: https://theteller.net/documentation
- * Charge:  POST {base}/v1.1/transaction/process   processing_code 000200
- * Status:  GET  {base}/v1.1/users/transactions/{transaction_id}/status
+ * Charge:   POST {base}/v1.1/transaction/process   processing_code 000200
+ * Status:   GET  {base}/v1.1/users/transactions/{transaction_id}/status
+ * Checkout: POST {checkoutBase}/initiate
  *
  * The status endpoint needs a `Merchant-Id` header in addition to basic auth;
  * the charge endpoint takes the merchant in the body instead.
+ *
+ * Server only: the credentials in `gatewayConfig()` must never reach the
+ * browser. Nothing here imports a runtime value, so the pure helpers can be
+ * unit tested with `npm test`.
  */
-import prices from "../prices.json" with { type: "json" };
-
-export type MomoNetwork = "MTN" | "VDF" | "ATL";
-
-export const momoNetworks: { code: MomoNetwork; label: string }[] = [
-  { code: "MTN", label: "MTN MoMo" },
-  { code: "VDF", label: "Telecel Cash" },
-  { code: "ATL", label: "AirtelTigo Money" },
-];
-
-export function isMomoNetwork(value: unknown): value is MomoNetwork {
-  return momoNetworks.some((network) => network.code === value);
-}
+import type { MomoNetwork } from "./networks";
 
 export type PaymentState = "paid" | "pending" | "failed";
 
@@ -35,49 +28,49 @@ export type PaymentResult = {
   gatewayIssue: boolean;
 };
 
-export type Env = {
-  THETELLER_API_USER?: string;
-  THETELLER_API_KEY?: string;
-  THETELLER_MERCHANT_ID?: string;
-  /** "test" (default) hits test.theteller.net, "live" hits prod.theteller.net. */
-  THETELLER_MODE?: string;
-  /**
-   * "auto" (default) asks for the in-page mobile money prompt and falls back to
-   * hosted checkout when PaySwitch refuses direct debit for this merchant;
-   * "prompt" and "checkout" pin one path.
-   */
-  THETELLER_FLOW?: string;
-  ALLOWED_ORIGINS?: string;
-  MAX_ORDER_TOTAL?: string;
-};
-
+/**
+ * "auto" asks for the in-page mobile money prompt and falls back to hosted
+ * checkout when PaySwitch refuses direct debit for this merchant; "prompt" and
+ * "checkout" pin one path.
+ */
 export type PaymentFlow = "auto" | "prompt" | "checkout";
 
-export function paymentFlow(env: Env): PaymentFlow {
-  const value = env.THETELLER_FLOW?.trim().toLowerCase();
-  return value === "prompt" || value === "checkout" ? value : "auto";
+export type GatewayConfig = {
+  apiUser: string;
+  apiKey: string;
+  merchantId: string;
+  live: boolean;
+  flow: PaymentFlow;
+  maxTotal: number;
+};
+
+const DEFAULT_MAX_TOTAL = 5000;
+
+export function gatewayConfig(): GatewayConfig {
+  const flow = process.env.THETELLER_FLOW?.trim().toLowerCase();
+  const maxTotal = Number(process.env.MAX_ORDER_TOTAL);
+  return {
+    apiUser: process.env.THETELLER_API_USER?.trim() ?? "",
+    apiKey: process.env.THETELLER_API_KEY?.trim() ?? "",
+    merchantId: process.env.THETELLER_MERCHANT_ID?.trim() ?? "",
+    live: process.env.THETELLER_MODE?.trim().toLowerCase() === "live",
+    flow: flow === "prompt" || flow === "checkout" ? flow : "auto",
+    maxTotal: Number.isFinite(maxTotal) && maxTotal > 0 ? maxTotal : DEFAULT_MAX_TOTAL,
+  };
 }
 
-export function isLive(env: Env) {
-  return env.THETELLER_MODE?.trim().toLowerCase() === "live";
+export function isConfigured(config: GatewayConfig) {
+  return Boolean(config.apiUser && config.apiKey && config.merchantId);
 }
 
-export function gatewayBase(env: Env) {
-  return isLive(env) ? "https://prod.theteller.net" : "https://test.theteller.net";
+export function gatewayBase(config: GatewayConfig) {
+  return config.live ? "https://prod.theteller.net" : "https://test.theteller.net";
 }
 
-export function checkoutBase(env: Env) {
-  return isLive(env)
+export function checkoutBase(config: GatewayConfig) {
+  return config.live
     ? "https://checkout.theteller.net"
     : "https://checkout-test.theteller.net";
-}
-
-export function isConfigured(env: Env) {
-  return Boolean(
-    env.THETELLER_API_USER?.trim() &&
-      env.THETELLER_API_KEY?.trim() &&
-      env.THETELLER_MERCHANT_ID?.trim()
-  );
 }
 
 /** theTeller wants the amount in pesewas, zero padded to twelve digits. */
@@ -96,16 +89,8 @@ export function newTransactionId(now = Date.now(), random = Math.random) {
   return `${head}${tail}`;
 }
 
-/**
- * Ghanaian wallets are entered as 0XXXXXXXXX but the gateway samples use the
- * international form, so everything is normalised to 233XXXXXXXXX.
- */
-export function normaliseSubscriberNumber(input: string) {
-  const digits = input.replace(/[^0-9]/g, "");
-  if (/^0[0-9]{9}$/.test(digits)) return `233${digits.slice(1)}`;
-  if (/^233[0-9]{9}$/.test(digits)) return digits;
-  if (/^[0-9]{9}$/.test(digits)) return `233${digits}`;
-  return null;
+export function isTransactionId(value: string) {
+  return /^[0-9]{6,20}$/.test(value);
 }
 
 const codeMap: Record<
@@ -202,43 +187,8 @@ export function describeStatus(status: string, code: string, reason?: string): P
   return describeCode(code, reason).state;
 }
 
-export type OrderLine = { id: string; qty: number };
-
-export type PricedOrder = {
-  total: number;
-  lines: { id: string; name: string; qty: number; price: number }[];
-};
-
-/**
- * Totals are recomputed here from `prices.json` so a tampered page cannot
- * decide what an order costs. Keep the file in step with the site menu by
- * running `npm run sync:prices` in this directory.
- */
-export function priceOrder(lines: OrderLine[], maxTotal: number): PricedOrder | { error: string } {
-  if (!Array.isArray(lines) || lines.length === 0) return { error: "The order is empty." };
-  if (lines.length > 40) return { error: "That is too many different items for one order." };
-
-  const priced: PricedOrder["lines"] = [];
-  for (const line of lines) {
-    const entry = (prices as Record<string, { name: string; price: number }>)[line.id];
-    if (!entry) return { error: `We no longer sell "${line.id}".` };
-    if (!Number.isInteger(line.qty) || line.qty < 1 || line.qty > 50) {
-      return { error: `Choose between 1 and 50 of ${entry.name}.` };
-    }
-    priced.push({ id: line.id, name: entry.name, qty: line.qty, price: entry.price });
-  }
-
-  const total = priced.reduce((sum, line) => sum + line.qty * line.price, 0);
-  if (total <= 0) return { error: "The order total is empty." };
-  if (total > maxTotal) {
-    return { error: `Orders over GHS ${maxTotal} are arranged by phone.` };
-  }
-  return { total, lines: priced };
-}
-
-function authHeader(env: Env) {
-  const raw = `${env.THETELLER_API_USER?.trim()}:${env.THETELLER_API_KEY?.trim()}`;
-  return `Basic ${btoa(raw)}`;
+function authHeader(config: GatewayConfig) {
+  return `Basic ${Buffer.from(`${config.apiUser}:${config.apiKey}`).toString("base64")}`;
 }
 
 async function readJson(response: Response) {
@@ -259,24 +209,27 @@ export type ChargeInput = {
   voucherCode?: string;
 };
 
-export async function chargeMomo(env: Env, input: ChargeInput): Promise<PaymentResult> {
+export async function chargeMomo(
+  config: GatewayConfig,
+  input: ChargeInput
+): Promise<PaymentResult> {
   const body: Record<string, string> = {
     amount: formatAmount(input.total),
     processing_code: "000200",
     transaction_id: input.transactionId,
     desc: input.description.slice(0, 100),
-    merchant_id: env.THETELLER_MERCHANT_ID!.trim(),
+    merchant_id: config.merchantId,
     subscriber_number: input.subscriberNumber,
     "r-switch": input.network,
   };
   if (input.voucherCode) body.voucher_code = input.voucherCode;
 
-  const response = await fetch(`${gatewayBase(env)}/v1.1/transaction/process`, {
+  const response = await fetch(`${gatewayBase(config)}/v1.1/transaction/process`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
-      Authorization: authHeader(env),
+      Authorization: authHeader(config),
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(25_000),
@@ -285,11 +238,10 @@ export async function chargeMomo(env: Env, input: ChargeInput): Promise<PaymentR
   const data = await readJson(response);
   const code = String(data.code ?? "");
   const reason = String(data.reason ?? data.description ?? "");
-  const described = describeCode(code, reason);
   return {
     transactionId: String(data.transaction_id ?? input.transactionId),
     code,
-    ...described,
+    ...describeCode(code, reason),
   };
 }
 
@@ -306,28 +258,25 @@ export type CheckoutInput = {
  * then calls `redirectUrl` back with code, status and transaction_id.
  */
 export async function initiateCheckout(
-  env: Env,
+  config: GatewayConfig,
   input: CheckoutInput
 ): Promise<{ checkoutUrl: string } | { error: string; code: string }> {
-  const apiUser = env.THETELLER_API_USER!.trim();
-  const apiKey = env.THETELLER_API_KEY!.trim();
-
-  const response = await fetch(`${checkoutBase(env)}/initiate`, {
+  const response = await fetch(`${checkoutBase(config)}/initiate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
-      Authorization: authHeader(env),
+      Authorization: authHeader(config),
     },
     body: JSON.stringify({
-      merchant_id: env.THETELLER_MERCHANT_ID!.trim(),
+      merchant_id: config.merchantId,
       transaction_id: input.transactionId,
       desc: input.description.slice(0, 100),
       amount: formatAmount(input.total),
       redirect_url: input.redirectUrl,
       email: input.email,
-      API_Key: apiKey,
-      apiuser: apiUser,
+      API_Key: config.apiKey,
+      apiuser: config.apiUser,
     }),
     signal: AbortSignal.timeout(25_000),
   });
@@ -341,14 +290,17 @@ export async function initiateCheckout(
   };
 }
 
-export async function fetchStatus(env: Env, transactionId: string): Promise<PaymentResult> {
+export async function fetchStatus(
+  config: GatewayConfig,
+  transactionId: string
+): Promise<PaymentResult> {
   const response = await fetch(
-    `${gatewayBase(env)}/v1.1/users/transactions/${encodeURIComponent(transactionId)}/status`,
+    `${gatewayBase(config)}/v1.1/users/transactions/${encodeURIComponent(transactionId)}/status`,
     {
       headers: {
         "Cache-Control": "no-cache",
-        Authorization: authHeader(env),
-        "Merchant-Id": env.THETELLER_MERCHANT_ID!.trim(),
+        Authorization: authHeader(config),
+        "Merchant-Id": config.merchantId,
       },
       signal: AbortSignal.timeout(20_000),
     }

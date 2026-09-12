@@ -1,21 +1,10 @@
 /**
- * Talks to the Play Man Lounge payment service (see `payments/`), which holds
- * the PaySwitch credentials. Nothing secret lives in the browser: the page only
- * ever sends the bag and the wallet details, and reads back a state.
+ * Browser side of mobile money payment. The PaySwitch credentials live on the
+ * server, so the page only ever posts the bag plus the wallet details to our own
+ * API routes and reads back a state.
  */
-export type MomoNetwork = "MTN" | "VDF" | "ATL";
-
-export const momoNetworks: {
-  code: MomoNetwork;
-  label: string;
-  prefixes: string[];
-}[] = [
-  { code: "MTN", label: "MTN MoMo", prefixes: ["024", "025", "053", "054", "055", "059"] },
-  { code: "VDF", label: "Telecel Cash", prefixes: ["020", "050"] },
-  { code: "ATL", label: "AirtelTigo Money", prefixes: ["026", "027", "056", "057"] },
-];
-
-export type PaymentState = "paid" | "pending" | "failed";
+import type { MomoNetwork } from "./networks";
+import type { PaymentState } from "./theteller";
 
 export type PaymentUpdate = {
   transactionId: string;
@@ -41,63 +30,26 @@ export class PaymentError extends Error {
   }
 }
 
-function tidyBase(value: string) {
-  return value.trim().replace(/\/+$/, "");
-}
-
 /**
- * Where the payment service lives. The build-time variable wins for local work;
- * otherwise `public/payments.json` is read at runtime so the deployed site can
- * be pointed at a payment service by editing one file, with no rebuild secret.
+ * Whether the server holds PaySwitch credentials. Asked once per page load so
+ * the form can hide "pay now" instead of offering a button that cannot work.
  */
-let runtimeBase: string | null = null;
+let configured: boolean | null = null;
 
-export function paymentApiBase() {
-  const fromEnv = tidyBase(process.env.NEXT_PUBLIC_PAYMENT_API_URL ?? "");
-  return fromEnv || (runtimeBase ?? "");
-}
-
-export function paymentsConfigured() {
-  return paymentApiBase().length > 0;
-}
-
-/** Reads `public/payments.json`. Safe to call more than once. */
-export async function loadPaymentConfig(configUrl: string) {
-  if (runtimeBase !== null) return paymentsConfigured();
+export async function loadPaymentConfig() {
+  if (configured !== null) return configured;
   try {
-    const response = await fetch(configUrl, { cache: "no-store" });
+    const response = await fetch("/api/payments/config", { cache: "no-store" });
     if (!response.ok) {
-      runtimeBase = "";
-      return paymentsConfigured();
+      configured = false;
+      return configured;
     }
-    const data = (await response.json()) as { apiUrl?: string };
-    runtimeBase = tidyBase(data.apiUrl ?? "");
+    const data = (await response.json()) as { enabled?: boolean };
+    configured = data.enabled === true;
   } catch {
-    runtimeBase = "";
+    configured = false;
   }
-  return paymentsConfigured();
-}
-
-export function digitsOnly(value: string) {
-  return value.replace(/[^0-9]/g, "");
-}
-
-export function isValidMomoNumber(value: string) {
-  const digits = digitsOnly(value);
-  return /^0[0-9]{9}$/.test(digits) || /^233[0-9]{9}$/.test(digits);
-}
-
-/** Ghanaian prefixes identify the wallet, so the network can be preselected. */
-export function guessNetwork(value: string): MomoNetwork | null {
-  const digits = digitsOnly(value);
-  const local = digits.startsWith("233") ? `0${digits.slice(3)}` : digits;
-  if (local.length < 3) return null;
-  const prefix = local.slice(0, 3);
-  return momoNetworks.find((network) => network.prefixes.includes(prefix))?.code ?? null;
-}
-
-export function networkLabel(code: MomoNetwork) {
-  return momoNetworks.find((network) => network.code === code)?.label ?? code;
+  return configured;
 }
 
 async function readError(response: Response) {
@@ -117,27 +69,23 @@ async function readError(response: Response) {
 }
 
 export type StartPaymentInput = {
+  name: string;
+  phone: string;
+  email: string;
+  fulfilment: "pickup" | "delivery";
+  preferredTime: string;
+  notes: string;
   lines: { id: string; qty: number }[];
   expectedTotal: number;
   network: MomoNetwork;
   momoNumber: string;
   voucherCode?: string;
-  customer: { name: string; phone: string; email: string };
-  returnUrl: string;
 };
 
 export async function startPayment(input: StartPaymentInput): Promise<StartedPayment> {
-  const base = paymentApiBase();
-  if (!base) {
-    throw new PaymentError("Online payment is not switched on yet.", {
-      gatewayIssue: true,
-      retryable: false,
-    });
-  }
-
   let response: Response;
   try {
-    response = await fetch(`${base}/pay/start`, {
+    response = await fetch("/api/payments/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -151,12 +99,9 @@ export async function startPayment(input: StartPaymentInput): Promise<StartedPay
 }
 
 export async function fetchPaymentStatus(transactionId: string): Promise<PaymentUpdate> {
-  const base = paymentApiBase();
-  if (!base) throw new PaymentError("Online payment is not switched on yet.", { retryable: false });
-
   let response: Response;
   try {
-    response = await fetch(`${base}/pay/status/${encodeURIComponent(transactionId)}`);
+    response = await fetch(`/api/payments/status/${encodeURIComponent(transactionId)}`);
   } catch {
     throw new PaymentError("We could not reach the payment service. Check your connection.");
   }

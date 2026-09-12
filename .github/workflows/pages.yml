@@ -1,4 +1,9 @@
-name: Deploy GitHub Pages
+name: Point GitHub Pages at the live site
+
+# The site used to be a static export on GitHub Pages. It now needs a server for
+# the order receipts and the PaySwitch payment routes, so the app is hosted
+# elsewhere and this workflow leaves a redirect behind — otherwise the old Pages
+# URL would serve a frozen copy of the site forever.
 
 on:
   push:
@@ -15,44 +20,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Build static site
-        run: npm run build
-        env:
-          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
-          # Set these as repository variables. Both are public by design; the
-          # PaySwitch keys stay on the payment service, never in the bundle.
-          NEXT_PUBLIC_PAYMENT_API_URL: ${{ vars.NEXT_PUBLIC_PAYMENT_API_URL }}
-          NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: ${{ vars.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
-          NEXT_PUBLIC_ORDER_EMAIL: ${{ vars.NEXT_PUBLIC_ORDER_EMAIL }}
-          NEXT_PUBLIC_CONTACT_EMAIL: ${{ vars.NEXT_PUBLIC_CONTACT_EMAIL }}
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: out
-
-  deploy:
-    needs: build
+  redirect:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - name: Build the redirect page
+        env:
+          TARGET: ${{ vars.SITE_URL || 'https://playman-lounge.vercel.app' }}
+        run: |
+          mkdir -p site
+          cat > site/index.html <<HTML
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <title>Play Man Lounge has moved</title>
+              <link rel="canonical" href="$TARGET" />
+              <meta http-equiv="refresh" content="0; url=$TARGET" />
+              <style>
+                body {
+                  margin: 0;
+                  min-height: 100vh;
+                  display: grid;
+                  place-items: center;
+                  background: #3a1a04;
+                  color: #f4e3bd;
+                  font-family: Georgia, "Times New Roman", serif;
+                  text-align: center;
+                  padding: 2rem;
+                }
+                a { color: #c27b07; }
+              </style>
+            </head>
+            <body>
+              <main>
+                <h1>Play Man Lounge</h1>
+                <p>The site lives here now:</p>
+                <p><a href="$TARGET">$TARGET</a></p>
+              </main>
+              <script>
+                location.replace("$TARGET");
+              </script>
+            </body>
+          </html>
+          HTML
+          cp site/index.html site/404.html
+
+      - name: Upload
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy
+        id: deploy
         uses: actions/deploy-pages@v4

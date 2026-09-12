@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { gallery } from "@/lib/content";
-import { asset } from "@/lib/asset";
 
 export function GallerySection() {
   const [active, setActive] = useState<number | null>(null);
@@ -49,7 +48,7 @@ export function GallerySection() {
                 className="block w-full cursor-pointer overflow-hidden"
               >
                 <Image
-                  src={asset(photo.src)}
+                  src={photo.src}
                   alt={photo.alt}
                   width={photo.width}
                   height={photo.height}
@@ -82,7 +81,7 @@ export function GallerySection() {
             onClick={(event) => event.stopPropagation()}
           >
             <Image
-              src={asset(item.src)}
+              src={item.src}
               alt=""
               width={item.width}
               height={item.height}

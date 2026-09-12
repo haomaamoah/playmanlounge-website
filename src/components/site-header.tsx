@@ -4,7 +4,6 @@ import Image from "next/image";
 import { Menu, Phone, ShoppingBag, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { nav, site } from "@/lib/content";
-import { asset } from "@/lib/asset";
 import { useOrder } from "@/lib/order-context";
 
 export function SiteHeader() {
@@ -36,7 +35,7 @@ export function SiteHeader() {
             aria-label={site.name}
           >
             <Image
-              src={asset(site.logo.src)}
+              src={site.logo.src}
               alt=""
               width={40}
               height={40}

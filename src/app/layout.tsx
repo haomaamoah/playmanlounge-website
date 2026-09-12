@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Calistoga, Figtree } from "next/font/google";
 import { site } from "@/lib/content";
-import { asset } from "@/lib/asset";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -22,8 +21,8 @@ export const metadata: Metadata = {
   description:
     "Online Ghanaian kitchen in Accra. Hot fried rice with beef, shawarma, spring rolls and cold drinks for delivery. Kaneshie hub for booked events and arranged pickup — not open to the public. Order hours 12:00 PM – 11:00 PM daily. Call +233 54 753 9942.",
   icons: {
-    icon: asset("/playman_lounge_transparent.png"),
-    apple: asset("/playman_lounge_transparent.png"),
+    icon: "/playman_lounge_transparent.png",
+    apple: "/playman_lounge_transparent.png",
   },
 };
 

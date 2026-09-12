@@ -1,5 +1,5 @@
 import { formatGhs, site, type MenuItem } from "@/lib/content";
-import { networkLabel, type MomoNetwork } from "@/lib/payments";
+import { networkLabel, type MomoNetwork } from "@/lib/payments/networks";
 
 export type Fulfilment = "pickup" | "delivery";
 

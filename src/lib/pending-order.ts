@@ -6,7 +6,7 @@
  */
 import { menu } from "@/lib/content";
 import type { Fulfilment, OrderPayload, PaymentInfo } from "@/lib/email";
-import type { MomoNetwork } from "@/lib/payments";
+import type { MomoNetwork } from "@/lib/payments/networks";
 
 export type PendingOrder = {
   transactionId: string;
@@ -58,7 +58,7 @@ export function clearPendingOrder() {
   }
 }
 
-/** Turns a parked order back into the payload the email formatters expect. */
+/** Turns a parked order back into the payload the order form submits. */
 export function restoreOrder(pending: PendingOrder, payment: PaymentInfo): OrderPayload {
   const lines = pending.lines.flatMap((line) => {
     const item = menu.find((candidate) => candidate.id === line.id);

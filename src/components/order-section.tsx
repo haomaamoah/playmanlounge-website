@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { asset } from "@/lib/asset";
 import { formatGhs, site } from "@/lib/content";
 import { useOrder } from "@/lib/order-context";
 import {
@@ -10,8 +9,6 @@ import {
   formatOrderSubject,
   formatPaymentLine,
   mailtoHref,
-  submitViaWeb3Forms,
-  web3formsKey,
   type Fulfilment,
   type OrderPayload,
   type PaymentInfo,
@@ -25,16 +22,17 @@ import {
 import {
   guessNetwork,
   isValidMomoNumber,
-  loadPaymentConfig,
   momoNetworks,
-  paymentsConfigured,
+  type MomoNetwork,
+} from "@/lib/payments/networks";
+import {
+  loadPaymentConfig,
   readCheckoutReturn,
   startPayment,
   stripCheckoutParams,
   waitForPayment,
   PaymentError,
-  type MomoNetwork,
-} from "@/lib/payments";
+} from "@/lib/payments/client";
 
 type PayMethod = "delivery" | "momo";
 
@@ -46,11 +44,16 @@ type FieldErrors = Partial<
     | "fulfilment"
     | "preferredTime"
     | "cart"
+    | "notes"
     | "momoNumber"
     | "momoNetwork",
     string
   >
 >;
+
+type SendResult =
+  | { ok: true; via: "email" | "mailto" | "mock"; orderRef?: string; body: string }
+  | { ok: false; errors?: FieldErrors; message?: string };
 
 type Status =
   | { kind: "idle" }
@@ -62,7 +65,8 @@ type Status =
   | {
       kind: "success";
       summary: string;
-      via: "web3forms" | "mailto";
+      via: "email" | "mailto" | "mock";
+      orderRef?: string;
       payment: PaymentInfo;
       total: number;
     }
@@ -107,36 +111,83 @@ export function OrderSection() {
   const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [preferredTime, setPreferredTime] = useState("13:00");
   const [notes, setNotes] = useState("");
+  /** Honeypot: a real customer never sees this, so anything in it is a bot. */
+  const [company, setCompany] = useState("");
   const [payMethod, setPayMethod] = useState<PayMethod>("delivery");
   const [momoNumber, setMomoNumber] = useState("");
   const [momoNetwork, setMomoNetwork] = useState<MomoNetwork | "">("");
   const [voucherCode, setVoucherCode] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>({ kind: "idle" });
-  const [canPayOnline, setCanPayOnline] = useState(paymentsConfigured);
+  const [canPayOnline, setCanPayOnline] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      setCanPayOnline(await loadPaymentConfig(asset("/payments.json")));
+      setCanPayOnline(await loadPaymentConfig());
     })();
   }, []);
 
-  async function emailOrder(payload: OrderPayload) {
-    const subject = formatOrderSubject(payload);
+  /**
+   * The server rebuilds the prices, checks the payment with PaySwitch and sends
+   * both receipts. If it cannot be reached at all, the order is handed to the
+   * customer's mail app so it is never simply lost.
+   */
+  async function sendOrder(payload: OrderPayload): Promise<SendResult> {
     const body = formatOrderBody(payload);
+    const handToMailApp = (): SendResult => {
+      window.location.href = mailtoHref(businessEmail(), formatOrderSubject(payload), body);
+      return { ok: true, via: "mailto", body };
+    };
 
-    if (web3formsKey()) {
-      const result = await submitViaWeb3Forms({
-        subject,
-        fromName: payload.name,
-        fromEmail: payload.email,
-        message: body,
+    let response: Response;
+    try {
+      response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: payload.name,
+          phone: payload.phone,
+          email: payload.email,
+          fulfilment: payload.fulfilment,
+          preferredTime: payload.preferredTime,
+          notes: payload.notes,
+          lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
+          payment: payload.payment,
+          company,
+        }),
       });
-      if (result.ok) return { via: "web3forms" as const, body };
+    } catch {
+      return handToMailApp();
     }
 
-    window.location.href = mailtoHref(businessEmail(), subject, body);
-    return { via: "mailto" as const, body };
+    let data: {
+      ok?: boolean;
+      via?: "brevo" | "resend" | "mock";
+      orderRef?: string;
+      error?: string;
+      errors?: FieldErrors;
+    } = {};
+    try {
+      data = await response.json();
+    } catch {
+      // A non-JSON answer is handled by the status checks below.
+    }
+
+    if (response.ok && data.ok) {
+      return {
+        ok: true,
+        via: data.via === "mock" ? "mock" : "email",
+        orderRef: data.orderRef,
+        body,
+      };
+    }
+    if (response.status === 400 && data.errors) return { ok: false, errors: data.errors };
+    // Mail is misconfigured or the provider is down: the order still leaves.
+    if (response.status === 502 || response.status === 503) return handToMailApp();
+    return {
+      ok: false,
+      message: data.error ?? "The order did not send. Call us or try again.",
+    };
   }
 
   /**
@@ -190,24 +241,26 @@ export function OrderSection() {
       }
 
       const payload = restoreOrder(pending, payment);
-      try {
-        const sent = await emailOrder(payload);
-        clearPendingOrder();
-        clear();
-        setStatus({
-          kind: "success",
-          summary: sent.body,
-          via: sent.via,
-          payment,
-          total: payload.total,
-        });
-      } catch {
+      const sent = await sendOrder(payload);
+      if (!sent.ok) {
         setStatus({
           kind: "error",
           message:
-            "The payment went through but the order email did not send. Call us with your reference and we will still cook it.",
+            "The payment went through but the order did not reach the kitchen. Call us with your reference and we will still cook it.",
         });
+        return;
       }
+
+      clearPendingOrder();
+      clear();
+      setStatus({
+        kind: "success",
+        summary: sent.body,
+        via: sent.via,
+        orderRef: sent.orderRef,
+        payment,
+        total: payload.total,
+      });
     })();
     // Runs once, for the redirect it arrived on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,39 +291,44 @@ export function OrderSection() {
 
   async function finishPaidOrder(payment: PaymentInfo) {
     const payload = currentPayload(payment);
-    try {
-      const sent = await emailOrder(payload);
-      clear();
-      setStatus({
-        kind: "success",
-        summary: sent.body,
-        via: sent.via,
-        payment,
-        total: payload.total,
-      });
-    } catch {
+    const sent = await sendOrder(payload);
+    if (!sent.ok) {
       setStatus({
         kind: "error",
         message:
-          "Payment went through but the order email did not send. Call us and we will still cook it.",
+          "Payment went through but the order did not reach the kitchen. Call us and we will still cook it.",
       });
+      return;
     }
+
+    clear();
+    setStatus({
+      kind: "success",
+      summary: sent.body,
+      via: sent.via,
+      orderRef: sent.orderRef,
+      payment,
+      total: payload.total,
+    });
   }
 
   async function payWithMomo(payload: OrderPayload, network: MomoNetwork) {
     setStatus({ kind: "starting" });
-    const returnUrl = `${window.location.origin}${window.location.pathname}?payment=return`;
 
     let started;
     try {
       started = await startPayment({
+        name,
+        phone,
+        email,
+        fulfilment,
+        preferredTime,
+        notes,
         lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
         expectedTotal: payload.total,
         network,
         momoNumber,
         voucherCode: voucherCode.trim() || undefined,
-        customer: { name, phone, email },
-        returnUrl,
       });
     } catch (error) {
       setStatus({
@@ -375,22 +433,30 @@ export function OrderSection() {
     }
 
     setStatus({ kind: "sending" });
-    try {
-      const sent = await emailOrder(payload);
-      if (sent.via === "web3forms") clear();
-      setStatus({
-        kind: "success",
-        summary: sent.body,
-        via: sent.via,
-        payment,
-        total: payload.total,
-      });
-    } catch {
+    const sent = await sendOrder(payload);
+    if (!sent.ok) {
+      if (sent.errors) {
+        setErrors(sent.errors);
+        setStatus({ kind: "idle" });
+        requestAnimationFrame(() => summaryRef.current?.focus());
+        return;
+      }
       setStatus({
         kind: "error",
-        message: "The order email did not send. Call us or try again.",
+        message: sent.message ?? "The order did not send. Call us or try again.",
       });
+      return;
     }
+
+    if (sent.via !== "mailto") clear();
+    setStatus({
+      kind: "success",
+      summary: sent.body,
+      via: sent.via,
+      orderRef: sent.orderRef,
+      payment,
+      total: payload.total,
+    });
   }
 
   function onMomoNumberChange(value: string) {
@@ -432,8 +498,8 @@ export function OrderSection() {
           </h2>
           <p className="mt-3 max-w-md text-base leading-relaxed">
             Pay on delivery, or pay now with mobile money and we start cooking
-            straight away. Either way the order reaches us by email (
-            {businessEmail()}). If anything sticks, call{" "}
+            straight away. Either way you get a pictured receipt and the kitchen
+            gets the same ticket ({businessEmail()}). If anything sticks, call{" "}
             <a className="underline" href={`tel:${site.phoneTel}`}>
               {site.phoneDisplay}
             </a>
@@ -599,12 +665,24 @@ export function OrderSection() {
               role="status"
             >
               <p className="font-semibold">
-                {status.payment.method === "momo"
-                  ? "Payment received. Order on its way to the kitchen."
-                  : status.via === "web3forms"
-                    ? "Order emailed to the kitchen."
-                    : "Your mail app should open with the order filled in. Send it to complete."}
+                {status.via === "mailto"
+                  ? "Your mail app should open with the order filled in. Send it to complete."
+                  : status.payment.method === "momo"
+                    ? "Payment received. The kitchen has your ticket."
+                    : "Order in. Receipt on its way to your inbox."}
               </p>
+              {status.via === "email" && (
+                <p className="mt-2 text-sm leading-relaxed">
+                  Receipt {status.orderRef} is in your inbox, and the kitchen has
+                  the same ticket.
+                </p>
+              )}
+              {status.via === "mock" && (
+                <p className="mt-2 text-sm leading-relaxed">
+                  Preview mode — ticket {status.orderRef} was saved on this
+                  machine instead of being emailed.
+                </p>
+              )}
               <p className="mt-2 text-sm leading-relaxed">
                 {formatPaymentLine(status.payment, status.total)}
               </p>
@@ -621,6 +699,17 @@ export function OrderSection() {
           )}
 
           <div className="space-y-5">
+            <div aria-hidden="true" className="hidden">
+              <label htmlFor={field("company")}>Company</label>
+              <input
+                id={field("company")}
+                name="company"
+                tabIndex={-1}
+                autoComplete="off"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+            </div>
             <div>
               <label htmlFor={field("name")} className="mb-1 block text-sm font-medium">
                 Name

@@ -1,6 +1,6 @@
 # Play Man Lounge
 
-Static marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE) — an Accra kitchen that sells mainly **online**. The Kaneshie site on Nikoi Olai Street is for **booked events**; without a booking it runs as a **delivery hub** and is **not open to the public**.
+Marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE) — an Accra kitchen that sells mainly **online**. The Kaneshie site on Nikoi Olai Street is for **booked events**; without a booking it runs as a **delivery hub** and is **not open to the public**.
 
 Tagline: **Life is tasty.**
 
@@ -21,21 +21,15 @@ npm start       # serve the build
 npm run lint
 ```
 
-## GitHub Pages
-
-This project ships a static export (`next.config.ts` → `output: "export"`) and a workflow at `.github/workflows/pages.yml`.
-
-After the repo is on GitHub with Pages enabled (Settings → Pages → Source: GitHub Actions), every push to `main` publishes to:
-
-`https://<your-github-username>.github.io/playmanlounge-website/`
-
-Local static build:
-
 ```bash
-npm run build   # writes the site to out/
+npm test        # pure logic: amounts, wallet numbers, gateway codes, menu integrity
 ```
 
-For local `npm run dev`, leave `NEXT_PUBLIC_BASE_PATH` unset so paths stay at `/`.
+## Where it runs
+
+The app needs a server: order receipts are sent from `/api/orders` and mobile money is charged from `/api/payments/*`, both of which hold secrets that must never reach the browser. Every push to `main` deploys to **Vercel** — <https://playman-lounge.vercel.app>.
+
+It used to be a static export on GitHub Pages. That is retired: `.github/workflows/pages.yml` now publishes a one-page redirect so the old `haomaamoah.github.io/playmanlounge-website/` link does not serve a frozen copy of the site. Set a repository variable `SITE_URL` if the live URL changes.
 
 
 ## Placeholder data (swap later)
@@ -46,7 +40,7 @@ Marked clearly so the owner can replace it:
 | --- | --- | --- |
 | Tray names on the poster | `src/lib/content.ts` → `menuGroups` | The printed poster prices the Playboy and Play Man trays by contents, not by name, so each item is named after its contents (“Playboy — 3 samosa, 1 spring roll”). Rename them if the kitchen settles on shorter names. |
 | Team portraits & bios | `src/lib/content.ts` → `team`, `public/media/team-*.webp` | Emmanuel Temeng (Managing Director, shown with the logo mark), Haoma Amoah (IT Director). Bios can still be tightened with their own words. |
-| Contact email and socials | `src/lib/content.ts` → `site.email`, `site.socials` | Placeholder inbox `hello@playmanlounge.gh`. Phone and street address are **real**. |
+| Socials | `src/lib/content.ts` → `site.socials` | Guessed handles. The inbox (`amoahinfotech@gmail.com`), phone and street address are **real**. |
 | Dish photographs | `public/media/food-*.webp`, `public/media/drink-*.webp` | Generated stand-ins shot to match the poster’s look. Swap them for real plates when the kitchen shoots its own. |
 | Gallery photographs | `public/media/gallery-*.webp` | **Real**, sent by the Managing Director; originals kept in `assets/images/director-*.jpg`. |
 | Logo | `public/playman_lounge_transparent.png` | Also wired as favicon and apple-touch-icon. |
@@ -66,21 +60,23 @@ When the kitchen prints a new board, edit `menuGroups` — the order form, the r
 
 The order form offers two choices:
 
-**Pay on delivery** — nothing changes for the customer. The order email says `Payment: PAY ON DELIVERY — collect GHS n on arrival`, and the subject line ends with `pay on delivery` so the kitchen can see it without opening the mail.
+**Pay on delivery** — nothing changes for the customer. Both receipts carry a `PAY ON DELIVERY` stamp telling the kitchen to collect the cedis on arrival, and the kitchen subject line ends with `pay on delivery` so it reads without opening the mail.
 
-**Pay now with mobile money** — the form asks for the wallet number and network (the network is preselected from the Ghanaian prefix), the submit button becomes **Pay GHS n now**, and payment is handled by PaySwitch (theTeller). Once the money lands, the order email goes out with `Payment: PAID ONLINE from MTN MoMo 0205786433 — PaySwitch reference 000123456789` and a `PAID` subject line.
+**Pay now with mobile money** — the form asks for the wallet number and network (the network is preselected from the Ghanaian prefix), the submit button becomes **Pay GHS n now**, and payment is handled by PaySwitch (theTeller). Once the money lands the receipts go out stamped `PAID ONLINE`, with the wallet and the PaySwitch reference, and the kitchen subject line ends with `PAID`.
 
-### Why there is a small server
+### Where the money logic lives
 
-GitHub Pages only serves files, and the PaySwitch credentials must never reach the browser (anyone could then charge wallets in the kitchen's name), so `payments/` holds a tiny service that is the only place the keys live. It exposes three routes:
+The PaySwitch credentials must never reach the browser — anyone could then charge wallets in the kitchen's name — so everything that touches them is a server route:
 
 | Route | Purpose |
 | --- | --- |
-| `GET /health` | Whether it is configured, in which mode and flow |
-| `POST /pay/start` | Prices the bag from its own table, then starts the payment |
-| `GET /pay/status/{id}` | Polls one transaction until it settles |
+| `GET /api/payments/config` | Whether keys are set, so the form can hide **Pay now** |
+| `POST /api/payments/start` | Prices the bag from the menu, then starts the payment |
+| `GET /api/payments/status/{id}` | Polls one transaction until it settles |
 
-The service prices the order itself from `payments/prices.json` and refuses a bag whose total does not match, so a tampered page cannot decide what an order costs. Run `npm run sync:prices` in `payments/` after changing menu prices — a test fails if the file drifts from `src/lib/content.ts`.
+`src/lib/payments/theteller.ts` is the only file that talks to the gateway. Totals are recomputed from `src/lib/content.ts` on every call (`hydrateOrder`), and a bag whose total does not match what the page showed is refused — a tampered page cannot decide what an order costs. The redirect back from hosted checkout is built from `SITE_URL` rather than taken from the request, so the merchant account cannot be pointed at somebody else's page.
+
+`/api/orders` never trusts the browser about money either: it asks PaySwitch what happened to the reference before the receipt says **PAID**.
 
 ### Two payment flows
 
@@ -90,7 +86,7 @@ The service prices the order itself from `payments/prices.json` and refuses a ba
 - `checkout` — PaySwitch's hosted page (`/initiate`) takes the payment and redirects back with the result.
 - `auto` (default) — asks for the prompt, and falls back to hosted checkout if PaySwitch refuses direct debit, so the customer is never told the order failed for a reason on our side.
 
-Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side, emails the order, and clears the bag. If the payment cannot be confirmed the bag comes back so the customer can retry or pay the rider — the site never claims a payment PaySwitch has not confirmed.
+Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side, sends the receipts, and clears the bag. If the payment cannot be confirmed the bag comes back so the customer can retry or pay the rider — the site never claims a payment PaySwitch has not confirmed.
 
 ### Merchant account status (September 2026)
 
@@ -112,63 +108,54 @@ curl -X POST https://prod.theteller.net/v1.1/transaction/process \
 
 Nothing needs to change in this repo when they enable it: with `THETELLER_FLOW=auto` the prompt starts working on its own.
 
-### Running and deploying the payment service
+### Switching payment on
 
-```bash
-cd payments
-cp .dev.vars.example .dev.vars   # git ignored; fill in from the theTeller dashboard
-npm test                         # pure logic: amounts, wallet numbers, code mapping, prices
-npm run dev                      # http://127.0.0.1:8787, no Cloudflare account needed
-```
-
-Then point the site at it in `.env.local`:
+Set four server-side variables on the host (Vercel → Settings → Environment Variables), or in `.env.local` for development:
 
 ```
-NEXT_PUBLIC_PAYMENT_API_URL=http://127.0.0.1:8787
+THETELLER_API_USER=your_api_user
+THETELLER_API_KEY=your_api_key
+THETELLER_MERCHANT_ID=TTM-00011795
+THETELLER_MODE=live          # "test" for the sandbox
 ```
 
-Deploying it as a Cloudflare Worker (free tier is enough):
+Until they are set, **Pay now** is disabled with a note on the form and the site keeps taking pay-on-delivery orders. No PaySwitch value is ever a `NEXT_PUBLIC_` variable, and none of them are committed. **Rotate any key that has been pasted into a chat, an issue or a commit.**
 
-```bash
-cd payments
-npx wrangler login
-npx wrangler secret put THETELLER_API_USER
-npx wrangler secret put THETELLER_API_KEY
-npx wrangler secret put THETELLER_MERCHANT_ID
-npx wrangler deploy
-```
+## Order receipts
 
-`wrangler.toml` carries the non-secret settings: `THETELLER_MODE` (`test` or `live`), `THETELLER_FLOW`, `ALLOWED_ORIGINS` (must list the Pages origin — it gates both CORS and the checkout return URL) and `MAX_ORDER_TOTAL`. Add the worker URL as a repository variable named `NEXT_PUBLIC_PAYMENT_API_URL` (Settings → Secrets and variables → Actions → Variables) and the Pages build will pick it up.
+There is **no database**. Each submit sends two separate HTML receipts — never one CC:
 
-Until that variable is set, the **Pay now** option is disabled with a note and the site keeps taking pay-on-delivery orders.
+| Recipient | What they get |
+| --- | --- |
+| The address the customer typed | “Your receipt” — logo, bag table with dish photos, payment stamp, total, delivery/pickup time |
+| `ORDER_STAFF_EMAILS` (default `amoahinfotech@gmail.com`) | Kitchen ticket — same table, plus the customer’s phone and email |
 
-The credentials themselves are never committed. Rotate any key that has been pasted into a chat, an issue or a commit.
+Both carry the payment stamp: `PAID ONLINE`, `PAY ON DELIVERY`, `PAYMENT NOT CONFIRMED` or `ONLINE PAYMENT FAILED`, and the kitchen subject line ends with the same word so it reads without opening the mail.
 
-## Order email
+Receipt HTML is a cocoa-and-cream takeaway docket (logo stamp, gold ticket ribbon, pictured ledger, GHS total). The small JPEGs in `public/email/` are generated from `public/media/*.webp`; `npm test` fails if a menu item has no thumbnail. A plain-text version goes with every mail for clients that strip HTML.
 
-The kiosk takes orders by **email**. The form in Make an Order:
+**Send mail in production (Brevo, preferred)**
 
-1. Collects name, phone, email, bag + quantities, delivery or arranged hub pickup, preferred time, and notes.
-2. Validates inline (errors sit under the field; a summary at the top of the form is focusable).
-3. Sends one of two ways:
-
-**Form-to-email (preferred in production)**  
-Create a free [Web3Forms](https://web3forms.com) access key. Copy `env.example` to `.env.local`:
+1. Create a free [Brevo](https://www.brevo.com) account.
+2. Verify `amoahinfotech@gmail.com` as a sender.
+3. Copy `env.example` to `.env.local` (and into Vercel → Settings → Environment Variables):
 
 ```
-NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=your_access_key
-NEXT_PUBLIC_ORDER_EMAIL=hello@playmanlounge.gh
-NEXT_PUBLIC_CONTACT_EMAIL=hello@playmanlounge.gh
+BREVO_API_KEY=your_key
+ORDER_FROM_EMAIL=amoahinfotech@gmail.com
+ORDER_STAFF_EMAILS=amoahinfotech@gmail.com
+SITE_URL=https://playman-lounge.vercel.app
 ```
 
-Restart the dev server. Submit posts JSON to Web3Forms. Tradeoff: you need a third-party key, and the key is public (it is a `NEXT_PUBLIC_` value). Lock the key to this domain in the Web3Forms dashboard. Formspree or EmailJS can replace the fetch URL in `src/lib/email.ts` the same way.
+Without a key, `npm run dev` still “succeeds” and writes HTML copies to `.order-previews/`. Production without a key returns an error and the form falls back to a `mailto:` draft, so an order is never simply lost.
 
-**mailto: fallback (no key, no backend)**  
-If `NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY` is empty, submit opens the visitor’s mail app with a fully formatted subject and body addressed to `NEXT_PUBLIC_ORDER_EMAIL` (or the placeholder inbox). Tradeoff: some phones mishandle long `mailto:` bodies, and the visitor must press Send. This is the no-dependency path.
+Preview the layout locally (dev server only):
 
-Either way, the kiosk number stays on screen as a tap-to-call fallback.
+- Customer copy: [http://127.0.0.1:43123/api/orders/preview](http://127.0.0.1:43123/api/orders/preview)
+- Kitchen copy: [http://127.0.0.1:43123/api/orders/preview?role=staff](http://127.0.0.1:43123/api/orders/preview?role=staff)
+- Payment stamps: add `?pay=paid`, `?pay=pending` or `?pay=failed`
 
-The contact form uses the same two paths.
+The Contact Us form still uses Web3Forms or `mailto:` (`NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`). The kiosk number stays on screen as a tap-to-call fallback.
 
 ## Footer
 
