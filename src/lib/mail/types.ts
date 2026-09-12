@@ -1,4 +1,4 @@
-import type { Fulfilment } from "@/lib/email";
+import type { Fulfilment, PaymentInfo } from "@/lib/email";
 import type { MenuItem } from "@/lib/content";
 
 export type OrderLineInput = { id: string; qty: number };
@@ -25,6 +25,7 @@ export type HydratedOrder = {
   notes: string;
   lines: { item: MenuItem; qty: number; lineTotal: number }[];
   total: number;
+  payment: PaymentInfo;
 };
 
 export type ReceiptRole = "customer" | "staff";

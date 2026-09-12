@@ -71,7 +71,7 @@ export function ContactSection() {
       } catch {
         setStatus({
           kind: "error",
-          message: "The message did not send. Call the kiosk instead.",
+          message: "The message did not send. Call us instead.",
         });
         return;
       }
@@ -96,6 +96,10 @@ export function ContactSection() {
             <p>{site.area}</p>
             <p className="text-muted-foreground mt-1 text-sm">Plus code {site.plusCode}</p>
           </address>
+          <p className="mt-4 max-w-md text-base leading-relaxed">
+            {site.locationNote} To book an event or ask about a delivery, call or
+            email us.
+          </p>
           <p className="mt-4">
             <a className="min-h-11 font-medium underline" href={`tel:${site.phoneTel}`}>
               {site.phoneDisplay}
@@ -107,6 +111,7 @@ export function ContactSection() {
             </a>
           </p>
           <p className="mt-4">
+            <span className="font-medium">{site.hoursLabel}: </span>
             {site.hours}, {site.hoursDays}
           </p>
           <p className="mt-6 max-w-md text-base leading-relaxed">
@@ -127,7 +132,7 @@ export function ContactSection() {
             <iframe
               title="Map of Play Man Lounge in Kaneshie, Accra"
               src={site.mapsEmbed}
-              className="h-64 w-full"
+              className="h-64 w-full max-w-full"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
@@ -141,7 +146,7 @@ export function ContactSection() {
         </div>
 
         <form onSubmit={onSubmit} noValidate className="bg-card p-5 sm:p-8">
-          <h3 className="font-display text-2xl">Email the kiosk</h3>
+          <h3 className="font-display text-2xl">Email us</h3>
           {Object.keys(errors).length > 0 && (
             <div
               ref={summaryRef}
@@ -172,7 +177,7 @@ export function ContactSection() {
           {status.kind === "success" && (
             <p role="status" className="mt-4 font-medium">
               {status.via === "web3forms"
-                ? "Message sent. We will reply from the kiosk email."
+                ? "Message sent. We will reply from the business email."
                 : "Your mail app should open with the message filled in. Send it to complete."}
             </p>
           )}

@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local HTML receipts when no mail API key is set
+.order-previews/
+
 # vercel
 .vercel
 
@@ -48,6 +51,3 @@ CLAUDE.md
 
 # skill script caches
 .cursor/skills/**/__pycache__/
-
-# local HTML receipts when no mail API key is set
-.order-previews/

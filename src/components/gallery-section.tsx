@@ -32,7 +32,9 @@ export function GallerySection() {
           Gallery
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base">
-          The kiosk, the wok, the packs. Tap a photo to enlarge it.
+          Packs going out for delivery, the kiosk on Nikoi Olai Street after
+          dark, and the boards the menu above is copied from. Tap a photo to
+          enlarge it.
         </p>
         <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {gallery.map((photo, index) => (
@@ -50,7 +52,7 @@ export function GallerySection() {
                   alt={photo.alt}
                   width={photo.width}
                   height={photo.height}
-                  className={`w-full object-cover ${index === 0 ? "aspect-4/3 sm:aspect-square" : "aspect-4/3"}`}
+                  className={`aspect-4/3 w-full object-cover sm:aspect-square ${photo.crop === "top" ? "object-top" : "object-center"}`}
                 />
               </button>
             </li>

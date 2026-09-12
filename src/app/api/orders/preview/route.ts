@@ -1,6 +1,6 @@
-import { menu } from "@/lib/content";
 import { hydrateOrder } from "@/lib/mail/order";
 import { receiptHtml } from "@/lib/mail/html";
+import type { PaymentInfo } from "@/lib/email";
 import type { ReceiptRole } from "@/lib/mail/types";
 
 export const runtime = "nodejs";
@@ -9,15 +9,29 @@ const SAMPLE = {
   name: "Ama Mensah",
   phone: "+233578141242",
   email: "ama.mensah@example.com",
-  fulfilment: "pickup" as const,
+  fulfilment: "delivery" as const,
   preferredTime: "13:30",
   notes: "Extra pepper on the fried rice. No onions on the shawarma.",
   lines: [
-    { id: "fried-rice-beef", qty: 2 },
+    { id: "jumbo-bite", qty: 2 },
     { id: "shawarma", qty: 1 },
-    { id: "juice-sobolo", qty: 2 },
+    { id: "fresh-juice", qty: 2 },
   ],
 };
+
+/** `?pay=paid|pending|failed` previews the mobile money stamps. */
+function samplePayment(value: string | null): PaymentInfo {
+  if (value === "paid" || value === "pending" || value === "failed") {
+    return {
+      method: "momo",
+      state: value,
+      reference: "000017916647",
+      network: "VDF",
+      momoNumber: "0205786433",
+    };
+  }
+  return { method: "delivery" };
+}
 
 export async function GET(request: Request) {
   if (
@@ -29,12 +43,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const role = (url.searchParams.get("role") === "staff" ? "staff" : "customer") as ReceiptRole;
-  const friedRice = menu.find((item) => item.id === "fried-rice-beef");
-  if (!friedRice) {
-    return new Response("Menu missing", { status: 500 });
-  }
 
-  const hydrated = hydrateOrder(SAMPLE);
+  const hydrated = hydrateOrder(SAMPLE, samplePayment(url.searchParams.get("pay")));
   if (!hydrated.order) {
     return new Response("Could not build sample", { status: 500 });
   }

@@ -1,5 +1,5 @@
 import { menu } from "@/lib/content";
-import type { Fulfilment } from "@/lib/email";
+import type { Fulfilment, PaymentInfo } from "@/lib/email";
 import type { HydratedOrder, OrderRequest } from "@/lib/mail/types";
 
 export type OrderFieldErrors = Partial<
@@ -94,7 +94,10 @@ export function validateOrderInput(order: OrderRequest): OrderFieldErrors {
   return errors;
 }
 
-export function hydrateOrder(order: OrderRequest): {
+export function hydrateOrder(
+  order: OrderRequest,
+  payment: PaymentInfo = { method: "delivery" }
+): {
   order?: HydratedOrder;
   errors?: OrderFieldErrors;
 } {
@@ -141,6 +144,7 @@ export function hydrateOrder(order: OrderRequest): {
       notes: order.notes.trim(),
       lines,
       total,
+      payment,
     },
   };
 }

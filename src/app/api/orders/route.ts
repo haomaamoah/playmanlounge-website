@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { formatOrderBody } from "@/lib/email";
 import { hydrateOrder, parseOrderRequest } from "@/lib/mail/order";
 import { sendOrderReceipts } from "@/lib/mail/send";
+import { readPaymentRequest, verifyPayment } from "@/lib/payments/verify";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const hydrated = hydrateOrder(parsed.data);
+  // The browser says which way the customer paid; PaySwitch says whether the
+  // money actually arrived.
+  const payment = await verifyPayment(readPaymentRequest(raw));
+
+  const hydrated = hydrateOrder(parsed.data, payment);
   if (hydrated.errors || !hydrated.order) {
     return NextResponse.json(
       { ok: false, errors: hydrated.errors },
@@ -60,5 +65,9 @@ export async function POST(request: Request) {
     via: sent.via,
     orderRef: sent.orderRef,
     total: hydrated.order.total,
+    payment: {
+      method: payment.method,
+      state: payment.method === "momo" ? payment.state : undefined,
+    },
   });
 }

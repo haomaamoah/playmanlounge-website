@@ -1,4 +1,5 @@
 import { formatGhs, site } from "@/lib/content";
+import { networkLabel } from "@/lib/payments/networks";
 import { absoluteUrl, kioskEmail } from "@/lib/mail/config";
 import { escapeHtml } from "@/lib/mail/escape";
 import type { HydratedOrder, ReceiptRole } from "@/lib/mail/types";
@@ -30,15 +31,78 @@ function fulfilmentLabel(order: HydratedOrder) {
   return order.fulfilment === "delivery" ? "Delivery" : "Pickup at the kiosk";
 }
 
+/**
+ * The kitchen needs to know at a glance whether the money is already in, so the
+ * payment gets its own stamp on both receipts.
+ */
+function paymentStamp(order: HydratedOrder, role: ReceiptRole) {
+  const payment = order.payment;
+  const money = formatGhs(order.total);
+  if (payment.method === "delivery") {
+    return {
+      label: "PAY ON DELIVERY",
+      detail:
+        role === "customer"
+          ? `Have ${money} ready for the rider.`
+          : `Collect ${money} on arrival.`,
+      settled: false,
+    };
+  }
+
+  const wallet = [payment.network ? networkLabel(payment.network) : "", payment.momoNumber]
+    .filter(Boolean)
+    .join(" ");
+  const trail = [wallet, payment.reference ? `reference ${payment.reference}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+
+  if (payment.state === "paid") {
+    return {
+      label: "PAID ONLINE",
+      detail:
+        role === "customer"
+          ? `Settled in full — nothing to pay the rider. ${trail}`
+          : `Money is in. ${trail}`,
+      settled: true,
+    };
+  }
+  if (payment.state === "pending") {
+    return {
+      label: "PAYMENT NOT CONFIRMED",
+      detail:
+        role === "customer"
+          ? `We have not seen this payment yet. We will call before cooking. ${trail}`
+          : `Check PaySwitch before cooking, or collect ${money}. ${trail}`,
+      settled: false,
+    };
+  }
+  return {
+    label: "ONLINE PAYMENT FAILED",
+    detail:
+      role === "customer"
+        ? `The mobile money charge did not go through, so pay ${money} on delivery. ${trail}`
+        : `Charge failed — collect ${money} instead. ${trail}`,
+    settled: false,
+  };
+}
+
+function paymentTag(order: HydratedOrder) {
+  if (order.payment.method === "delivery") return "pay on delivery";
+  if (order.payment.state === "paid") return "PAID";
+  if (order.payment.state === "pending") return "payment unconfirmed";
+  return "payment failed";
+}
+
 export function receiptSubject(order: HydratedOrder, role: ReceiptRole) {
   const money = formatGhs(order.total);
   if (role === "customer") {
     return `${site.name} — we got your order ${order.orderRef} · ${money}`;
   }
-  return `New order ${order.orderRef} — ${order.name} — ${money} — ${fulfilmentLabel(order)} ${formatTime(order.preferredTime)}`;
+  return `New order ${order.orderRef} — ${order.name} — ${money} — ${paymentTag(order)} — ${fulfilmentLabel(order)} ${formatTime(order.preferredTime)}`;
 }
 
 export function receiptText(order: HydratedOrder, role: ReceiptRole) {
+  const payment = paymentStamp(order, role);
   const items = order.lines
     .map(
       (line) =>
@@ -64,6 +128,7 @@ export function receiptText(order: HydratedOrder, role: ReceiptRole) {
     items,
     "",
     `Total: ${formatGhs(order.total)}`,
+    `${payment.label} — ${payment.detail}`,
     "",
     `Notes: ${order.notes || "(none)"}`,
     "",
@@ -111,6 +176,22 @@ export function receiptHtml(order: HydratedOrder, role: ReceiptRole) {
     ? `${escapeHtml(order.name)} just sent a bag from the website. Reply to this mail to reach them.`
     : `The wok has your ticket. ${fulfilmentLabel(order)} around ${escapeHtml(formatTime(order.preferredTime))}. If pictures stay hidden, the names, quantities and cedis are still in the table.`;
 
+  const payment = paymentStamp(order, role);
+  const paymentRow = `<tr>
+        <td style="padding:4px 20px 8px;background:${SURFACE};">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:2px solid ${COCOA};">
+            <tr>
+              <td width="150" valign="middle" style="padding:12px 14px;background:${payment.settled ? COCOA : PALM};font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.1em;font-weight:bold;color:${payment.settled ? GOLD : CREAM};">
+                ${payment.label}
+              </td>
+              <td valign="middle" style="padding:12px 14px;background:${CREAM};font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:${COCOA};">
+                ${escapeHtml(payment.detail)}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+
   const notes = order.notes
     ? `<tr>
         <td style="padding:4px 20px 18px;background:${SURFACE};">
@@ -152,7 +233,7 @@ export function receiptHtml(order: HydratedOrder, role: ReceiptRole) {
 </head>
 <body style="margin:0;padding:0;background:${COCOA_DEEP};">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-    ${escapeHtml(headline)} ${escapeHtml(order.orderRef)} · ${formatGhs(order.total)} · ${escapeHtml(fulfilmentLabel(order))} ${escapeHtml(formatTime(order.preferredTime))}
+    ${escapeHtml(headline)} ${escapeHtml(order.orderRef)} · ${formatGhs(order.total)} · ${payment.label} · ${escapeHtml(fulfilmentLabel(order))} ${escapeHtml(formatTime(order.preferredTime))}
   </div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${COCOA_DEEP};margin:0;padding:0;">
     <tr>
@@ -192,6 +273,7 @@ export function receiptHtml(order: HydratedOrder, role: ReceiptRole) {
               </table>
             </td>
           </tr>
+          ${paymentRow}
           <tr>
             <td style="padding:8px 20px 4px;background:${SURFACE};">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
