@@ -99,6 +99,15 @@ function validate(
   return errors;
 }
 
+function successHeadline(via: "email" | "mailto" | "mock", payment: PaymentInfo) {
+  if (via === "mailto") {
+    return "Your mail app should open with the order filled in. Send it to complete.";
+  }
+  if (via === "mock") return "Order in — preview mode, so nothing was emailed.";
+  if (payment.method === "momo") return "Payment received. The kitchen has your ticket.";
+  return "Order in. Receipt on its way to your inbox.";
+}
+
 export function OrderSection() {
   const { lines, total, setQty, remove, restore, clear } = useOrder();
   const formId = useId();
@@ -664,13 +673,7 @@ export function OrderSection() {
               className="border-cocoa mb-6 border p-4"
               role="status"
             >
-              <p className="font-semibold">
-                {status.via === "mailto"
-                  ? "Your mail app should open with the order filled in. Send it to complete."
-                  : status.payment.method === "momo"
-                    ? "Payment received. The kitchen has your ticket."
-                    : "Order in. Receipt on its way to your inbox."}
-              </p>
+              <p className="font-semibold">{successHeadline(status.via, status.payment)}</p>
               {status.via === "email" && (
                 <p className="mt-2 text-sm leading-relaxed">
                   Receipt {status.orderRef} is in your inbox, and the kitchen has
@@ -679,8 +682,7 @@ export function OrderSection() {
               )}
               {status.via === "mock" && (
                 <p className="mt-2 text-sm leading-relaxed">
-                  Preview mode — ticket {status.orderRef} was saved on this
-                  machine instead of being emailed.
+                  Ticket {status.orderRef} was saved on this machine instead.
                 </p>
               )}
               <p className="mt-2 text-sm leading-relaxed">
