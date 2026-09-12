@@ -1,0 +1,9 @@
+# Copy to .dev.vars (git ignored) for `wrangler dev`, or export these before
+# `npm run dev`. Values come from the theTeller dashboard under My Account.
+THETELLER_API_USER=your_api_username
+THETELLER_API_KEY=your_api_key
+THETELLER_MERCHANT_ID=TTM-00000000
+# "test" hits test.theteller.net, "live" hits prod.theteller.net and moves real money.
+THETELLER_MODE=test
+ALLOWED_ORIGINS=http://127.0.0.1:43123,http://localhost:43123
+MAX_ORDER_TOTAL=5000

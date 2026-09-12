@@ -1,24 +1,78 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { asset } from "@/lib/asset";
 import { formatGhs, site } from "@/lib/content";
 import { useOrder } from "@/lib/order-context";
 import {
   businessEmail,
   formatOrderBody,
   formatOrderSubject,
+  formatPaymentLine,
   mailtoHref,
   submitViaWeb3Forms,
   web3formsKey,
   type Fulfilment,
   type OrderPayload,
+  type PaymentInfo,
 } from "@/lib/email";
+import {
+  clearPendingOrder,
+  readPendingOrder,
+  rememberPendingOrder,
+  restoreOrder,
+} from "@/lib/pending-order";
+import {
+  guessNetwork,
+  isValidMomoNumber,
+  loadPaymentConfig,
+  momoNetworks,
+  paymentsConfigured,
+  readCheckoutReturn,
+  startPayment,
+  stripCheckoutParams,
+  waitForPayment,
+  PaymentError,
+  type MomoNetwork,
+} from "@/lib/payments";
+
+type PayMethod = "delivery" | "momo";
 
 type FieldErrors = Partial<
-  Record<"name" | "phone" | "email" | "fulfilment" | "preferredTime" | "cart", string>
+  Record<
+    | "name"
+    | "phone"
+    | "email"
+    | "fulfilment"
+    | "preferredTime"
+    | "cart"
+    | "momoNumber"
+    | "momoNetwork",
+    string
+  >
 >;
 
-function validate(order: OrderPayload): FieldErrors {
+type Status =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "starting" }
+  | { kind: "awaiting"; reference: string; message: string }
+  | { kind: "redirecting" }
+  | { kind: "verifying" }
+  | {
+      kind: "success";
+      summary: string;
+      via: "web3forms" | "mailto";
+      payment: PaymentInfo;
+      total: number;
+    }
+  | { kind: "payment-failed"; message: string; reference?: string; gatewayIssue: boolean }
+  | { kind: "error"; message: string };
+
+function validate(
+  order: OrderPayload,
+  payment: { method: PayMethod; momoNumber: string; momoNetwork: MomoNetwork | "" }
+): FieldErrors {
   const errors: FieldErrors = {};
   if (!order.name.trim()) errors.name = "Enter your name.";
   const phone = order.phone.replace(/\s/g, "");
@@ -31,30 +85,145 @@ function validate(order: OrderPayload): FieldErrors {
   if (!order.fulfilment) errors.fulfilment = "Choose delivery or arranged pickup.";
   if (!order.preferredTime) errors.preferredTime = "Choose a time between 12:00 and 23:00.";
   if (order.lines.length === 0) errors.cart = "Add at least one menu item.";
+  if (payment.method === "momo") {
+    if (!payment.momoNumber.trim())
+      errors.momoNumber = "Enter the mobile money number to charge.";
+    else if (!isValidMomoNumber(payment.momoNumber))
+      errors.momoNumber = "Use ten digits, like 0205786433.";
+    if (!payment.momoNetwork) errors.momoNetwork = "Choose the mobile money network.";
+  }
   return errors;
 }
 
 export function OrderSection() {
-  const { lines, total, setQty, remove, clear } = useOrder();
+  const { lines, total, setQty, remove, restore, clear } = useOrder();
   const formId = useId();
   const summaryRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<AbortController | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [fulfilment, setFulfilment] = useState<Fulfilment>("delivery");
   const [preferredTime, setPreferredTime] = useState("13:00");
   const [notes, setNotes] = useState("");
+  const [payMethod, setPayMethod] = useState<PayMethod>("delivery");
+  const [momoNumber, setMomoNumber] = useState("");
+  const [momoNetwork, setMomoNetwork] = useState<MomoNetwork | "">("");
+  const [voucherCode, setVoucherCode] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [status, setStatus] = useState<
-    | { kind: "idle" }
-    | { kind: "sending" }
-    | { kind: "success"; summary: string; via: "web3forms" | "mailto" }
-    | { kind: "error"; message: string }
-  >({ kind: "idle" });
+  const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [canPayOnline, setCanPayOnline] = useState(paymentsConfigured);
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    const payload: OrderPayload = {
+  useEffect(() => {
+    void (async () => {
+      setCanPayOnline(await loadPaymentConfig(asset("/payments.json")));
+    })();
+  }, []);
+
+  async function emailOrder(payload: OrderPayload) {
+    const subject = formatOrderSubject(payload);
+    const body = formatOrderBody(payload);
+
+    if (web3formsKey()) {
+      const result = await submitViaWeb3Forms({
+        subject,
+        fromName: payload.name,
+        fromEmail: payload.email,
+        message: body,
+      });
+      if (result.ok) return { via: "web3forms" as const, body };
+    }
+
+    window.location.href = mailtoHref(businessEmail(), subject, body);
+    return { via: "mailto" as const, body };
+  }
+
+  /**
+   * PaySwitch sends the customer back here after hosted checkout. The gateway
+   * answers "transaction not found" until the debit lands, so the status is
+   * polled for a short while rather than read once.
+   */
+  useEffect(() => {
+    void (async () => {
+      const returned = readCheckoutReturn(window.location.search);
+      if (!returned) return;
+      stripCheckoutParams();
+      const pending = readPendingOrder();
+      setStatus({ kind: "verifying" });
+
+      const settled = await waitForPayment(returned.transactionId, {
+        intervalMs: 4000,
+        timeoutMs: 45_000,
+      });
+
+      const payment: PaymentInfo = {
+        method: "momo",
+        state: settled.state,
+        reference: settled.transactionId,
+        network: pending?.network,
+        momoNumber: pending?.momoNumber,
+      };
+
+      // Anything short of a confirmed payment keeps the order in the customer's
+      // hands: the bag comes back so they can retry or pay the rider.
+      if (settled.state !== "paid") {
+        if (pending) restore(pending.lines);
+        setStatus({
+          kind: "payment-failed",
+          message: settled.message,
+          reference: settled.transactionId,
+          gatewayIssue: settled.gatewayIssue,
+        });
+        return;
+      }
+
+      if (!pending) {
+        setStatus({
+          kind: "payment-failed",
+          message:
+            "The payment went through, but this browser lost the order details. Call the kitchen with your reference and we will take the order by phone.",
+          reference: settled.transactionId,
+          gatewayIssue: false,
+        });
+        return;
+      }
+
+      const payload = restoreOrder(pending, payment);
+      try {
+        const sent = await emailOrder(payload);
+        clearPendingOrder();
+        clear();
+        setStatus({
+          kind: "success",
+          summary: sent.body,
+          via: sent.via,
+          payment,
+          total: payload.total,
+        });
+      } catch {
+        setStatus({
+          kind: "error",
+          message:
+            "The payment went through but the order email did not send. Call us with your reference and we will still cook it.",
+        });
+      }
+    })();
+    // Runs once, for the redirect it arrived on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Move focus to whatever the form is now saying, so the payment steps are
+  // announced instead of silently appearing above the fields.
+  useEffect(() => {
+    if (status.kind === "idle" || status.kind === "sending") return;
+    statusRef.current?.focus();
+  }, [status.kind]);
+
+  useEffect(() => () => pollRef.current?.abort(), []);
+
+  function currentPayload(payment: PaymentInfo): OrderPayload {
+    return {
       name,
       phone,
       email,
@@ -63,8 +232,136 @@ export function OrderSection() {
       notes,
       lines,
       total,
+      payment,
     };
-    const nextErrors = validate(payload);
+  }
+
+  async function finishPaidOrder(payment: PaymentInfo) {
+    const payload = currentPayload(payment);
+    try {
+      const sent = await emailOrder(payload);
+      clear();
+      setStatus({
+        kind: "success",
+        summary: sent.body,
+        via: sent.via,
+        payment,
+        total: payload.total,
+      });
+    } catch {
+      setStatus({
+        kind: "error",
+        message:
+          "Payment went through but the order email did not send. Call us and we will still cook it.",
+      });
+    }
+  }
+
+  async function payWithMomo(payload: OrderPayload, network: MomoNetwork) {
+    setStatus({ kind: "starting" });
+    const returnUrl = `${window.location.origin}${window.location.pathname}?payment=return`;
+
+    let started;
+    try {
+      started = await startPayment({
+        lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
+        expectedTotal: payload.total,
+        network,
+        momoNumber,
+        voucherCode: voucherCode.trim() || undefined,
+        customer: { name, phone, email },
+        returnUrl,
+      });
+    } catch (error) {
+      setStatus({
+        kind: "payment-failed",
+        message:
+          error instanceof PaymentError
+            ? error.message
+            : "The payment could not be started. Try again, or choose pay on delivery.",
+        gatewayIssue: error instanceof PaymentError ? error.gatewayIssue : false,
+      });
+      return;
+    }
+
+    if (started.mode === "checkout") {
+      rememberPendingOrder({
+        transactionId: started.transactionId,
+        savedAt: Date.now(),
+        total: payload.total,
+        network,
+        momoNumber,
+        customer: { name, phone, email, fulfilment, preferredTime, notes },
+        lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
+      });
+      setStatus({ kind: "redirecting" });
+      window.location.assign(started.checkoutUrl);
+      return;
+    }
+
+    const payment = (state: "paid" | "pending" | "failed"): PaymentInfo => ({
+      method: "momo",
+      state,
+      reference: started.transactionId,
+      network,
+      momoNumber,
+    });
+
+    if (started.state === "paid") {
+      await finishPaidOrder(payment("paid"));
+      return;
+    }
+    if (started.state === "failed") {
+      setStatus({
+        kind: "payment-failed",
+        message: started.message,
+        reference: started.transactionId,
+        gatewayIssue: started.gatewayIssue,
+      });
+      return;
+    }
+
+    setStatus({
+      kind: "awaiting",
+      reference: started.transactionId,
+      message: started.message,
+    });
+
+    pollRef.current?.abort();
+    const controller = new AbortController();
+    pollRef.current = controller;
+    const settled = await waitForPayment(started.transactionId, {
+      signal: controller.signal,
+      onUpdate: (update) =>
+        setStatus({
+          kind: "awaiting",
+          reference: update.transactionId,
+          message: update.message,
+        }),
+    });
+    if (controller.signal.aborted) return;
+
+    if (settled.state === "paid") {
+      await finishPaidOrder(payment("paid"));
+      return;
+    }
+    setStatus({
+      kind: "payment-failed",
+      message: settled.message,
+      reference: settled.transactionId,
+      gatewayIssue: settled.gatewayIssue,
+    });
+  }
+
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const payment: PaymentInfo =
+      payMethod === "delivery"
+        ? { method: "delivery" }
+        : { method: "momo", state: "pending", reference: "", network: momoNetwork || undefined };
+    const payload = currentPayload(payment);
+
+    const nextErrors = validate(payload, { method: payMethod, momoNumber, momoNetwork });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setStatus({ kind: "idle" });
@@ -72,38 +369,59 @@ export function OrderSection() {
       return;
     }
 
-    const subject = formatOrderSubject(payload);
-    const body = formatOrderBody(payload);
-    setStatus({ kind: "sending" });
-
-    if (web3formsKey()) {
-      try {
-        const result = await submitViaWeb3Forms({
-          subject,
-          fromName: name,
-          fromEmail: email,
-          message: body,
-        });
-        if (result.ok) {
-          setStatus({ kind: "success", summary: body, via: "web3forms" });
-          clear();
-          return;
-        }
-      } catch {
-        setStatus({
-          kind: "error",
-          message:
-            "The order email did not send. Call us or try the mail app fallback.",
-        });
-        return;
-      }
+    if (payMethod === "momo" && momoNetwork) {
+      await payWithMomo(payload, momoNetwork);
+      return;
     }
 
-    window.location.href = mailtoHref(businessEmail(), subject, body);
-    setStatus({ kind: "success", summary: body, via: "mailto" });
+    setStatus({ kind: "sending" });
+    try {
+      const sent = await emailOrder(payload);
+      if (sent.via === "web3forms") clear();
+      setStatus({
+        kind: "success",
+        summary: sent.body,
+        via: sent.via,
+        payment,
+        total: payload.total,
+      });
+    } catch {
+      setStatus({
+        kind: "error",
+        message: "The order email did not send. Call us or try again.",
+      });
+    }
+  }
+
+  function onMomoNumberChange(value: string) {
+    setMomoNumber(value);
+    const guess = guessNetwork(value);
+    if (guess) setMomoNetwork(guess);
+  }
+
+  function switchToPayOnDelivery() {
+    pollRef.current?.abort();
+    setPayMethod("delivery");
+    setStatus({ kind: "idle" });
   }
 
   const field = (id: string) => `${formId}-${id}`;
+  const busy =
+    status.kind === "sending" ||
+    status.kind === "starting" ||
+    status.kind === "awaiting" ||
+    status.kind === "redirecting" ||
+    status.kind === "verifying";
+
+  function submitLabel() {
+    if (status.kind === "starting") return "Starting payment…";
+    if (status.kind === "awaiting") return "Waiting for your approval…";
+    if (status.kind === "redirecting") return "Opening secure payment…";
+    if (status.kind === "verifying") return "Confirming payment…";
+    if (status.kind === "sending") return "Sending order…";
+    if (payMethod === "momo") return `Pay ${formatGhs(total)} now`;
+    return "Email this order";
+  }
 
   return (
     <section id="order" aria-labelledby="order-heading" className="bg-card py-16 sm:py-24">
@@ -113,9 +431,9 @@ export function OrderSection() {
             Make an Order
           </h2>
           <p className="mt-3 max-w-md text-base leading-relaxed">
-            We take orders online by email ({businessEmail()}). Delivery is
-            the usual path; arranged hub pickup is available when we confirm it
-            — the kitchen is not a walk-in counter. If email fails, call{" "}
+            Pay on delivery, or pay now with mobile money and we start cooking
+            straight away. Either way the order reaches us by email (
+            {businessEmail()}). If anything sticks, call{" "}
             <a className="underline" href={`tel:${site.phoneTel}`}>
               {site.phoneDisplay}
             </a>
@@ -193,21 +511,109 @@ export function OrderSection() {
               </ul>
             </div>
           )}
+
+          {(status.kind === "starting" ||
+            status.kind === "redirecting" ||
+            status.kind === "verifying" ||
+            status.kind === "awaiting") && (
+            <div
+              ref={statusRef}
+              tabIndex={-1}
+              role="status"
+              aria-live="polite"
+              className="border-cocoa mb-6 border p-4"
+            >
+              <p className="font-semibold motion-safe:animate-pulse">
+                {status.kind === "starting" && "Asking mobile money for your payment…"}
+                {status.kind === "redirecting" && "Opening the secure payment page…"}
+                {status.kind === "verifying" && "Confirming your payment…"}
+                {status.kind === "awaiting" && "Check your phone"}
+              </p>
+              {status.kind === "awaiting" && (
+                <>
+                  <p className="mt-2 text-sm leading-relaxed">
+                    {status.message} We are watching for {formatGhs(total)} on{" "}
+                    {momoNumber}. Keep this page open.
+                  </p>
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    Reference {status.reference}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={switchToPayOnDelivery}
+                    className="mt-3 min-h-11 text-sm underline"
+                  >
+                    Stop waiting and pay on delivery instead
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {status.kind === "payment-failed" && (
+            <div
+              ref={statusRef}
+              tabIndex={-1}
+              role="alert"
+              className="border-destructive text-destructive mb-6 border p-4"
+            >
+              <p className="font-semibold">Payment not completed</p>
+              <p className="mt-2 text-sm leading-relaxed">{status.message}</p>
+              {status.reference && (
+                <p className="mt-2 text-sm">Reference {status.reference}</p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-4">
+                <button
+                  type="button"
+                  onClick={switchToPayOnDelivery}
+                  className="min-h-11 text-sm underline"
+                >
+                  Pay on delivery instead
+                </button>
+                <a className="min-h-11 text-sm underline" href={`tel:${site.phoneTel}`}>
+                  Call {site.phoneDisplay}
+                </a>
+              </div>
+            </div>
+          )}
+
           {status.kind === "error" && (
-            <p role="alert" className="border-destructive text-destructive mb-6 border p-4">
+            <div
+              ref={statusRef}
+              tabIndex={-1}
+              role="alert"
+              className="border-destructive text-destructive mb-6 border p-4"
+            >
               {status.message}{" "}
               <a className="underline" href={`tel:${site.phoneTel}`}>
                 {site.phoneDisplay}
               </a>
-            </p>
+            </div>
           )}
+
           {status.kind === "success" && (
-            <div className="border-cocoa mb-6 border p-4" role="status">
+            <div
+              ref={statusRef}
+              tabIndex={-1}
+              className="border-cocoa mb-6 border p-4"
+              role="status"
+            >
               <p className="font-semibold">
-                {status.via === "web3forms"
-                  ? "Order emailed to the kitchen."
-                  : "Your mail app should open with the order filled in. Send it to complete."}
+                {status.payment.method === "momo"
+                  ? "Payment received. Order on its way to the kitchen."
+                  : status.via === "web3forms"
+                    ? "Order emailed to the kitchen."
+                    : "Your mail app should open with the order filled in. Send it to complete."}
               </p>
+              <p className="mt-2 text-sm leading-relaxed">
+                {formatPaymentLine(status.payment, status.total)}
+              </p>
+              {status.payment.method === "momo" && status.via === "mailto" && (
+                <p className="mt-2 text-sm leading-relaxed">
+                  Your mail app is opening with the paid order — send it so the
+                  kitchen has your address and time.
+                </p>
+              )}
               <pre className="mt-3 max-h-48 overflow-auto text-xs whitespace-pre-wrap">
                 {status.summary}
               </pre>
@@ -309,6 +715,140 @@ export function OrderSection() {
                 <p className="text-destructive mt-1 text-sm">{errors.fulfilment}</p>
               )}
             </fieldset>
+
+            <fieldset className="border-border border-t pt-5">
+              <legend className="mb-2 text-sm font-medium">Payment</legend>
+              <div className="flex flex-col gap-2">
+                <label className="inline-flex min-h-11 items-center gap-2">
+                  <input
+                    type="radio"
+                    name="payMethod"
+                    value="delivery"
+                    checked={payMethod === "delivery"}
+                    onChange={() => setPayMethod("delivery")}
+                  />
+                  Pay on delivery
+                </label>
+                <label className="inline-flex min-h-11 items-center gap-2">
+                  <input
+                    type="radio"
+                    name="payMethod"
+                    value="momo"
+                    checked={payMethod === "momo"}
+                    disabled={!canPayOnline}
+                    onChange={() => setPayMethod("momo")}
+                  />
+                  Pay now with mobile money
+                </label>
+              </div>
+              <p className="text-muted-foreground mt-2 text-sm">
+                {canPayOnline
+                  ? "Paying now puts your order straight into the queue. Pay on delivery means you settle the rider."
+                  : "Paying online is being switched on. For now, choose pay on delivery and we will confirm by phone."}
+              </p>
+            </fieldset>
+
+            {payMethod === "momo" && canPayOnline && (
+              <div className="space-y-5">
+                <div>
+                  <label
+                    htmlFor={field("momoNumber")}
+                    className="mb-1 block text-sm font-medium"
+                  >
+                    Mobile money number
+                  </label>
+                  <input
+                    id={field("momoNumber")}
+                    name="momoNumber"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="0205786433"
+                    value={momoNumber}
+                    onChange={(e) => onMomoNumberChange(e.target.value)}
+                    aria-invalid={!!errors.momoNumber}
+                    aria-describedby={
+                      errors.momoNumber
+                        ? `${field("momoNumber")}-error`
+                        : `${field("momoNumber")}-hint`
+                    }
+                    className="border-input min-h-11 w-full border bg-background px-3"
+                  />
+                  <p
+                    id={`${field("momoNumber")}-hint`}
+                    className="text-muted-foreground mt-1 text-sm"
+                  >
+                    The wallet we should charge {formatGhs(total)} from. It can
+                    differ from your phone number above.
+                  </p>
+                  {errors.momoNumber && (
+                    <p
+                      id={`${field("momoNumber")}-error`}
+                      className="text-destructive mt-1 text-sm"
+                    >
+                      {errors.momoNumber}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    htmlFor={field("momoNetwork")}
+                    className="mb-1 block text-sm font-medium"
+                  >
+                    Mobile money network
+                  </label>
+                  <select
+                    id={field("momoNetwork")}
+                    name="momoNetwork"
+                    value={momoNetwork}
+                    onChange={(e) => setMomoNetwork(e.target.value as MomoNetwork | "")}
+                    aria-invalid={!!errors.momoNetwork}
+                    aria-describedby={
+                      errors.momoNetwork ? `${field("momoNetwork")}-error` : undefined
+                    }
+                    className="border-input min-h-11 w-full border bg-background px-3"
+                  >
+                    <option value="">Choose a network</option>
+                    {momoNetworks.map((network) => (
+                      <option key={network.code} value={network.code}>
+                        {network.label}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.momoNetwork && (
+                    <p
+                      id={`${field("momoNetwork")}-error`}
+                      className="text-destructive mt-1 text-sm"
+                    >
+                      {errors.momoNetwork}
+                    </p>
+                  )}
+                </div>
+                {momoNetwork === "VDF" && (
+                  <div>
+                    <label
+                      htmlFor={field("voucherCode")}
+                      className="mb-1 block text-sm font-medium"
+                    >
+                      Telecel Cash approval code (if your wallet asks for one)
+                    </label>
+                    <input
+                      id={field("voucherCode")}
+                      name="voucherCode"
+                      inputMode="numeric"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value)}
+                      className="border-input min-h-11 w-full border bg-background px-3"
+                    />
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Dial *110# on the Telecel line to generate it. Leave it
+                      blank if you are not asked.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <label
                 htmlFor={field("preferredTime")}
@@ -365,10 +905,10 @@ export function OrderSection() {
             )}
             <button
               type="submit"
-              disabled={status.kind === "sending"}
+              disabled={busy}
               className="bg-cocoa text-cream hover:bg-cocoa-deep inline-flex min-h-12 w-full items-center justify-center px-6 text-base font-semibold disabled:opacity-60"
             >
-              {status.kind === "sending" ? "Sending order…" : "Email this order"}
+              {submitLabel()}
             </button>
           </div>
         </form>

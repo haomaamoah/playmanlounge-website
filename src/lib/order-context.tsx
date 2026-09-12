@@ -17,6 +17,7 @@ type OrderContextValue = {
   add: (id: string) => void;
   remove: (id: string) => void;
   setQty: (id: string, qty: number) => void;
+  restore: (entries: { id: string; qty: number }[]) => void;
   clear: () => void;
   count: number;
   total: number;
@@ -55,6 +56,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /** Puts a bag back after a payment that sent the customer off the site. */
+  const restore = useCallback((entries: { id: string; qty: number }[]) => {
+    const restored = entries.flatMap((entry) => {
+      const item = menu.find((candidate) => candidate.id === entry.id);
+      return item && entry.qty > 0 ? [{ item, qty: entry.qty }] : [];
+    });
+    if (restored.length === 0) return;
+    setLines(restored);
+    setNotice("Your order is back in the bag");
+  }, []);
+
   const clear = useCallback(() => {
     setLines([]);
     setNotice("Order cleared");
@@ -69,12 +81,13 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       add,
       remove,
       setQty,
+      restore,
       clear,
       count,
       total,
       notice,
     }),
-    [lines, add, remove, setQty, clear, count, total, notice]
+    [lines, add, remove, setQty, restore, clear, count, total, notice]
   );
 
   return (

@@ -62,6 +62,88 @@ Do **not** replace the real phone (`+233 54 753 9942`, set by the Managing Direc
 
 When the kitchen prints a new board, edit `menuGroups` — the order form, the running total, and the order email all read from it.
 
+## Paying for an order
+
+The order form offers two choices:
+
+**Pay on delivery** — nothing changes for the customer. The order email says `Payment: PAY ON DELIVERY — collect GHS n on arrival`, and the subject line ends with `pay on delivery` so the kitchen can see it without opening the mail.
+
+**Pay now with mobile money** — the form asks for the wallet number and network (the network is preselected from the Ghanaian prefix), the submit button becomes **Pay GHS n now**, and payment is handled by PaySwitch (theTeller). Once the money lands, the order email goes out with `Payment: PAID ONLINE from MTN MoMo 0205786433 — PaySwitch reference 000123456789` and a `PAID` subject line.
+
+### Why there is a small server
+
+GitHub Pages only serves files, and the PaySwitch credentials must never reach the browser (anyone could then charge wallets in the kitchen's name), so `payments/` holds a tiny service that is the only place the keys live. It exposes three routes:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /health` | Whether it is configured, in which mode and flow |
+| `POST /pay/start` | Prices the bag from its own table, then starts the payment |
+| `GET /pay/status/{id}` | Polls one transaction until it settles |
+
+The service prices the order itself from `payments/prices.json` and refuses a bag whose total does not match, so a tampered page cannot decide what an order costs. Run `npm run sync:prices` in `payments/` after changing menu prices — a test fails if the file drifts from `src/lib/content.ts`.
+
+### Two payment flows
+
+`THETELLER_FLOW` decides how the money is asked for:
+
+- `prompt` — the direct API (`/v1.1/transaction/process`, `processing_code 000200`) pushes a mobile money prompt straight to the customer's phone; the page polls until they approve. This is the nicer flow, but PaySwitch enables it per merchant.
+- `checkout` — PaySwitch's hosted page (`/initiate`) takes the payment and redirects back with the result.
+- `auto` (default) — asks for the prompt, and falls back to hosted checkout if PaySwitch refuses direct debit, so the customer is never told the order failed for a reason on our side.
+
+Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side, emails the order, and clears the bag. If the payment cannot be confirmed the bag comes back so the customer can retry or pay the rider — the site never claims a payment PaySwitch has not confirmed.
+
+### Merchant account status (September 2026)
+
+Verified against the live gateway with merchant `TTM-00011795`:
+
+- Hosted checkout **works** — `/initiate` returns a payment link.
+- Direct debit is **not enabled**. `/v1.1/transaction/process` answers `{"code":999,"description":"Access Denied. Merchant not found"}` in both test and live, with either production key, and the same answer comes back with deliberately wrong credentials — so it is a merchant permission, not a key problem.
+- The test environment does not know the merchant at all, so integration testing has to happen on live with small amounts.
+
+To get the in-page prompt, ask PaySwitch support to enable **direct mobile money debit (collection) API** on `TTM-00011795` and to provision the merchant in the test environment. Reproduction for the ticket:
+
+```bash
+curl -X POST https://prod.theteller.net/v1.1/transaction/process \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(printf 'API_USER:API_KEY' | base64)" \
+  -d '{"amount":"000000000010","processing_code":"000200","transaction_id":"000000000001",
+       "desc":"test","merchant_id":"TTM-00011795","subscriber_number":"233205786433","r-switch":"VDF"}'
+```
+
+Nothing needs to change in this repo when they enable it: with `THETELLER_FLOW=auto` the prompt starts working on its own.
+
+### Running and deploying the payment service
+
+```bash
+cd payments
+cp .dev.vars.example .dev.vars   # git ignored; fill in from the theTeller dashboard
+npm test                         # pure logic: amounts, wallet numbers, code mapping, prices
+npm run dev                      # http://127.0.0.1:8787, no Cloudflare account needed
+```
+
+Then point the site at it in `.env.local`:
+
+```
+NEXT_PUBLIC_PAYMENT_API_URL=http://127.0.0.1:8787
+```
+
+Deploying it as a Cloudflare Worker (free tier is enough):
+
+```bash
+cd payments
+npx wrangler login
+npx wrangler secret put THETELLER_API_USER
+npx wrangler secret put THETELLER_API_KEY
+npx wrangler secret put THETELLER_MERCHANT_ID
+npx wrangler deploy
+```
+
+`wrangler.toml` carries the non-secret settings: `THETELLER_MODE` (`test` or `live`), `THETELLER_FLOW`, `ALLOWED_ORIGINS` (must list the Pages origin — it gates both CORS and the checkout return URL) and `MAX_ORDER_TOTAL`. Add the worker URL as a repository variable named `NEXT_PUBLIC_PAYMENT_API_URL` (Settings → Secrets and variables → Actions → Variables) and the Pages build will pick it up.
+
+Until that variable is set, the **Pay now** option is disabled with a note and the site keeps taking pay-on-delivery orders.
+
+The credentials themselves are never committed. Rotate any key that has been pasted into a chat, an issue or a commit.
+
 ## Order email
 
 The kiosk takes orders by **email**. The form in Make an Order:

@@ -34,6 +34,12 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          # Set these as repository variables. Both are public by design; the
+          # PaySwitch keys stay on the payment service, never in the bundle.
+          NEXT_PUBLIC_PAYMENT_API_URL: ${{ vars.NEXT_PUBLIC_PAYMENT_API_URL }}
+          NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: ${{ vars.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
+          NEXT_PUBLIC_ORDER_EMAIL: ${{ vars.NEXT_PUBLIC_ORDER_EMAIL }}
+          NEXT_PUBLIC_CONTACT_EMAIL: ${{ vars.NEXT_PUBLIC_CONTACT_EMAIL }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

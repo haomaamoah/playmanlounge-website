@@ -1,6 +1,18 @@
 import { formatGhs, site, type MenuItem } from "@/lib/content";
+import { networkLabel, type MomoNetwork } from "@/lib/payments";
 
 export type Fulfilment = "pickup" | "delivery";
+
+/** How the customer chose to pay, and what actually happened if they paid now. */
+export type PaymentInfo =
+  | { method: "delivery" }
+  | {
+      method: "momo";
+      state: "paid" | "pending" | "failed";
+      reference: string;
+      network?: MomoNetwork;
+      momoNumber?: string;
+    };
 
 export type OrderPayload = {
   name: string;
@@ -11,7 +23,25 @@ export type OrderPayload = {
   notes: string;
   lines: { item: MenuItem; qty: number }[];
   total: number;
+  payment: PaymentInfo;
 };
+
+export function formatPaymentLine(payment: PaymentInfo, total: number) {
+  if (payment.method === "delivery") {
+    return `Payment: PAY ON DELIVERY — collect ${formatGhs(total)} on arrival`;
+  }
+  const wallet = [payment.network ? networkLabel(payment.network) : "", payment.momoNumber]
+    .filter(Boolean)
+    .join(" ");
+  const walletNote = wallet ? ` from ${wallet}` : "";
+  if (payment.state === "paid") {
+    return `Payment: PAID ONLINE${walletNote} — PaySwitch reference ${payment.reference}`;
+  }
+  if (payment.state === "pending") {
+    return `Payment: NOT CONFIRMED YET${walletNote} — PaySwitch reference ${payment.reference}. Check the PaySwitch dashboard before cooking.`;
+  }
+  return `Payment: ONLINE PAYMENT FAILED${walletNote} — collect ${formatGhs(total)} instead (reference ${payment.reference})`;
+}
 
 export function businessEmail() {
   return (
@@ -55,6 +85,7 @@ export function formatOrderBody(order: OrderPayload) {
     items || "(none)",
     "",
     `Total: ${formatGhs(order.total)}`,
+    formatPaymentLine(order.payment, order.total),
     "",
     "Notes:",
     order.notes.trim() || "(none)",
@@ -62,7 +93,13 @@ export function formatOrderBody(order: OrderPayload) {
 }
 
 export function formatOrderSubject(order: OrderPayload) {
-  return `${site.name} order — ${order.name} — ${formatGhs(order.total)}`;
+  const paymentTag =
+    order.payment.method === "delivery"
+      ? "pay on delivery"
+      : order.payment.state === "paid"
+        ? "PAID"
+        : "payment unconfirmed";
+  return `${site.name} order — ${order.name} — ${formatGhs(order.total)} — ${paymentTag}`;
 }
 
 export function mailtoHref(to: string, subject: string, body: string) {

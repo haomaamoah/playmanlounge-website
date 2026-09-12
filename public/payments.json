@@ -1,0 +1,4 @@
+{
+  "_comment": "Set apiUrl to the deployed payment service (see payments/ and the README) to switch on 'Pay now with mobile money'. Leave it empty and the site takes pay-on-delivery orders only. No PaySwitch key belongs in this file.",
+  "apiUrl": ""
+}
