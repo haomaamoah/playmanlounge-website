@@ -317,6 +317,7 @@ export function OrderSection() {
         notes,
         lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
         expectedTotal: payload.total,
+        acceptedTerms: true,
       });
     } catch (error) {
       setStatus({

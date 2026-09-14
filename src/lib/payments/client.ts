@@ -77,6 +77,7 @@ export type StartPaymentInput = {
   notes: string;
   lines: { id: string; qty: number }[];
   expectedTotal: number;
+  acceptedTerms?: boolean;
   network?: MomoNetwork;
   momoNumber?: string;
   voucherCode?: string;

@@ -170,7 +170,7 @@ House policy PDFs (branded A4, not a lawyer’s letter):
 - [Terms and Conditions](/legal/terms-and-conditions.pdf)
 - [Return Policy](/legal/return-policy.pdf)
 
-The order form shows the Terms as already accepted and locked. The words **Terms and Conditions** in that label open the PDF. The same two files are buttons in the footer. `/api/orders` still requires `acceptedTerms: true`.
+The order form shows the Terms as already accepted and locked. Placing an order is acceptance. The words **Terms and Conditions** in that label open the PDF. The same two files are buttons in the footer.
 
 Print sources live in `legal/*.html`. The UI/UX prompt used to generate them is `prompts/ui-ux-legal-documents.md`.
 
