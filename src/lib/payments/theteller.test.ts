@@ -49,6 +49,7 @@ test("response codes become states the form can act on", () => {
   assert.equal(describeCode("111").state, "pending");
   assert.equal(describeCode("101").state, "failed");
   assert.equal(describeCode("101").retryable, true);
+  assert.match(describeCode("100").message, /no popup/);
   // 999 is "merchant not found": our setup, not the customer's wallet.
   assert.equal(describeCode("999").gatewayIssue, true);
   assert.equal(describeCode("101").gatewayIssue, false);

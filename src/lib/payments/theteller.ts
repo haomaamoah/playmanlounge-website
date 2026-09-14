@@ -102,7 +102,12 @@ const codeMap: Record<
     state: "pending",
     message: "Approve the mobile money prompt on your phone.",
   },
-  "100": { state: "failed", message: "The wallet declined the payment.", retryable: true },
+  "100": {
+    state: "failed",
+    message:
+      "The wallet did not approve. Telecel Cash often sends no popup — while the payment page is open, dial *110# and approve the pending charge.",
+    retryable: true,
+  },
   "101": { state: "failed", message: "Not enough money in the wallet.", retryable: true },
   "102": {
     state: "failed",

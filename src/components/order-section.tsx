@@ -637,6 +637,17 @@ export function OrderSection() {
               {status.reference && (
                 <p className="mt-2 text-sm">Reference {status.reference}</p>
               )}
+              {momoNetwork === "VDF" && (
+                <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-foreground">
+                  <li>Add Kitchen test again and choose Pay now.</li>
+                  <li>On the PaySwitch page, pick Telecel and Pay GHS 0.10.</li>
+                  <li>
+                    Do not wait for a popup. Dial *110#, then My Account → Approvals,
+                    enter your PIN, open the pending transaction, and approve it
+                    before the five-minute timer ends.
+                  </li>
+                </ol>
+              )}
               <div className="mt-3 flex flex-wrap gap-4">
                 <button
                   type="button"
@@ -932,8 +943,9 @@ export function OrderSection() {
                       className="border-input min-h-11 w-full border bg-background px-3"
                     />
                     <p className="text-muted-foreground mt-1 text-sm">
-                      Dial *110# on the Telecel line to generate it. Leave it
-                      blank if you are not asked.
+                      Telecel Cash often sends no popup. Leave this blank, then
+                      on the payment page dial *110# → My Account → Approvals
+                      and approve the pending charge before the timer ends.
                     </p>
                   </div>
                 )}
