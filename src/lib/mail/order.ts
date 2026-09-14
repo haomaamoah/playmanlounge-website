@@ -1,4 +1,4 @@
-import { menu } from "@/lib/content";
+import { menu, pesewas } from "@/lib/content";
 import type { Fulfilment, PaymentInfo } from "@/lib/email";
 import type { HydratedOrder, OrderRequest } from "@/lib/mail/types";
 
@@ -113,14 +113,14 @@ export function hydrateOrder(
     lines.push({
       item,
       qty: line.qty,
-      lineTotal: line.qty * item.price,
+      lineTotal: pesewas(line.qty * item.price) / 100,
     });
   }
   if (lines.length === 0) {
     return { errors: { cart: "Add at least one menu item." } };
   }
 
-  const total = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  const total = pesewas(lines.reduce((sum, line) => sum + line.lineTotal, 0)) / 100;
   const placedAt = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Africa/Accra",
     weekday: "short",

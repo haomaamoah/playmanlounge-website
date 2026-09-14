@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { site } from "@/lib/content";
+import { pesewas, site } from "@/lib/content";
 import { siteUrl } from "@/lib/mail/config";
 import { hydrateOrder, parseOrderRequest } from "@/lib/mail/order";
 import { isMomoNetwork, normaliseSubscriberNumber } from "@/lib/payments/networks";
@@ -164,7 +164,10 @@ export async function POST(request: Request) {
 
   const body = raw as Record<string, unknown>;
   const expectedTotal = Number(body.expectedTotal);
-  if (Number.isFinite(expectedTotal) && Math.round(expectedTotal) !== order.total) {
+  if (
+    Number.isFinite(expectedTotal) &&
+    pesewas(expectedTotal) !== pesewas(order.total)
+  ) {
     return fail(409, {
       error: "Prices changed while you were ordering. Check the new total.",
       total: order.total,

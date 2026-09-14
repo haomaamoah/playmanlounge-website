@@ -114,6 +114,16 @@ export const menuGroups: MenuGroup[] = [
         image: "/media/food-jumbo-bite.webp",
         ...PHOTO,
       },
+      {
+        id: "kitchen-test",
+        name: "Kitchen test",
+        description:
+          "Ten pesewas (GHS 0.10). For checking mobile money — not a real plate. Do not order this unless you are testing payment.",
+        price: 0.1,
+        category: "food",
+        image: "/media/food-playboy-roll.webp",
+        ...PHOTO,
+      },
     ],
   },
   {
@@ -304,6 +314,12 @@ export const nav = [
   { href: "#contact", label: "Contact Us" },
 ] as const;
 
+export function pesewas(amount: number) {
+  return Math.round(amount * 100);
+}
+
 export function formatGhs(amount: number) {
-  return `GHS ${amount}`;
+  const cedis = pesewas(amount) / 100;
+  const shown = Number.isInteger(cedis) ? String(cedis) : cedis.toFixed(2);
+  return `GHS ${shown}`;
 }

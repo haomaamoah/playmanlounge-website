@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { menu, type MenuItem } from "@/lib/content";
+import { menu, pesewas, type MenuItem } from "@/lib/content";
 
 export type CartLine = { item: MenuItem; qty: number };
 
@@ -73,7 +73,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const count = lines.reduce((n, l) => n + l.qty, 0);
-  const total = lines.reduce((n, l) => n + l.qty * l.item.price, 0);
+  const total = pesewas(lines.reduce((n, l) => n + l.qty * l.item.price, 0)) / 100;
 
   const value = useMemo(
     () => ({
