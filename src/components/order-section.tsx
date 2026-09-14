@@ -20,12 +20,6 @@ import {
   restoreOrder,
 } from "@/lib/pending-order";
 import {
-  guessNetwork,
-  isValidMomoNumber,
-  momoNetworks,
-  type MomoNetwork,
-} from "@/lib/payments/networks";
-import {
   loadPaymentConfig,
   readCheckoutReturn,
   startPayment,
@@ -46,8 +40,6 @@ type FieldErrors = Partial<
     | "preferredTime"
     | "cart"
     | "notes"
-    | "momoNumber"
-    | "momoNetwork"
     | "terms",
     string
   >
@@ -75,11 +67,7 @@ type Status =
   | { kind: "payment-failed"; message: string; reference?: string; gatewayIssue: boolean }
   | { kind: "error"; message: string };
 
-function validate(
-  order: OrderPayload,
-  payment: { method: PayMethod; momoNumber: string; momoNetwork: MomoNetwork | "" },
-  acceptedTerms: boolean
-): FieldErrors {
+function validate(order: OrderPayload, acceptedTerms: boolean): FieldErrors {
   const errors: FieldErrors = {};
   if (!order.name.trim()) errors.name = "Enter your name.";
   const phone = order.phone.replace(/\s/g, "");
@@ -92,13 +80,6 @@ function validate(
   if (!order.fulfilment) errors.fulfilment = "Choose delivery or arranged pickup.";
   if (!order.preferredTime) errors.preferredTime = "Choose a time between 12:00 and 23:00.";
   if (order.lines.length === 0) errors.cart = "Add at least one menu item.";
-  if (payment.method === "momo") {
-    if (!payment.momoNumber.trim())
-      errors.momoNumber = "Enter the mobile money number to charge.";
-    else if (!isValidMomoNumber(payment.momoNumber))
-      errors.momoNumber = "Use ten digits, like 0205786433.";
-    if (!payment.momoNetwork) errors.momoNetwork = "Choose the mobile money network.";
-  }
   if (!acceptedTerms)
     errors.terms = "Accept the Terms and Conditions before you send the order.";
   return errors;
@@ -128,9 +109,6 @@ export function OrderSection() {
   /** Honeypot: a real customer never sees this, so anything in it is a bot. */
   const [company, setCompany] = useState("");
   const [payMethod, setPayMethod] = useState<PayMethod>("delivery");
-  const [momoNumber, setMomoNumber] = useState("");
-  const [momoNetwork, setMomoNetwork] = useState<MomoNetwork | "">("");
-  const [voucherCode, setVoucherCode] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -328,7 +306,7 @@ export function OrderSection() {
     });
   }
 
-  async function payWithMomo(payload: OrderPayload, network: MomoNetwork) {
+  async function payWithMomo(payload: OrderPayload) {
     setStatus({ kind: "starting" });
 
     let started;
@@ -342,9 +320,6 @@ export function OrderSection() {
         notes,
         lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
         expectedTotal: payload.total,
-        network,
-        momoNumber,
-        voucherCode: voucherCode.trim() || undefined,
       });
     } catch (error) {
       setStatus({
@@ -363,8 +338,6 @@ export function OrderSection() {
         transactionId: started.transactionId,
         savedAt: Date.now(),
         total: payload.total,
-        network,
-        momoNumber,
         customer: { name, phone, email, fulfilment, preferredTime, notes },
         lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
       });
@@ -377,8 +350,6 @@ export function OrderSection() {
       method: "momo",
       state,
       reference: started.transactionId,
-      network,
-      momoNumber,
     });
 
     if (started.state === "paid") {
@@ -432,14 +403,10 @@ export function OrderSection() {
     const payment: PaymentInfo =
       payMethod === "delivery"
         ? { method: "delivery" }
-        : { method: "momo", state: "pending", reference: "", network: momoNetwork || undefined };
+        : { method: "momo", state: "pending", reference: "" };
     const payload = currentPayload(payment);
 
-    const nextErrors = validate(
-      payload,
-      { method: payMethod, momoNumber, momoNetwork },
-      acceptedTerms
-    );
+    const nextErrors = validate(payload, acceptedTerms);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setStatus({ kind: "idle" });
@@ -447,8 +414,8 @@ export function OrderSection() {
       return;
     }
 
-    if (payMethod === "momo" && momoNetwork) {
-      await payWithMomo(payload, momoNetwork);
+    if (payMethod === "momo") {
+      await payWithMomo(payload);
       return;
     }
 
@@ -477,12 +444,6 @@ export function OrderSection() {
       payment,
       total: payload.total,
     });
-  }
-
-  function onMomoNumberChange(value: string) {
-    setMomoNumber(value);
-    const guess = guessNetwork(value);
-    if (guess) setMomoNetwork(guess);
   }
 
   function switchToPayOnDelivery() {
@@ -618,8 +579,8 @@ export function OrderSection() {
               {status.kind === "awaiting" && (
                 <>
                   <p className="mt-2 text-sm leading-relaxed">
-                    {status.message} We are watching for {formatGhs(total)} on{" "}
-                    {momoNumber}. Keep this page open.
+                    {status.message} We are watching for {formatGhs(total)}. Keep
+                    this page open.
                   </p>
                   <p className="text-muted-foreground mt-2 text-sm">
                     Reference {status.reference}
@@ -648,17 +609,10 @@ export function OrderSection() {
               {status.reference && (
                 <p className="mt-2 text-sm">Reference {status.reference}</p>
               )}
-              {momoNetwork === "VDF" && (
-                <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-foreground">
-                  <li>Add Kitchen test again and choose Pay now.</li>
-                  <li>On the PaySwitch page, pick Telecel and Pay GHS 0.10.</li>
-                  <li>
-                    Do not wait for a popup. Dial *110#, then My Account → Approvals,
-                    enter your PIN, open the pending transaction, and approve it
-                    before the five-minute timer ends.
-                  </li>
-                </ol>
-              )}
+              <p className="mt-3 text-sm leading-relaxed text-foreground">
+                Telecel Cash often sends no popup. While the payment page is
+                open, dial *110# and approve under Pending.
+              </p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <button
                   type="button"
@@ -856,112 +810,10 @@ export function OrderSection() {
               </div>
               <p className="text-muted-foreground mt-2 text-sm">
                 {canPayOnline
-                  ? "Paying now puts your order straight into the queue. Pay on delivery means you settle the rider."
+                  ? "Paying now opens a PaySwitch page where you enter the wallet. Pay on delivery means you settle the rider."
                   : "Paying online is being switched on. For now, choose pay on delivery and we will confirm by phone."}
               </p>
             </fieldset>
-
-            {payMethod === "momo" && canPayOnline && (
-              <div className="space-y-5">
-                <div>
-                  <label
-                    htmlFor={field("momoNumber")}
-                    className="mb-1 block text-sm font-medium"
-                  >
-                    Mobile money number
-                  </label>
-                  <input
-                    id={field("momoNumber")}
-                    name="momoNumber"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    placeholder="0205786433"
-                    value={momoNumber}
-                    onChange={(e) => onMomoNumberChange(e.target.value)}
-                    aria-invalid={!!errors.momoNumber}
-                    aria-describedby={
-                      errors.momoNumber
-                        ? `${field("momoNumber")}-error`
-                        : `${field("momoNumber")}-hint`
-                    }
-                    className="border-input min-h-11 w-full border bg-background px-3"
-                  />
-                  <p
-                    id={`${field("momoNumber")}-hint`}
-                    className="text-muted-foreground mt-1 text-sm"
-                  >
-                    The wallet we should charge {formatGhs(total)} from. It can
-                    differ from your phone number above.
-                  </p>
-                  {errors.momoNumber && (
-                    <p
-                      id={`${field("momoNumber")}-error`}
-                      className="text-destructive mt-1 text-sm"
-                    >
-                      {errors.momoNumber}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    htmlFor={field("momoNetwork")}
-                    className="mb-1 block text-sm font-medium"
-                  >
-                    Mobile money network
-                  </label>
-                  <select
-                    id={field("momoNetwork")}
-                    name="momoNetwork"
-                    value={momoNetwork}
-                    onChange={(e) => setMomoNetwork(e.target.value as MomoNetwork | "")}
-                    aria-invalid={!!errors.momoNetwork}
-                    aria-describedby={
-                      errors.momoNetwork ? `${field("momoNetwork")}-error` : undefined
-                    }
-                    className="border-input min-h-11 w-full border bg-background px-3"
-                  >
-                    <option value="">Choose a network</option>
-                    {momoNetworks.map((network) => (
-                      <option key={network.code} value={network.code}>
-                        {network.label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.momoNetwork && (
-                    <p
-                      id={`${field("momoNetwork")}-error`}
-                      className="text-destructive mt-1 text-sm"
-                    >
-                      {errors.momoNetwork}
-                    </p>
-                  )}
-                </div>
-                {momoNetwork === "VDF" && (
-                  <div>
-                    <label
-                      htmlFor={field("voucherCode")}
-                      className="mb-1 block text-sm font-medium"
-                    >
-                      Telecel Cash approval code (if your wallet asks for one)
-                    </label>
-                    <input
-                      id={field("voucherCode")}
-                      name="voucherCode"
-                      inputMode="numeric"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value)}
-                      className="border-input min-h-11 w-full border bg-background px-3"
-                    />
-                    <p className="text-muted-foreground mt-1 text-sm">
-                      Telecel Cash often sends no popup. Leave this blank, then
-                      on the payment page dial *110# → My Account → Approvals
-                      and approve the pending charge before the timer ends.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
 
             <div>
               <label

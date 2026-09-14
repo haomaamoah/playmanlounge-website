@@ -175,25 +175,18 @@ export async function POST(request: Request) {
   }
 
   const transactionId = newTransactionId();
-
-  if (config.flow === "checkout") {
+  const subscriberNumber = normaliseSubscriberNumber(
+    typeof body.momoNumber === "string" ? body.momoNumber : ""
+  );
+  const network = body.network;
+  // Wallet number and network are collected on PaySwitch's hosted page. Direct
+  // debit still accepts them when they are sent, but the order form does not.
+  if (config.flow === "checkout" || !isMomoNetwork(network) || !subscriberNumber) {
     return startCheckout(config, {
       transactionId,
       total: order.total,
       name: order.name,
       email: order.email,
-    });
-  }
-
-  if (!isMomoNetwork(body.network)) {
-    return fail(400, { error: "Choose a mobile money network." });
-  }
-  const subscriberNumber = normaliseSubscriberNumber(
-    typeof body.momoNumber === "string" ? body.momoNumber : ""
-  );
-  if (!subscriberNumber) {
-    return fail(400, {
-      error: "Enter the mobile money number as ten digits, like 0205786433.",
     });
   }
   const voucherCode = (typeof body.voucherCode === "string" ? body.voucherCode : "")
@@ -205,7 +198,7 @@ export async function POST(request: Request) {
     result = await chargeMomo(config, {
       transactionId,
       total: order.total,
-      network: body.network,
+      network,
       subscriberNumber,
       description: `${site.name} order for ${order.name}`,
       voucherCode: voucherCode || undefined,

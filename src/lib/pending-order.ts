@@ -12,8 +12,8 @@ export type PendingOrder = {
   transactionId: string;
   savedAt: number;
   total: number;
-  network: MomoNetwork;
-  momoNumber: string;
+  network?: MomoNetwork;
+  momoNumber?: string;
   customer: {
     name: string;
     phone: string;
