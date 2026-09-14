@@ -163,6 +163,17 @@ Preview the layout locally (dev server only):
 
 The Contact Us form still uses Web3Forms or `mailto:` (`NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`). The kiosk number stays on screen as a tap-to-call fallback.
 
+## Legal
+
+House policy PDFs (branded A4, not a lawyer’s letter):
+
+- [Terms and Conditions](/legal/terms-and-conditions.pdf)
+- [Return Policy](/legal/return-policy.pdf)
+
+The order form cannot submit until the customer ticks that they accept the Terms. The words **Terms and Conditions** in that label open the PDF. The same two files are buttons in the footer. `/api/orders` also refuses a bag that did not send `acceptedTerms: true`.
+
+Print sources live in `legal/*.html`. The UI/UX prompt used to generate them is `prompts/ui-ux-legal-documents.md`.
+
 ## Footer
 
-The copyright line reads: **Powered By Amoah Infotech**
+The cocoa bar has **Terms and Conditions** and **Return Policy** buttons, then **Powered By Amoah Infotech**.

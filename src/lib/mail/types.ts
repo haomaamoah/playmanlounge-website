@@ -12,6 +12,7 @@ export type OrderRequest = {
   notes: string;
   lines: OrderLineInput[];
   company?: string;
+  acceptedTerms?: boolean;
 };
 
 export type HydratedOrder = {

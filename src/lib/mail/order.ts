@@ -4,7 +4,7 @@ import type { HydratedOrder, OrderRequest } from "@/lib/mail/types";
 
 export type OrderFieldErrors = Partial<
   Record<
-    "name" | "phone" | "email" | "fulfilment" | "preferredTime" | "cart" | "notes",
+    "name" | "phone" | "email" | "fulfilment" | "preferredTime" | "cart" | "notes" | "terms",
     string
   >
 >;
@@ -63,6 +63,9 @@ export function parseOrderRequest(raw: unknown): {
   };
 
   const errors = validateOrderInput(data);
+  if (body.acceptedTerms !== true) {
+    errors.terms = "Accept the Terms and Conditions before you send the order.";
+  }
   if (Object.keys(errors).length) return { errors };
   return { data };
 }

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { site } from "@/lib/content";
+import { legal } from "@/lib/legal";
 
 export function SiteFooter() {
   return (
@@ -24,7 +25,27 @@ export function SiteFooter() {
             </a>
           </div>
         </div>
-        <p className="text-sm text-cream/80">Powered By Amoah Infotech</p>
+        <div className="flex flex-col items-start gap-3 sm:items-end">
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={legal.terms.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center border border-cream/40 px-4 text-sm font-medium hover:bg-cream/10"
+            >
+              {legal.terms.label}
+            </a>
+            <a
+              href={legal.returns.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center border border-cream/40 px-4 text-sm font-medium hover:bg-cream/10"
+            >
+              {legal.returns.label}
+            </a>
+          </div>
+          <p className="text-sm text-cream/80">Powered By Amoah Infotech</p>
+        </div>
       </div>
     </footer>
   );

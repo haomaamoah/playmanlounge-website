@@ -33,6 +33,7 @@ import {
   waitForPayment,
   PaymentError,
 } from "@/lib/payments/client";
+import { legal } from "@/lib/legal";
 
 type PayMethod = "delivery" | "momo";
 
@@ -46,7 +47,8 @@ type FieldErrors = Partial<
     | "cart"
     | "notes"
     | "momoNumber"
-    | "momoNetwork",
+    | "momoNetwork"
+    | "terms",
     string
   >
 >;
@@ -75,7 +77,8 @@ type Status =
 
 function validate(
   order: OrderPayload,
-  payment: { method: PayMethod; momoNumber: string; momoNetwork: MomoNetwork | "" }
+  payment: { method: PayMethod; momoNumber: string; momoNetwork: MomoNetwork | "" },
+  acceptedTerms: boolean
 ): FieldErrors {
   const errors: FieldErrors = {};
   if (!order.name.trim()) errors.name = "Enter your name.";
@@ -96,6 +99,8 @@ function validate(
       errors.momoNumber = "Use ten digits, like 0205786433.";
     if (!payment.momoNetwork) errors.momoNetwork = "Choose the mobile money network.";
   }
+  if (!acceptedTerms)
+    errors.terms = "Accept the Terms and Conditions before you send the order.";
   return errors;
 }
 
@@ -126,6 +131,7 @@ export function OrderSection() {
   const [momoNumber, setMomoNumber] = useState("");
   const [momoNetwork, setMomoNetwork] = useState<MomoNetwork | "">("");
   const [voucherCode, setVoucherCode] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [canPayOnline, setCanPayOnline] = useState(false);
@@ -162,6 +168,7 @@ export function OrderSection() {
           notes: payload.notes,
           lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
           payment: payload.payment,
+          acceptedTerms: true,
           company,
         }),
       });
@@ -428,7 +435,11 @@ export function OrderSection() {
         : { method: "momo", state: "pending", reference: "", network: momoNetwork || undefined };
     const payload = currentPayload(payment);
 
-    const nextErrors = validate(payload, { method: payMethod, momoNumber, momoNetwork });
+    const nextErrors = validate(
+      payload,
+      { method: payMethod, momoNumber, momoNetwork },
+      acceptedTerms
+    );
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setStatus({ kind: "idle" });
@@ -1006,6 +1017,38 @@ export function OrderSection() {
                 {errors.cart}
               </p>
             )}
+            <div>
+              <div className="flex items-start gap-3">
+                <input
+                  id={field("terms")}
+                  name="terms"
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  aria-invalid={!!errors.terms}
+                  aria-describedby={errors.terms ? `${field("terms")}-error` : undefined}
+                  className="border-input mt-1 size-5 shrink-0 accent-cocoa"
+                />
+                <label htmlFor={field("terms")} className="text-sm leading-relaxed">
+                  I have read and accept the{" "}
+                  <a
+                    className="text-cocoa font-medium underline underline-offset-2"
+                    href={legal.terms.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {legal.terms.label}
+                  </a>
+                  .
+                </label>
+              </div>
+              {errors.terms && (
+                <p id={`${field("terms")}-error`} className="text-destructive mt-2 text-sm">
+                  {errors.terms}
+                </p>
+              )}
+            </div>
             <button
               type="submit"
               disabled={busy}
