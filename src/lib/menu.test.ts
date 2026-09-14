@@ -22,13 +22,13 @@ test("kitchen test is ten pesewas so pay-now can be checked without a real plate
   const item = menu.find((entry) => entry.id === "kitchen-test");
   assert.ok(item, "kitchen-test is missing from the menu");
   assert.equal(item.price, 0.1);
-  assert.equal(formatGhs(item.price), "GHS 0.10");
+  assert.equal(formatGhs(item.price), "GH₵ 0.10");
   assert.equal(pesewas(item.price), 10);
 });
 
 test("cedis amounts print whole numbers without decimals", () => {
-  assert.equal(formatGhs(40), "GHS 40");
-  assert.equal(formatGhs(0.1), "GHS 0.10");
+  assert.equal(formatGhs(40), "GH₵ 40");
+  assert.equal(formatGhs(0.1), "GH₵ 0.10");
 });
 
 test("every menu photo has a receipt thumbnail", () => {

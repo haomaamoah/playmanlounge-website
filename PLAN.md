@@ -46,7 +46,7 @@ Single page with hash links. A kiosk site has one job (see food, send an order).
 | Name + tagline   | cocoa wash from the left          |
 | Hours, street    | [Make an Order]                   |
 +------------------+-----------------------------------+
-| FOOD ledger (photo + line + GHS) | DRINKS ledger     |
+| FOOD ledger (photo + line + GH₵) | DRINKS ledger     |
 | Gallery: irregular photo grid, tap to enlarge        |
 | Two portraits, name / title / bio                    |
 | Bag + email order form                               |
@@ -61,7 +61,7 @@ Alignment: left. The kiosk is a counter, not a cathedral. Do not center the hero
 1. The plate of fried rice opens the site. The logo is a mark, not a second headline.
 2. Palette only from the PNG. No extra neon, no dark theme.
 3. One non-user motion moment at most (hero photo present on load). No fade-up on every section.
-4. Prices read like a painted board: GHS figure first, then the dish.
+4. Prices read like a painted board: GH₵ figure first, then the dish.
 5. Order is email. The bag on the menu is the same bag on the form.
 
 ### Navigation

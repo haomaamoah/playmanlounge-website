@@ -67,7 +67,7 @@ type Status =
   | { kind: "payment-failed"; message: string; reference?: string; gatewayIssue: boolean }
   | { kind: "error"; message: string };
 
-function validate(order: OrderPayload, acceptedTerms: boolean): FieldErrors {
+function validate(order: OrderPayload): FieldErrors {
   const errors: FieldErrors = {};
   if (!order.name.trim()) errors.name = "Enter your name.";
   const phone = order.phone.replace(/\s/g, "");
@@ -80,8 +80,6 @@ function validate(order: OrderPayload, acceptedTerms: boolean): FieldErrors {
   if (!order.fulfilment) errors.fulfilment = "Choose delivery or arranged pickup.";
   if (!order.preferredTime) errors.preferredTime = "Choose a time between 12:00 and 23:00.";
   if (order.lines.length === 0) errors.cart = "Add at least one menu item.";
-  if (!acceptedTerms)
-    errors.terms = "Accept the Terms and Conditions before you send the order.";
   return errors;
 }
 
@@ -109,7 +107,6 @@ export function OrderSection() {
   /** Honeypot: a real customer never sees this, so anything in it is a bot. */
   const [company, setCompany] = useState("");
   const [payMethod, setPayMethod] = useState<PayMethod>("delivery");
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [canPayOnline, setCanPayOnline] = useState(false);
@@ -406,7 +403,7 @@ export function OrderSection() {
         : { method: "momo", state: "pending", reference: "" };
     const payload = currentPayload(payment);
 
-    const nextErrors = validate(payload, acceptedTerms);
+    const nextErrors = validate(payload);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setStatus({ kind: "idle" });
@@ -875,11 +872,12 @@ export function OrderSection() {
                   id={field("terms")}
                   name="terms"
                   type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  aria-invalid={!!errors.terms}
-                  aria-describedby={errors.terms ? `${field("terms")}-error` : undefined}
-                  className="border-input mt-1 size-5 shrink-0 accent-cocoa"
+                  checked
+                  disabled
+                  readOnly
+                  aria-checked="true"
+                  aria-disabled="true"
+                  className="border-input mt-1 size-5 shrink-0 cursor-not-allowed accent-cocoa disabled:opacity-100"
                 />
                 <label htmlFor={field("terms")} className="text-sm leading-relaxed">
                   I have read and accept the{" "}
@@ -895,11 +893,6 @@ export function OrderSection() {
                   .
                 </label>
               </div>
-              {errors.terms && (
-                <p id={`${field("terms")}-error`} className="text-destructive mt-2 text-sm">
-                  {errors.terms}
-                </p>
-              )}
             </div>
             <button
               type="submit"

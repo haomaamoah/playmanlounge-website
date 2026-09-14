@@ -22,7 +22,7 @@ Play Man Lounge is an Accra online kitchen (Kaneshie hub at Nikoi Olai Street, o
 
 ## Copy to cover
 
-**Terms:** who we are; online kitchen vs booked events; ordering hours; bag prices in GHS; payment (delivery or MoMo); cooking starts after a confirmed order/paid MoMo; customer must be reachable; allergies/notes; we may refuse or delay when the kitchen is full; photos are a guide; Ghana law / Accra.
+**Terms:** who we are; online kitchen vs booked events; ordering hours; bag prices in GH₵; payment (delivery or MoMo); cooking starts after a confirmed order/paid MoMo; customer must be reachable; allergies/notes; we may refuse or delay when the kitchen is full; photos are a guide; Ghana law / Accra.
 
 **Returns:** cooked food is not taken back once delivered in good condition; replacements or refunds for wrong item, missing item, or food that is unsafe/spoiled if reported by phone the same order window; MoMo refunds to the paying number; no cash refund at the hub on ordinary days; event bookings handled separately.
 

@@ -158,7 +158,7 @@ export async function POST(request: Request) {
   const order = hydrated.order;
   if (order.total > config.maxTotal) {
     return fail(400, {
-      error: `Orders over GHS ${config.maxTotal} are arranged by phone.`,
+      error: `Orders over GH₵ ${config.maxTotal} are arranged by phone.`,
     });
   }
 

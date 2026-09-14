@@ -48,7 +48,7 @@ const jsonLd = {
   },
   openingHours: "Mo-Su 12:00-23:00",
   servesCuisine: "Ghanaian",
-  priceRange: "GHS 10–55",
+  priceRange: "GH₵ 10–55",
 };
 
 export default function RootLayout({

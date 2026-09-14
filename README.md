@@ -62,7 +62,7 @@ The order form offers two choices:
 
 **Pay on delivery** — nothing changes for the customer. Both receipts carry a `PAY ON DELIVERY` stamp telling the kitchen to collect the cedis on arrival, and the kitchen subject line ends with `pay on delivery` so it reads without opening the mail.
 
-**Pay now with mobile money** — the form asks for the wallet number and network (the network is preselected from the Ghanaian prefix), the submit button becomes **Pay GHS n now**, and payment is handled by PaySwitch (theTeller). Once the money lands the receipts go out stamped `PAID ONLINE`, with the wallet and the PaySwitch reference, and the kitchen subject line ends with `PAID`.
+**Pay now with mobile money** — the form asks for the wallet number and network (the network is preselected from the Ghanaian prefix), the submit button becomes **Pay GH₵ n now**, and payment is handled by PaySwitch (theTeller). Once the money lands the receipts go out stamped `PAID ONLINE`, with the wallet and the PaySwitch reference, and the kitchen subject line ends with `PAID`.
 
 ### Where the money logic lives
 
@@ -138,7 +138,7 @@ There is **no database**. Each submit sends two separate HTML receipts — never
 
 Both carry the payment stamp: `PAID ONLINE`, `PAY ON DELIVERY`, `PAYMENT NOT CONFIRMED` or `ONLINE PAYMENT FAILED`, and the kitchen subject line ends with the same word so it reads without opening the mail.
 
-Receipt HTML is a cocoa-and-cream takeaway docket (logo stamp, gold ticket ribbon, pictured ledger, GHS total). The small JPEGs in `public/email/` are generated from `public/media/*.webp`; `npm test` fails if a menu item has no thumbnail. A plain-text version goes with every mail for clients that strip HTML.
+Receipt HTML is a cocoa-and-cream takeaway docket (logo stamp, gold ticket ribbon, pictured ledger, GH₵ total). The small JPEGs in `public/email/` are generated from `public/media/*.webp`; `npm test` fails if a menu item has no thumbnail. A plain-text version goes with every mail for clients that strip HTML.
 
 **Send mail in production (Brevo, preferred)**
 
@@ -170,7 +170,7 @@ House policy PDFs (branded A4, not a lawyer’s letter):
 - [Terms and Conditions](/legal/terms-and-conditions.pdf)
 - [Return Policy](/legal/return-policy.pdf)
 
-The order form cannot submit until the customer ticks that they accept the Terms. The words **Terms and Conditions** in that label open the PDF. The same two files are buttons in the footer. `/api/orders` also refuses a bag that did not send `acceptedTerms: true`.
+The order form shows the Terms as already accepted and locked. The words **Terms and Conditions** in that label open the PDF. The same two files are buttons in the footer. `/api/orders` still requires `acceptedTerms: true`.
 
 Print sources live in `legal/*.html`. The UI/UX prompt used to generate them is `prompts/ui-ux-legal-documents.md`.
 
