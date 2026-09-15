@@ -63,13 +63,15 @@ function Ledger({ group }: { group: MenuGroup }) {
       <ul className="mt-2 grid sm:grid-cols-2 sm:gap-x-10">
         {group.items.map((item) => (
           <li key={item.id} className="border-border flex gap-3 border-b py-4">
-            <Image
-              src={item.image}
-              alt={item.name}
-              width={item.width}
-              height={item.height}
-              className="size-20 shrink-0 object-cover sm:size-24"
-            />
+            <div className="relative size-20 shrink-0 overflow-hidden rounded-xl sm:size-24">
+              <Image
+                src={item.image}
+                alt={item.name}
+                width={item.width}
+                height={item.height}
+                className="size-full object-cover"
+              />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <h4 className="min-w-0 font-medium break-words">{item.name}</h4>

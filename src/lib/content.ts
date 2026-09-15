@@ -168,7 +168,7 @@ export const menuGroups: MenuGroup[] = [
         description: "One spring roll, as priced on the board.",
         price: 10,
         category: "food",
-        image: "/media/food-playboy-roll.webp",
+        image: "/media/food-spring-rolls.webp",
         ...PHOTO,
       },
       {
