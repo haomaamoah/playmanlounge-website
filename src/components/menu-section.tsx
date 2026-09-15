@@ -101,12 +101,11 @@ export function MenuSection() {
           Menu
         </h2>
         <p className="text-muted-foreground mt-3 max-w-xl text-base leading-relaxed">
-          Everything here is off our own boards — the shutter board at the kiosk
-          and the printed poster, both in the{" "}
+          Off the current Play Man Lounge menu board — the same poster in the{" "}
           <a className="text-foreground underline" href="#gallery">
             gallery
           </a>
-          . Prices are in cedis and include the sauce.
+          . Combos come with a Coke. Prices are in cedis.
         </p>
         <p className="sr-only" aria-live="polite">
           {notice}

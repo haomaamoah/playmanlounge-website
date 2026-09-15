@@ -11,11 +11,11 @@ const SAMPLE = {
   email: "ama.mensah@example.com",
   fulfilment: "delivery" as const,
   preferredTime: "13:30",
-  notes: "Extra pepper on the fried rice. No onions on the shawarma.",
+  notes: "Extra pepper on the fried rice.",
   lines: [
-    { id: "jumbo-bite", qty: 2 },
-    { id: "shawarma", qty: 1 },
-    { id: "fresh-juice", qty: 2 },
+    { id: "big-boy", qty: 1 },
+    { id: "chairman", qty: 2 },
+    { id: "fried-rice", qty: 1 },
   ],
 };
 

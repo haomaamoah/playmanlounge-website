@@ -1,6 +1,6 @@
 import { formatGhs, site } from "@/lib/content";
 import { networkLabel } from "@/lib/payments/networks";
-import { absoluteUrl, kioskEmail } from "@/lib/mail/config";
+import { absoluteUrl } from "@/lib/mail/config";
 import { escapeHtml } from "@/lib/mail/escape";
 import type { HydratedOrder, ReceiptRole } from "@/lib/mail/types";
 
@@ -135,6 +135,7 @@ export function receiptText(order: HydratedOrder, role: ReceiptRole) {
     `${site.addressLine}, ${site.area}`,
     `${site.hours}, ${site.hoursDays}`,
     site.phoneDisplay,
+    `To follow up an order, call ${site.followUpPhoneDisplay}`,
     role === "customer"
       ? "Reply or call if you need to change this."
       : "Reply goes to the customer.",
@@ -221,8 +222,8 @@ export function receiptHtml(order: HydratedOrder, role: ReceiptRole) {
     : "";
 
   const customerHelp = isStaff
-    ? ""
-    : `<p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${CREAM};">Questions? Call the kiosk or reply — it goes to ${escapeHtml(kioskEmail())}.</p>`;
+    ? `<p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${CREAM};">Customer follow-up number: <a href="tel:${site.followUpPhoneTel}" style="color:${GOLD};text-decoration:none;">${escapeHtml(site.followUpPhoneDisplay)}</a></p>`
+    : `<p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.55;color:${CREAM};">To follow up this order, call <a href="tel:${site.followUpPhoneTel}" style="color:${GOLD};text-decoration:none;">${escapeHtml(site.followUpPhoneDisplay)}</a>.</p>`;
 
   return `<!DOCTYPE html>
 <html lang="en">

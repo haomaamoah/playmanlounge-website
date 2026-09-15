@@ -89,6 +89,8 @@ export function formatOrderBody(order: OrderPayload) {
     "",
     "Notes:",
     order.notes.trim() || "(none)",
+    "",
+    `To follow up an order, call ${site.followUpPhoneDisplay}`,
   ].join("\n");
 }
 

@@ -484,6 +484,13 @@ export function OrderSection() {
             </a>
             .
           </p>
+          <p className="mt-3 max-w-md text-base leading-relaxed">
+            To follow up an order, call{" "}
+            <a className="underline" href={`tel:${site.followUpPhoneTel}`}>
+              {site.followUpPhoneDisplay}
+            </a>
+            .
+          </p>
           <div className="border-cocoa mt-8 border-t-2 pt-4">
             <h3 className="font-display text-2xl">Your bag</h3>
             {lines.length === 0 ? (
@@ -651,7 +658,11 @@ export function OrderSection() {
               {status.via === "email" && (
                 <p className="mt-2 text-sm leading-relaxed">
                   Receipt {status.orderRef} is in your inbox, and the kitchen has
-                  the same ticket.
+                  the same ticket. To follow up, call{" "}
+                  <a className="underline" href={`tel:${site.followUpPhoneTel}`}>
+                    {site.followUpPhoneDisplay}
+                  </a>
+                  .
                 </p>
               )}
               {status.via === "mock" && (

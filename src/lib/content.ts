@@ -6,6 +6,8 @@ export const site = {
     "We cook for Accra mainly online. Order fried rice, shawarma and more for delivery, or book the Kaneshie kitchen for a private event. Without a booking the site is our delivery hub — not open to the public.",
   phoneDisplay: "+233 54 753 9942",
   phoneTel: "+233547539942",
+  followUpPhoneDisplay: "053 840 9046",
+  followUpPhoneTel: "+233538409046",
   addressLine: "Nikoi Olai Street, off Amarboifio Avenue",
   area: "Kaneshie, Accra, Ghana",
   plusCode: "HQH4+2M Accra",
@@ -63,55 +65,84 @@ export type MenuGroup = {
 const PHOTO = { width: 1100, height: 733 };
 
 /**
- * Every item and price below is transcribed from the two boards the business
- * uses: the kiosk shutter board and the printed PLAYMAN LOUNGE MENU poster
- * (both in the gallery). The poster prices the Playboy and Play Man trays by
- * contents rather than by name, so the contents are kept in the item name to
- * keep order emails unambiguous.
+ * Transcribed from the current Play Man Lounge menu board (black poster with
+ * combos and a Coke). Fried rice is printed as two prices on one card, so both
+ * are orderable. Kitchen test is not on the board — it stays for payment checks.
  */
 export const menuGroups: MenuGroup[] = [
   {
+    id: "combos",
+    title: "Combos",
+    blurb: "Every combo on the board comes with a Coke.",
+    items: [
+      {
+        id: "chairman",
+        name: "Chairman",
+        description: "3 samosa + 1 Coke.",
+        price: 25,
+        category: "food",
+        image: "/media/food-chairman.webp",
+        ...PHOTO,
+      },
+      {
+        id: "playboy",
+        name: "Playboy",
+        description: "2 spring rolls + 1 Coke.",
+        price: 30,
+        category: "food",
+        image: "/media/food-playboy.webp",
+        ...PHOTO,
+      },
+      {
+        id: "street-king",
+        name: "Street King",
+        description: "2 chicken + 1 Coke.",
+        price: 30,
+        category: "food",
+        image: "/media/food-street-king.webp",
+        ...PHOTO,
+      },
+      {
+        id: "four-in-one",
+        name: "4 in One",
+        description: "1 spring roll + samosa + 1 chicken + Coke.",
+        price: 35,
+        category: "food",
+        image: "/media/food-four-in-one.webp",
+        ...PHOTO,
+      },
+      {
+        id: "big-boy",
+        name: "Big Boy",
+        description: "Fried rice + 2 samosa + Coke.",
+        price: 50,
+        category: "food",
+        image: "/media/food-big-boy.webp",
+        ...PHOTO,
+      },
+    ],
+  },
+  {
     id: "plates",
     title: "Plates",
-    blurb: "Full plates off the wok, packed hot for the rider.",
+    blurb: "Fried rice at the two prices printed on the board.",
     items: [
       {
         id: "fried-rice",
         name: "Fried rice",
-        description:
-          "The house plate. Hot fried rice with beef — the taste regulars come back for.",
-        price: 40,
+        description: "The house plate. The board prices this at GH₵ 35.",
+        price: 35,
         category: "food",
         image: "/media/food-fried-rice-beef.webp",
         ...PHOTO,
       },
       {
-        id: "shawarma",
-        name: "Shawarma",
-        description: "Wrapped, loaded and rolled tight so it travels well.",
-        price: 30,
-        category: "food",
-        image: "/media/food-shawarma.webp",
-        ...PHOTO,
-      },
-      {
-        id: "mini-bite",
-        name: "Mini Bite",
-        description:
-          "Fried rice plated with 1 chicken, 1 samosa, salad, shito and sauce.",
-        price: 35,
-        category: "food",
-        image: "/media/food-mini-bite.webp",
-        ...PHOTO,
-      },
-      {
-        id: "jumbo-bite",
-        name: "Jumbo Bite",
-        description:
-          "The big one: fried rice with 2 chicken, 1 samosa, salad, shito and sauce.",
+        id: "fried-rice-60",
+        name: "Fried rice — GH₵ 60",
+        description: "The same fried rice plate at the board’s second price of GH₵ 60.",
         price: 60,
         category: "food",
-        image: "/media/food-jumbo-bite.webp",
+        image: "/media/food-fried-rice-beef.webp",
         ...PHOTO,
       },
       {
@@ -128,97 +159,25 @@ export const menuGroups: MenuGroup[] = [
   },
   {
     id: "bites",
-    title: "Bites & trays",
-    blurb: "Samosa, spring roll and chicken trays. Sauce comes with every one.",
+    title: "Extra bites",
+    blurb: "Add a roll or samosas on the side.",
     items: [
       {
-        id: "ben-10",
-        name: "Ben 10",
-        description: "Three samosas and sauce. The cheapest way to eat well here.",
-        price: 15,
-        category: "food",
-        image: "/media/food-ben10.webp",
-        ...PHOTO,
-      },
-      {
-        id: "spring-rolls",
-        name: "Spring rolls",
-        description: "The shutter-board pack — golden, crunchy, made to dip.",
-        price: 20,
-        category: "food",
-        image: "/media/food-spring-rolls.webp",
-        ...PHOTO,
-      },
-      {
-        id: "playboy-mix",
-        name: "Playboy — 3 samosa, 1 spring roll",
-        description: "The full snack tray with sauce. Good for two people talking.",
-        price: 20,
-        category: "food",
-        image: "/media/food-playboy-mix.webp",
-        ...PHOTO,
-      },
-      {
-        id: "playboy-roll",
-        name: "Playboy — 1 spring roll",
-        description: "One roll, one sauce. A ten-cedi stop on the way home.",
+        id: "spring-roll",
+        name: "Spring roll",
+        description: "One spring roll, as priced on the board.",
         price: 10,
         category: "food",
         image: "/media/food-playboy-roll.webp",
         ...PHOTO,
       },
       {
-        id: "playboy-samosa",
-        name: "Playboy — 2 samosa",
-        description: "Two samosas and sauce, straight out of the fryer.",
+        id: "samosa",
+        name: "Samosa — 2 for GH₵ 10",
+        description: "Two samosas. The board prices them two for GH₵ 10.",
         price: 10,
         category: "food",
         image: "/media/food-playboy-samosa.webp",
-        ...PHOTO,
-      },
-      {
-        id: "playman-bite",
-        name: "Play Man — 2 chicken, 1 samosa",
-        description: "Two pieces of grilled chicken, a samosa and sauce. No rice.",
-        price: 30,
-        category: "food",
-        image: "/media/food-playman-bite.webp",
-        ...PHOTO,
-      },
-      {
-        id: "playman-feast",
-        name: "Play Man — 3 chicken, 1 spring roll",
-        description: "Three pieces of chicken, a spring roll and sauce. Share it.",
-        price: 50,
-        category: "food",
-        image: "/media/food-playman-feast.webp",
-        ...PHOTO,
-      },
-    ],
-  },
-  {
-    id: "drinks",
-    title: "Drinks",
-    blurb: "Cold from the fridge, packed beside the food.",
-    items: [
-      {
-        id: "fresh-juice",
-        name: "Fresh juice",
-        description:
-          "Poured cold to order. Say which flavour you want in the order notes.",
-        price: 15,
-        category: "drinks",
-        image: "/media/drink-orange.webp",
-        ...PHOTO,
-      },
-      {
-        id: "bottled-drink",
-        name: "Bottled drink",
-        description:
-          "Soft drink, malt or water. Name your bottle in the order notes.",
-        price: 10,
-        category: "drinks",
-        image: "/media/drink-sodas.webp",
         ...PHOTO,
       },
     ],
@@ -266,7 +225,7 @@ export const gallery = [
   },
   {
     src: "/media/gallery-menu-board.webp",
-    alt: "Printed Play Man Lounge menu poster listing Ben 10, Mini Bite, Jumbo Bite, Playboy and Play Man trays with prices",
+    alt: "Play Man Lounge menu board listing Chairman, Playboy, Street King, 4 in One, Big Boy, fried rice, spring roll and samosa with prices",
     width: 764,
     height: 1080,
     crop: "top",
