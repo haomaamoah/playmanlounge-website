@@ -491,6 +491,13 @@ export function OrderSection() {
             </a>
             .
           </p>
+          <p className="mt-3 max-w-md text-base leading-relaxed">
+            Prefer the new order desk?{" "}
+            <a className="underline" href="/app">
+              Open it here
+            </a>
+            . Live MoMo checkout on this page still works.
+          </p>
           <div className="border-cocoa mt-8 border-t-2 pt-4">
             <h3 className="font-display text-2xl">Your bag</h3>
             {lines.length === 0 ? (

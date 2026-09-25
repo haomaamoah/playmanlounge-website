@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ArrowUpRight, Phone } from "lucide-react";
 import { site } from "@/lib/content";
 
 export function Hero() {
@@ -33,37 +34,37 @@ export function Hero() {
         <p className="mt-5 max-w-lg text-base leading-relaxed text-cream/90">
           {site.blurb}
         </p>
-        <dl className="border-gold/50 mt-8 max-w-md space-y-3 border-l-4 pl-4 text-cream">
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <a
+            href="/app"
+            className="bg-cream text-cocoa hover:bg-card inline-flex min-h-12 items-center justify-center gap-2 px-6 text-base font-semibold"
+          >
+            Make an Order
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          </a>
+          <a
+            href={`tel:${site.phoneTel}`}
+            className="border-cream/40 text-cream hover:bg-cream/10 inline-flex min-h-12 items-center justify-center gap-2 border px-6 text-base font-semibold"
+          >
+            <Phone className="size-4" aria-hidden="true" />
+            Call {site.phoneDisplay}
+          </a>
+        </div>
+        <dl className="border-cream/30 mt-10 grid max-w-2xl gap-5 border-t pt-5 text-cream sm:grid-cols-2 sm:gap-8">
           <div>
-            <dt className="text-cream/70 text-sm">{site.hoursLabel}</dt>
-            <dd className="font-medium">
+            <dt className="text-cream/65 text-sm">{site.hoursLabel}</dt>
+            <dd className="mt-1 font-medium">
               {site.hours}, {site.hoursDays}
             </dd>
           </div>
           <div>
-            <dt className="text-cream/70 text-sm">{site.locationLabel}</dt>
-            <dd className="font-medium">
-              {site.addressLine}, {site.area}
-            </dd>
-            <dd className="text-cream/80 mt-1 text-sm leading-relaxed">
+            <dt className="text-cream/65 text-sm">{site.locationLabel}</dt>
+            <dd className="mt-1 font-medium">{site.area}</dd>
+            <dd className="text-cream/75 mt-1 text-sm leading-relaxed">
               {site.locationNote}
             </dd>
           </div>
         </dl>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <a
-            href="#order"
-            className="bg-cream text-cocoa hover:bg-card inline-flex min-h-12 items-center justify-center px-6 text-base font-semibold"
-          >
-            Make an Order
-          </a>
-          <a
-            href={`tel:${site.phoneTel}`}
-            className="border-cream/40 text-cream hover:bg-cream/10 inline-flex min-h-12 items-center justify-center border px-6 text-base font-semibold"
-          >
-            Call {site.phoneDisplay}
-          </a>
-        </div>
       </div>
     </section>
   );

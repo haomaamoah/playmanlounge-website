@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Calistoga, Figtree } from "next/font/google";
 import { site } from "@/lib/content";
+import { MockStoreProvider } from "@/lib/mocks/store";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -63,7 +64,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {children}
+        <MockStoreProvider>{children}</MockStoreProvider>
       </body>
     </html>
   );
