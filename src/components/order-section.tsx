@@ -27,6 +27,12 @@ import {
   waitForPayment,
   PaymentError,
 } from "@/lib/payments/client";
+import {
+  guessNetwork,
+  isValidMomoNumber,
+  momoNetworks,
+  type MomoNetwork,
+} from "@/lib/payments/networks";
 import { legal } from "@/lib/legal";
 
 type PayMethod = "delivery" | "momo";
@@ -40,7 +46,9 @@ type FieldErrors = Partial<
     | "preferredTime"
     | "cart"
     | "notes"
-    | "terms",
+    | "terms"
+    | "momoNumber"
+    | "network",
     string
   >
 >;
@@ -107,6 +115,8 @@ export function OrderSection() {
   /** Honeypot: a real customer never sees this, so anything in it is a bot. */
   const [company, setCompany] = useState("");
   const [payMethod, setPayMethod] = useState<PayMethod>("delivery");
+  const [momoNumber, setMomoNumber] = useState("");
+  const [network, setNetwork] = useState<MomoNetwork | "">("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [canPayOnline, setCanPayOnline] = useState(false);
@@ -318,6 +328,8 @@ export function OrderSection() {
         lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
         expectedTotal: payload.total,
         acceptedTerms: true,
+        network: network || undefined,
+        momoNumber,
       });
     } catch (error) {
       setStatus({
@@ -336,6 +348,8 @@ export function OrderSection() {
         transactionId: started.transactionId,
         savedAt: Date.now(),
         total: payload.total,
+        network: network || undefined,
+        momoNumber,
         customer: { name, phone, email, fulfilment, preferredTime, notes },
         lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
       });
@@ -348,6 +362,8 @@ export function OrderSection() {
       method: "momo",
       state,
       reference: started.transactionId,
+      network: network || undefined,
+      momoNumber,
     });
 
     if (started.state === "paid") {
@@ -401,10 +417,22 @@ export function OrderSection() {
     const payment: PaymentInfo =
       payMethod === "delivery"
         ? { method: "delivery" }
-        : { method: "momo", state: "pending", reference: "" };
+        : {
+            method: "momo",
+            state: "pending",
+            reference: "",
+            network: network || undefined,
+            momoNumber,
+          };
     const payload = currentPayload(payment);
 
     const nextErrors = validate(payload);
+    if (payMethod === "momo") {
+      if (!isValidMomoNumber(momoNumber)) {
+        nextErrors.momoNumber = "Enter a mobile money number like 0241234567.";
+      }
+      if (!network) nextErrors.network = "Choose the mobile money network.";
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setStatus({ kind: "idle" });
@@ -622,8 +650,8 @@ export function OrderSection() {
                 <p className="mt-2 text-sm">Reference {status.reference}</p>
               )}
               <p className="mt-3 text-sm leading-relaxed text-foreground">
-                Telecel Cash often sends no popup. While the payment page is
-                open, dial *110# and approve under Pending.
+                If no prompt appeared, check your mobile money menu for a
+                pending approval, then try again.
               </p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <button
@@ -826,9 +854,83 @@ export function OrderSection() {
               </div>
               <p className="text-muted-foreground mt-2 text-sm">
                 {canPayOnline
-                  ? "Paying now opens a PaySwitch page where you enter the wallet. Pay on delivery means you settle the rider."
+                  ? "Paying now sends an approval prompt to your phone. Pay on delivery means you settle the rider."
                   : "Paying online is being switched on. For now, choose pay on delivery and we will confirm by phone."}
               </p>
+              {payMethod === "momo" && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor={field("momoNumber")}
+                      className="mb-1 block text-sm font-medium"
+                    >
+                      Mobile money number
+                    </label>
+                    <input
+                      id={field("momoNumber")}
+                      name="momoNumber"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      placeholder="0241234567"
+                      value={momoNumber}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setMomoNumber(value);
+                        const guessed = guessNetwork(value);
+                        if (guessed) setNetwork(guessed);
+                      }}
+                      aria-invalid={!!errors.momoNumber}
+                      aria-describedby={
+                        errors.momoNumber ? `${field("momoNumber")}-error` : undefined
+                      }
+                      className="border-input min-h-11 w-full border bg-background px-3"
+                    />
+                    {errors.momoNumber && (
+                      <p
+                        id={`${field("momoNumber")}-error`}
+                        className="text-destructive mt-1 text-sm"
+                      >
+                        {errors.momoNumber}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label
+                      htmlFor={field("network")}
+                      className="mb-1 block text-sm font-medium"
+                    >
+                      Network
+                    </label>
+                    <select
+                      id={field("network")}
+                      name="network"
+                      value={network}
+                      onChange={(e) => setNetwork(e.target.value as MomoNetwork | "")}
+                      aria-invalid={!!errors.network}
+                      aria-describedby={
+                        errors.network ? `${field("network")}-error` : undefined
+                      }
+                      className="border-input min-h-11 w-full border bg-background px-3"
+                    >
+                      <option value="">Choose network</option>
+                      {momoNetworks.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.network && (
+                      <p
+                        id={`${field("network")}-error`}
+                        className="text-destructive mt-1 text-sm"
+                      >
+                        {errors.network}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </fieldset>
 
             <div>

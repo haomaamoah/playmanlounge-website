@@ -179,8 +179,12 @@ export async function POST(request: Request) {
     typeof body.momoNumber === "string" ? body.momoNumber : ""
   );
   const network = body.network;
-  // Wallet number and network are collected on PaySwitch's hosted page. Direct
-  // debit still accepts them when they are sent, but the order form does not.
+  const hasWallet = isMomoNetwork(network) && Boolean(subscriberNumber);
+  if (config.flow === "prompt" && !hasWallet) {
+    return fail(400, { error: "Enter a valid mobile money number and network." });
+  }
+  // Hosted checkout collects the wallet itself; "auto" also uses it for older
+  // pages that do not send wallet details.
   if (config.flow === "checkout" || !isMomoNetwork(network) || !subscriberNumber) {
     return startCheckout(config, {
       transactionId,

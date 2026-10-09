@@ -82,46 +82,32 @@ The PaySwitch credentials must never reach the browser — anyone could then cha
 
 `THETELLER_FLOW` decides how the money is asked for:
 
-- `prompt` — the direct API (`/v1.1/transaction/process`, `processing_code 000200`) pushes a mobile money prompt straight to the customer's phone; the page polls until they approve. This is the nicer flow, but PaySwitch enables it per merchant.
+- `prompt` — the direct API (`/v1.1/transaction/process`, `processing_code 000200`) pushes a mobile money prompt straight to the customer's phone; the page polls until they approve. The customer stays on the order page.
 - `checkout` — PaySwitch's hosted page (`/initiate`) takes the payment and redirects back with the result.
-- `auto` — asks for the prompt, and falls back to hosted checkout when PaySwitch refuses direct debit **or does not answer at all**, so the customer is never told the order failed for a reason on our side.
+- `auto` — asks for the prompt, and falls back to hosted checkout when PaySwitch refuses direct debit **or does not answer at all**.
 
-Use `checkout` while the merchant is in its current state (see below): under `auto` the customer waits for the direct endpoint to time out before the payment page opens.
+Use `prompt` for the in-page flow. If wallet details are missing, prompt mode rejects the request instead of redirecting.
 
-Hosted checkout only works from a public HTTPS address, because PaySwitch has to be able to reach the return URL — `/initiate` answers `code 999` for a `SITE_URL` on `127.0.0.1`. The route checks for that first and tells the customer to pay on delivery instead, so **Pay now cannot be exercised against a local dev server**; test it on a deployed URL.
+Hosted checkout only works from a public HTTPS address, because PaySwitch has to be able to reach the return URL — `/initiate` answers `code 999` for a `SITE_URL` on `127.0.0.1`. The route checks for that first and tells the customer to pay on delivery instead.
 
 Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side, sends the receipts, and clears the bag. If the payment cannot be confirmed the bag comes back so the customer can retry or pay the rider — the site never claims a payment PaySwitch has not confirmed.
 
-### Merchant account status (September 2026)
+### Merchant account status (October 2026)
 
-Verified against the live gateway with merchant `TTM-00011795`:
+On 9 October 2026, a live GH₵ 0.10 MTN test to a consenting wallet through `/v1.1/transaction/process` returned code `000`, and the status endpoint confirmed it as approved. Direct mobile money prompts are therefore enabled for `TTM-00011795`.
 
-- Hosted checkout **works** — `/initiate` returns a payment link.
-- Direct debit is **not enabled**. `/v1.1/transaction/process` answers `{"code":999,"description":"Access Denied. Merchant not found"}` in both test and live, with either production key, and the same answer comes back with deliberately wrong credentials — so it is a merchant permission, not a key problem.
-- The test environment does not know the merchant at all, so integration testing has to happen on live with small amounts.
-
-To get the in-page prompt, ask PaySwitch support to enable **direct mobile money debit (collection) API** on `TTM-00011795` and to provision the merchant in the test environment. Reproduction for the ticket:
-
-```bash
-curl -X POST https://prod.theteller.net/v1.1/transaction/process \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(printf 'API_USER:API_KEY' | base64)" \
-  -d '{"amount":"000000000010","processing_code":"000200","transaction_id":"000000000001",
-       "desc":"test","merchant_id":"TTM-00011795","subscriber_number":"233205786433","r-switch":"VDF"}'
-```
-
-Nothing needs to change in this repo when they enable it: with `THETELLER_FLOW=auto` the prompt starts working on its own.
+The test environment has not been rechecked, so test changes on live only with small amounts and consenting wallets.
 
 ### Switching payment on
 
-Set four server-side variables on the host (Vercel → Settings → Environment Variables), or in `.env.local` for development:
+Set the server-side variables on the host (Vercel → Settings → Environment Variables), or in `.env.local` for development:
 
 ```
 THETELLER_API_USER=your_api_user
 THETELLER_API_KEY=your_api_key
 THETELLER_MERCHANT_ID=TTM-00011795
 THETELLER_MODE=live          # "test" for the sandbox
-THETELLER_FLOW=checkout      # "auto" once direct debit is enabled
+THETELLER_FLOW=prompt        # in-page mobile money prompt
 SITE_URL=https://playman-lounge.vercel.app
 ```
 

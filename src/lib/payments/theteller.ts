@@ -105,7 +105,7 @@ const codeMap: Record<
   "100": {
     state: "failed",
     message:
-      "The wallet did not approve. Telecel Cash often sends no popup — while the payment page is open, dial *110# and approve the pending charge.",
+      "The wallet did not approve. If no prompt appeared, check your mobile money menu for a pending approval.",
     retryable: true,
   },
   "101": { state: "failed", message: "Not enough money in the wallet.", retryable: true },
