@@ -2,105 +2,54 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { formatGhs, site } from "@/lib/content";
-import { deskDate, deskTime, paymentTone, statusTone } from "@/lib/mocks/display";
-import { networkLabel, nextStatus, statusLabel } from "@/lib/mocks/seed";
-import { useMockStore } from "@/lib/mocks/store";
+import { useState } from "react";
+import type { AdminOrder, ItemResponse, OrderStatus } from "@/lib/admin/contracts";
+import { formatGhs } from "@/lib/content";
+import { Badge, PageHeading, ResourceState, adminRequest, dateLabel, orderLabels, paymentLabels, useAdminResource } from "./admin-ui";
 
 export function OrderDetail() {
-  const params = useParams<{ id: string }>();
-  const { orders, payments, advanceOrder, ready } = useMockStore();
-  const order = orders.find((entry) => entry.id === params.id);
-  const payment = payments.find((entry) => entry.id === order?.paymentId);
-
-  if (!ready) return <p>Loading ticket…</p>;
-  if (!order) {
-    return (
-      <div>
-        <p>That ticket is not on this desk.</p>
-        <Link href="/admin/orders" className="mt-4 inline-flex underline">
-          Back to the board
-        </Link>
-      </div>
-    );
+  const { id } = useParams<{ id: string }>();
+  const { data, loading, error, reload } = useAdminResource<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(id)}`);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [mutationError, setMutationError] = useState("");
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  async function update(status: OrderStatus) {
+    setBusy(true); setMutationError(""); setNotice("");
+    try {
+      await adminRequest(`/api/admin/orders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      setNotice(`Kitchen status changed to ${orderLabels[status].toLowerCase()}.`); setConfirmCancel(false); reload();
+    } catch (err) { setMutationError((err as Error).message); }
+    finally { setBusy(false); }
   }
-
-  const upcoming = nextStatus(order.status);
-
-  return (
-    <div className="mx-auto max-w-xl">
-      <Link href="/admin/orders" className="text-sm underline">
-        All tickets
-      </Link>
-      <p className="text-husk mt-4 text-sm">
-        {deskDate(order.createdAt)} · {deskTime(order.createdAt)}
-      </p>
-      <h1 className="font-display mt-1 text-4xl">{order.id}</h1>
-      <p className={`mt-4 inline-flex border px-3 py-1 text-sm font-semibold ${statusTone(order.status)}`}>
-        {statusLabel(order.status)}
-      </p>
-      <dl className="mt-6 space-y-2 text-sm">
-        <div className="flex justify-between gap-4">
-          <dt className="text-muted-foreground">Customer</dt>
-          <dd className="font-medium">{order.customerName}</dd>
-        </div>
-        <div className="flex justify-between gap-4">
-          <dt className="text-muted-foreground">Phone</dt>
-          <dd>
-            <a className="underline" href={`tel:${order.customerPhone.replace(/\s/g, "")}`}>
-              {order.customerPhone}
-            </a>
-          </dd>
-        </div>
-        <div className="flex justify-between gap-4">
-          <dt className="text-muted-foreground">Area</dt>
-          <dd>{order.deliveryArea}</dd>
-        </div>
-        {payment ? (
-          <>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">MoMo</dt>
-              <dd>{networkLabel(payment.network)}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Payment</dt>
-              <dd className={`px-2 py-0.5 text-xs font-semibold ${paymentTone(payment.status)}`}>
-                {payment.status} · {payment.reference}
-              </dd>
-            </div>
-          </>
-        ) : null}
-      </dl>
-      <ul className="mt-6 divide-y divide-border border-y border-border">
-        {order.lines.map((line) => (
-          <li key={line.itemId} className="flex justify-between py-3 text-sm">
-            <span>
-              {line.qty} × {line.name}
-            </span>
-            <span>{formatGhs(line.qty * line.unitPrice)}</span>
-          </li>
-        ))}
-      </ul>
-      {order.notes ? <p className="mt-4 text-sm">Note: {order.notes}</p> : null}
-      <p className="font-display text-palm mt-4 text-3xl">{formatGhs(order.total)}</p>
-      {upcoming ? (
-        <button
-          type="button"
-          onClick={() => advanceOrder(order.id)}
-          className="bg-cocoa text-cream mt-6 inline-flex min-h-12 items-center px-5 font-semibold"
-        >
-          Mark {statusLabel(upcoming)}
-        </button>
-      ) : (
-        <p className="mt-6 text-sm">This ticket has left the hatch.</p>
-      )}
-      <p className="text-muted-foreground mt-6 text-sm">
-        Customer follow-up line is{" "}
-        <a className="underline" href={`tel:${site.followUpPhoneTel}`}>
-          {site.followUpPhoneDisplay}
-        </a>
-        .
-      </p>
-    </div>
-  );
+  const order = data?.item;
+  return <><Link className="admin-back" href="/admin/orders">Back to orders</Link>
+    <ResourceState loading={loading} error={error} retry={reload} />
+    {order && <>
+      <PageHeading title={order.id} description={`Placed ${dateLabel(order.createdAt)} · Accra time`} />
+      {order.isDemo && <p className="admin-demo-note" role="note"><Badge value="demo">Demo</Badge> Sample order for training. Not a real customer order and excluded from Home totals.</p>}
+      <div className="admin-detail-grid">
+        <section className="admin-report"><h2>Order ticket</h2>
+          <ul className="admin-line-items">{order.lines.map((line, index) => <li key={`${line.itemId}-${index}`}><span>{line.qty} × {line.name}</span><strong>{formatGhs(line.qty * line.unitPrice)}</strong></li>)}</ul>
+          <div className="admin-ticket-total"><span>Total</span><strong>{formatGhs(order.total)}</strong></div>
+          <dl className="admin-details"><div><dt>Payment</dt><dd><Badge value={order.paymentStatus}>{paymentLabels[order.paymentStatus]}</Badge></dd></div><div><dt>Transaction reference</dt><dd>{order.transactionId || "Not yet recorded"}</dd></div></dl>
+          <p className="admin-footnote">Kitchen status changes do not mark an order as paid.</p>
+        </section>
+        <section className="admin-report"><h2>Customer & fulfilment</h2><dl className="admin-details">
+          <div><dt>Customer</dt><dd>{order.customerName}</dd></div><div><dt>Phone</dt><dd><a href={`tel:${order.customerPhone}`}>{order.customerPhone}</a></dd></div>
+          <div><dt>Email</dt><dd>{order.customerEmail ? <a href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a> : "Not provided"}</dd></div>
+          <div><dt>Fulfilment</dt><dd>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</dd></div><div><dt>Preferred time</dt><dd>{order.preferredTime || "As soon as possible"}</dd></div>
+          <div><dt>Customer notes</dt><dd className="admin-preserve">{order.notes || "No notes provided."}</dd></div>
+        </dl></section>
+      </div>
+      <section className="admin-report admin-status-editor"><h2>Kitchen status</h2><Badge value={order.status}>{orderLabels[order.status]}</Badge>
+        <form onSubmit={(event) => { event.preventDefault(); const status = new FormData(event.currentTarget).get("status") as OrderStatus; if (status === "cancelled") setConfirmCancel(true); else void update(status); }}>
+          <label>Update fulfilment<select name="status" key={order.status} defaultValue={order.status} disabled={busy}>{Object.entries(orderLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <button className="admin-button" disabled={busy}>{busy ? "Saving…" : "Save kitchen status"}</button>
+        </form>
+        {confirmCancel && <div className="admin-confirm"><p>Cancel this order? This changes fulfilment only and does not refund any payment.</p><button className="admin-button admin-button-danger" disabled={busy} onClick={() => update("cancelled")}>Confirm cancellation</button><button className="admin-button admin-button-secondary" disabled={busy} onClick={() => setConfirmCancel(false)}>Keep order</button></div>}
+        {mutationError && <p className="admin-error" role="alert">{mutationError}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
+      </section>
+    </>}
+  </>;
 }

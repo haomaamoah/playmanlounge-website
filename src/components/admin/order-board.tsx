@@ -1,80 +1,29 @@
 "use client";
 
-import Link from "next/link";
-import { formatGhs } from "@/lib/content";
-import { deskTime, statusTone } from "@/lib/mocks/display";
-import { nextStatus, statusLabel } from "@/lib/mocks/seed";
-import { ORDER_STATUSES } from "@/lib/mocks/types";
-import { useMockStore } from "@/lib/mocks/store";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import type { AdminOrder, ListResponse } from "@/lib/admin/contracts";
+import { EmptyState, OrderTable, PageHeading, ResourceState, useAdminResource } from "./admin-ui";
+
+const filters = [
+  { value: "", label: "All" }, { value: "pending", label: "Pending" },
+  { value: "paid", label: "Paid" }, { value: "cod", label: "Pay on delivery" }, { value: "failed", label: "Failed" },
+];
 
 export function OrderBoard() {
-  const { orders, payments, advanceOrder } = useMockStore();
-
-  return (
-    <div>
-      <h1 className="font-display text-3xl sm:text-4xl">Tickets</h1>
-      <p className="text-muted-foreground mt-2 max-w-xl text-sm">
-        Paid orders land here. Move a ticket as the wok finishes. Failed MoMo
-        stays on Payments, not on this rail.
-      </p>
-      <div className="mt-6 grid gap-4 lg:grid-cols-4">
-        {ORDER_STATUSES.map((status) => {
-          const column = orders.filter((order) => {
-            const payment = payments.find((entry) => entry.id === order.paymentId);
-            if (payment?.status === "failed") return false;
-            return order.status === status;
-          });
-          return (
-            <section key={status} className="bg-cream min-h-48 border border-border p-3">
-              <h2 className="font-display flex items-baseline justify-between text-xl">
-                {statusLabel(status)}
-                <span className="text-husk text-sm font-sans">{column.length}</span>
-              </h2>
-              <ul className="mt-3 space-y-3">
-                {column.map((order) => (
-                  <li key={order.id} className="border-cocoa bg-surface border-l-4 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <Link
-                        href={`/admin/orders/${order.id}`}
-                        className="font-semibold underline-offset-2 hover:underline"
-                      >
-                        {order.id}
-                      </Link>
-                      <span className="text-muted-foreground text-xs">
-                        {deskTime(order.createdAt)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm">{order.customerName}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {order.lines.map((line) => `${line.qty}× ${line.name}`).join(", ")}
-                    </p>
-                    <p className="font-display text-palm mt-2">{formatGhs(order.total)}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span
-                        className={`inline-flex border px-2 py-0.5 text-xs font-semibold ${statusTone(order.status)}`}
-                      >
-                        {statusLabel(order.status)}
-                      </span>
-                      {nextStatus(order.status) ? (
-                        <button
-                          type="button"
-                          onClick={() => advanceOrder(order.id)}
-                          className="bg-cocoa text-cream inline-flex min-h-11 items-center px-3 text-xs font-semibold"
-                        >
-                          Mark {statusLabel(nextStatus(order.status)!)}
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-                {column.length === 0 ? (
-                  <li className="text-muted-foreground text-sm">No tickets.</li>
-                ) : null}
-              </ul>
-            </section>
-          );
-        })}
-      </div>
+  const search = useSearchParams();
+  const [filter, setFilter] = useState(filters.some((entry) => entry.value === search.get("payment")) ? search.get("payment")! : "");
+  const [status, setStatus] = useState("");
+  const [offset, setOffset] = useState(0);
+  const { data, error, loading, reload } = useAdminResource<ListResponse<AdminOrder>>(`/api/admin/orders?paymentStatus=${filter}&status=${status}&limit=50&offset=${offset}`);
+  return <>
+    <PageHeading title="Orders" description="Follow each ticket from payment to the kitchen. Payment and fulfilment are tracked separately." action={<button className="admin-button admin-button-secondary" onClick={reload}>Refresh</button>} />
+    <div className="admin-toolbar">
+      <div className="admin-filters" role="group" aria-label="Filter by payment status">{filters.map((entry) => <button key={entry.value} aria-pressed={entry.value === filter} onClick={() => { setFilter(entry.value); setOffset(0); }}>{entry.label}</button>)}</div>
+      <label className="admin-inline-label">Kitchen status<select value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">All kitchen statuses</option><option value="pending">Pending</option><option value="cooking">Cooking</option><option value="ready">Ready</option><option value="out">Out for delivery</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>
     </div>
-  );
+    <ResourceState loading={loading} error={error} retry={reload} />
+    {data && (data.items.length ? <><p className="admin-results" aria-live="polite">{data.total} matching orders</p><OrderTable items={data.items} /></> : <EmptyState title="No matching orders">Try another payment filter or kitchen status. New orders appear here automatically when you refresh.</EmptyState>)}
+    {data && data.total > 50 && <div className="admin-pagination"><button className="admin-button admin-button-secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>Previous</button><span>{offset + 1}–{Math.min(offset + 50, data.total)} of {data.total}</span><button className="admin-button admin-button-secondary" disabled={offset + 50 >= data.total} onClick={() => setOffset(offset + 50)}>Next</button></div>}
+  </>;
 }

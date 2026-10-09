@@ -4,7 +4,6 @@ import Image from "next/image";
 import { Minus, Plus } from "lucide-react";
 import {
   formatGhs,
-  menuGroups,
   type MenuGroup,
   type MenuItem,
 } from "@/lib/content";
@@ -93,7 +92,13 @@ function Ledger({ group }: { group: MenuGroup }) {
   );
 }
 
-export function MenuSection() {
+export function MenuSection({
+  groups,
+  unavailable,
+}: {
+  groups: MenuGroup[];
+  unavailable: boolean;
+}) {
   const { notice } = useOrder();
 
   return (
@@ -113,7 +118,16 @@ export function MenuSection() {
           {notice}
         </p>
         <div className="mt-10 space-y-12">
-          {menuGroups.map((group) => (
+          {unavailable ? (
+            <p role="alert" className="text-destructive">
+              The menu is temporarily unavailable.{" "}
+              <button type="button" onClick={() => window.location.reload()} className="min-h-11 underline">
+                Refresh the menu
+              </button>{" "}or call the kitchen to order.
+            </p>
+          ) : groups.length === 0 ? (
+            <p>No dishes are available to order right now. Please call the kitchen.</p>
+          ) : groups.map((group) => (
             <Ledger key={group.id} group={group} />
           ))}
         </div>

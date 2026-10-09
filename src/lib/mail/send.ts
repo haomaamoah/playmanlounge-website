@@ -12,6 +12,7 @@ import {
   staffOrderEmails,
 } from "@/lib/mail/config";
 import type { HydratedOrder, ReceiptRole } from "@/lib/mail/types";
+import { deliverClaimed, providerIdempotencyKey, type DeliveryStore } from "@/lib/mail/delivery";
 
 export type MailJob = {
   to: string;
@@ -70,12 +71,13 @@ async function sendBrevo(job: MailJob) {
   }
 }
 
-async function sendResend(job: MailJob) {
+async function sendResend(job: MailJob, idempotencyKey?: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${resendApiKey()}`,
       "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from: resendFrom(),
@@ -104,8 +106,42 @@ async function writeMock(jobs: MailJob[], orderRef: string) {
   await writeFile(path.join(dir, "index.txt"), index.join("\n") + "\n", "utf8");
 }
 
-export async function sendOrderReceipts(order: HydratedOrder): Promise<SendResult> {
+async function writeMockJob(job: MailJob, orderRef: string, key: string) {
+  const dir = path.join(process.cwd(), ".order-previews", orderRef);
+  await mkdir(dir, { recursive: true });
+  const file = `${job.role}-${key.replace(/[^a-z0-9-]/gi, "_")}.html`;
+  await writeFile(path.join(dir, file), job.html, "utf8");
+  await writeFile(path.join(dir, "index.txt"), `${job.role} → ${job.to} (${file})\n`, { encoding: "utf8", flag: "a" });
+}
+
+/** Persisted orders pass `delivery` so retries send only recipients not yet delivered. */
+export type ReceiptDelivery = { orderId: string; store: DeliveryStore };
+
+function provider(): "brevo" | "resend" | "mock" | null {
+  if (brevoApiKey()) return "brevo";
+  if (resendApiKey()) return "resend";
+  if (process.env.NODE_ENV !== "production") return "mock";
+  return null;
+}
+
+export async function sendOrderReceipts(order: HydratedOrder, delivery?: ReceiptDelivery): Promise<SendResult> {
   const jobs = jobsFor(order);
+  const via = provider();
+  if (!via) return { ok: false, reason: "no-provider" };
+
+  if (delivery) {
+    try {
+      const outcome = await deliverClaimed(jobs, delivery.store, async (job, key) => {
+        if (via === "brevo") await sendBrevo(job);
+        else if (via === "resend") await sendResend(job, providerIdempotencyKey(delivery.orderId, key));
+        else await writeMockJob(job, order.orderRef, key);
+      });
+      if (!outcome.ok) return { ok: false, reason: "send-failed", detail: outcome.detail };
+      return { ok: true, via, orderRef: order.orderRef };
+    } catch (error) {
+      return { ok: false, reason: "send-failed", detail: error instanceof Error ? error.message : "Receipt delivery tracking failed" };
+    }
+  }
 
   if (brevoApiKey()) {
     try {

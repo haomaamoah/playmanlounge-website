@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { updatePayment } from "@/lib/db/orders";
+import { rateLimit } from "@/lib/admin/server";
+import { ApiFailure } from "@/lib/admin/validation";
 import {
   fetchStatus,
   gatewayConfig,
@@ -10,7 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const config = gatewayConfig();
@@ -32,15 +35,18 @@ export async function GET(
   }
 
   try {
-    return NextResponse.json(await fetchStatus(config, id), { headers });
-  } catch {
+    await rateLimit(request,"payment-status",120,60);
+    const result = await fetchStatus(config,id);
+    await updatePayment(id,result.state,result.gatewayIssue);
+    return NextResponse.json(result, { headers });
+  } catch (error) {
     return NextResponse.json(
       {
         error: "Could not read the payment status. Try again in a moment.",
         transactionId: id,
         retryable: true,
       },
-      { status: 502, headers }
+      { status: error instanceof ApiFailure ? error.status : 502, headers }
     );
   }
 }

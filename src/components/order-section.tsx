@@ -93,7 +93,7 @@ function validate(order: OrderPayload): FieldErrors {
 
 function successHeadline(via: "email" | "mailto" | "mock", payment: PaymentInfo) {
   if (via === "mailto") {
-    return "Your mail app should open with the order filled in. Send it to complete.";
+    return "Your order is saved, but the receipt email could not be sent. Your mail app can send a copy to the kitchen.";
   }
   if (via === "mock") return "Order in — preview mode, so nothing was emailed.";
   if (payment.method === "momo") return "Payment received. The kitchen has your ticket.";
@@ -101,11 +101,12 @@ function successHeadline(via: "email" | "mailto" | "mock", payment: PaymentInfo)
 }
 
 export function OrderSection() {
-  const { lines, total, setQty, remove, restore, clear } = useOrder();
+  const { items, lines, total, setQty, remove, restore, clear } = useOrder();
   const formId = useId();
   const summaryRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<AbortController | null>(null);
+  const submissionRef = useRef<{ body: string; key: string } | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -127,38 +128,41 @@ export function OrderSection() {
     })();
   }, []);
 
-  /**
-   * The server rebuilds the prices, checks the payment with PaySwitch and sends
-   * both receipts. If it cannot be reached at all, the order is handed to the
-   * customer's mail app so it is never simply lost.
-   */
   async function sendOrder(payload: OrderPayload): Promise<SendResult> {
     const body = formatOrderBody(payload);
     const handToMailApp = (): SendResult => {
       window.location.href = mailtoHref(businessEmail(), formatOrderSubject(payload), body);
+      submissionRef.current = null;
       return { ok: true, via: "mailto", body };
     };
+    const requestBody = JSON.stringify({
+      name: payload.name,
+      phone: payload.phone,
+      email: payload.email,
+      fulfilment: payload.fulfilment,
+      preferredTime: payload.preferredTime,
+      notes: payload.notes,
+      lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
+      payment: payload.payment,
+      acceptedTerms: true,
+      company,
+    });
+    if (submissionRef.current?.body !== requestBody) {
+      submissionRef.current = { body: requestBody, key: crypto.randomUUID() };
+    }
 
     let response: Response;
     try {
       response = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: payload.name,
-          phone: payload.phone,
-          email: payload.email,
-          fulfilment: payload.fulfilment,
-          preferredTime: payload.preferredTime,
-          notes: payload.notes,
-          lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
-          payment: payload.payment,
-          acceptedTerms: true,
-          company,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": submissionRef.current.key,
+        },
+        body: requestBody,
       });
     } catch {
-      return handToMailApp();
+      return { ok: false, message: "We could not confirm your order was saved. Retry or call the kitchen." };
     }
 
     let data: {
@@ -167,6 +171,7 @@ export function OrderSection() {
       orderRef?: string;
       error?: string;
       errors?: FieldErrors;
+      persisted?: boolean;
     } = {};
     try {
       data = await response.json();
@@ -175,6 +180,7 @@ export function OrderSection() {
     }
 
     if (response.ok && data.ok) {
+      submissionRef.current = null;
       return {
         ok: true,
         via: data.via === "mock" ? "mock" : "email",
@@ -183,8 +189,8 @@ export function OrderSection() {
       };
     }
     if (response.status === 400 && data.errors) return { ok: false, errors: data.errors };
-    // Mail is misconfigured or the provider is down: the order still leaves.
-    if (response.status === 502 || response.status === 503) return handToMailApp();
+    if ((response.status === 502 || response.status === 503) && data.persisted === true)
+      return handToMailApp();
     return {
       ok: false,
       message: data.error ?? "The order did not send. Call us or try again.",
@@ -241,7 +247,16 @@ export function OrderSection() {
         return;
       }
 
-      const payload = restoreOrder(pending, payment);
+      if (pending.lines.some((line) => !items.some((item) => item.id === line.id))) {
+        setStatus({
+          kind: "payment-failed",
+          message: "Payment received, but a dish is no longer on the menu. Call the kitchen with your payment reference; do not pay again.",
+          reference: settled.transactionId,
+          gatewayIssue: false,
+        });
+        return;
+      }
+      const payload = restoreOrder(pending, payment, items);
       const sent = await sendOrder(payload);
       if (!sent.ok) {
         setStatus({

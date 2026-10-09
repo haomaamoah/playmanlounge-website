@@ -1,4 +1,4 @@
-import { menu, pesewas } from "@/lib/content";
+import { menu, pesewas, type MenuItem } from "@/lib/content";
 import type { Fulfilment, PaymentInfo } from "@/lib/email";
 import type { HydratedOrder, OrderRequest } from "@/lib/mail/types";
 
@@ -70,11 +70,13 @@ export function parseOrderRequest(raw: unknown): {
 export function validateOrderInput(order: OrderRequest): OrderFieldErrors {
   const errors: OrderFieldErrors = {};
   if (!order.name.trim()) errors.name = "Enter your name.";
+  else if (order.name.length > 100) errors.name = "Keep your name under 100 characters.";
   const phone = order.phone.replace(/\s/g, "");
   if (!phone) errors.phone = "Enter a phone number we can call.";
   else if (!/^\+?[0-9]{9,15}$/.test(phone))
     errors.phone = "Use a number with country code, like +233578141242.";
   if (!order.email.trim()) errors.email = "Enter your email.";
+  else if (order.email.length > 254) errors.email = "Email address is too long.";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.email.trim()))
     errors.email = "Enter an email we can reply to.";
   if (!isFulfilment(order.fulfilment))
@@ -94,9 +96,24 @@ export function validateOrderInput(order: OrderRequest): OrderFieldErrors {
   return errors;
 }
 
+/** Receipt timestamp in the kitchen's timezone. */
+export function formatPlacedAt(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Accra",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
 export function hydrateOrder(
   order: OrderRequest,
-  payment: PaymentInfo = { method: "delivery" }
+  payment: PaymentInfo = { method: "delivery" },
+  catalog: readonly MenuItem[] = menu
 ): {
   order?: HydratedOrder;
   errors?: OrderFieldErrors;
@@ -106,7 +123,7 @@ export function hydrateOrder(
     if (line.qty < 1 || line.qty > 20) {
       return { errors: { cart: "Quantity must be between 1 and 20." } };
     }
-    const item = menu.find((entry) => entry.id === line.id);
+    const item = catalog.find((entry) => entry.id === line.id);
     if (!item) {
       return { errors: { cart: "A menu item is no longer available." } };
     }
@@ -121,16 +138,7 @@ export function hydrateOrder(
   }
 
   const total = pesewas(lines.reduce((sum, line) => sum + line.lineTotal, 0)) / 100;
-  const placedAt = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Africa/Accra",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date());
+  const placedAt = formatPlacedAt(new Date());
 
   return {
     order: {

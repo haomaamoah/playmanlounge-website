@@ -1,5 +1,5 @@
-import { PaymentsLedger } from "@/components/admin/payments-ledger";
+import { redirect } from "next/navigation";
 
 export default function AdminPaymentsPage() {
-  return <PaymentsLedger />;
+  redirect("/admin/orders");
 }

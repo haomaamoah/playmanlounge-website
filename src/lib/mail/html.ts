@@ -14,6 +14,8 @@ const MUTED = "#6B4A28";
 const RULE = "#e4d4a8";
 
 function thumbUrl(imagePath: string) {
+  // Bucket images have a server-generated `.thumb.jpg` sibling for email clients.
+  if (/^https:\/\//.test(imagePath)) return escapeHtml(imagePath.replace(/\.webp$/i, ".thumb.jpg"));
   const file =
     imagePath.split("/").pop()?.replace(/\.(webp|png|jpe?g)$/i, "") ?? "food";
   return absoluteUrl(`/email/${file}.jpg`);

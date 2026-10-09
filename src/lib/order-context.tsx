@@ -8,11 +8,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { menu, pesewas, type MenuItem } from "@/lib/content";
+import { pesewas, type MenuItem } from "@/lib/content";
 
 export type CartLine = { item: MenuItem; qty: number };
 
 type OrderContextValue = {
+  items: MenuItem[];
   lines: CartLine[];
   add: (id: string) => void;
   remove: (id: string) => void;
@@ -26,12 +27,18 @@ type OrderContextValue = {
 
 const OrderContext = createContext<OrderContextValue | null>(null);
 
-export function OrderProvider({ children }: { children: ReactNode }) {
+export function OrderProvider({
+  children,
+  items,
+}: {
+  children: ReactNode;
+  items: MenuItem[];
+}) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [notice, setNotice] = useState("");
 
   const add = useCallback((id: string) => {
-    const item = menu.find((m) => m.id === id);
+    const item = items.find((m) => m.id === id);
     if (!item) return;
     setLines((prev) => {
       const existing = prev.find((l) => l.item.id === id);
@@ -43,7 +50,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return [...prev, { item, qty: 1 }];
     });
     setNotice(`${item.name} added to your order`);
-  }, []);
+  }, [items]);
 
   const remove = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.item.id !== id));
@@ -59,13 +66,13 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   /** Puts a bag back after a payment that sent the customer off the site. */
   const restore = useCallback((entries: { id: string; qty: number }[]) => {
     const restored = entries.flatMap((entry) => {
-      const item = menu.find((candidate) => candidate.id === entry.id);
+      const item = items.find((candidate) => candidate.id === entry.id);
       return item && entry.qty > 0 ? [{ item, qty: entry.qty }] : [];
     });
     if (restored.length === 0) return;
     setLines(restored);
     setNotice("Your order is back in the bag");
-  }, []);
+  }, [items]);
 
   const clear = useCallback(() => {
     setLines([]);
@@ -77,6 +84,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
+      items,
       lines,
       add,
       remove,
@@ -87,7 +95,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       total,
       notice,
     }),
-    [lines, add, remove, setQty, restore, clear, count, total, notice]
+    [items, lines, add, remove, setQty, restore, clear, count, total, notice]
   );
 
   return (

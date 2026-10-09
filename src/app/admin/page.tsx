@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { HomeDashboard } from "@/components/admin/home-dashboard";
 
 export default function AdminIndexPage() {
-  redirect("/admin/orders");
+  return <HomeDashboard />;
 }

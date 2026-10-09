@@ -3,112 +3,74 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardList, LogOut, Receipt, UtensilsCrossed } from "lucide-react";
+import { House, ClipboardList, UtensilsCrossed, MessagesSquare, Settings, LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { AdminProfile, SessionResponse } from "@/lib/admin/contracts";
 import { site } from "@/lib/content";
-import { useMockStore } from "@/lib/mocks/store";
-import { useEffect } from "react";
+import { adminRequest } from "./admin-ui";
 
 const links = [
+  { href: "/admin", label: "Home", icon: House },
   { href: "/admin/orders", label: "Orders", icon: ClipboardList },
   { href: "/admin/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/admin/payments", label: "Payments", icon: Receipt },
-] as const;
+  { href: "/admin/support", label: "Support", icon: MessagesSquare },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
+];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { staffAuthed, logout, ready } = useMockStore();
   const isLogin = pathname === "/admin/login";
+  const [admin, setAdmin] = useState<AdminProfile | null>(null);
+  const [error, setError] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!ready || isLogin) return;
-    if (!staffAuthed) router.replace("/admin/login");
-  }, [ready, staffAuthed, isLogin, router]);
+    if (isLogin) return;
+    const controller = new AbortController();
+    adminRequest<SessionResponse>("/api/admin/session", { signal: controller.signal })
+      .then((data) => { setAdmin(data.admin); setError(""); })
+      .catch((err: Error) => {
+        if (!controller.signal.aborted) setError(err.message);
+      });
+    const expired = () => { setAdmin(null); router.replace(`/admin/login?next=${encodeURIComponent(pathname)}`); };
+    window.addEventListener("admin-session-expired", expired);
+    return () => { controller.abort(); window.removeEventListener("admin-session-expired", expired); };
+  }, [isLogin, pathname, router, attempt]);
 
-  if (isLogin) {
-    return <div className="bg-cocoa min-h-full text-cream">{children}</div>;
+  async function logout() {
+    setSigningOut(true);
+    try {
+      await adminRequest("/api/admin/logout", { method: "POST", body: JSON.stringify({}) });
+      setAdmin(null);
+      router.replace("/admin/login");
+    } catch (err) { setError((err as Error).message); }
+    finally { setSigningOut(false); }
   }
 
-  if (!ready || !staffAuthed) {
-    return (
-      <div className="bg-cocoa grid min-h-full place-items-center text-cream">
-        <p>Opening the kitchen desk…</p>
-      </div>
-    );
-  }
+  if (isLogin) return <div className="admin-root admin-login">{children}</div>;
+  if (!admin) return <div className="admin-root admin-gate" aria-live="polite">
+    <h1 className="font-display">Kitchen desk</h1>
+    {error ? <><p role="alert">{error}</p><button className="admin-button" onClick={() => setAttempt(attempt + 1)}>Try again</button><Link href="/admin/login">Back to sign in</Link></> : <p>Checking your secure session…</p>}
+  </div>;
 
-  return (
-    <div className="bg-surface flex min-h-full flex-col md:flex-row">
-      <aside className="bg-cocoa text-cream hidden w-56 shrink-0 flex-col md:flex">
-        <Link href="/admin/orders" className="flex items-center gap-2 px-4 py-5">
-          <Image
-            src={site.logo.src}
-            alt=""
-            width={36}
-            height={36}
-            className="size-9 object-contain"
-          />
-          <span className="font-display text-lg leading-none">Kitchen desk</span>
-        </Link>
-        <nav className="flex flex-1 flex-col gap-1 px-2" aria-label="Admin">
-          {links.map((link) => {
-            const Icon = link.icon;
-            const active = pathname.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`inline-flex min-h-11 items-center gap-2 px-3 text-sm font-medium ${
-                  active ? "bg-palm text-cream" : "text-cream/80 hover:text-cream"
-                }`}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <button
-          type="button"
-          onClick={() => {
-            logout();
-            router.push("/admin/login");
-          }}
-          className="inline-flex min-h-12 items-center gap-2 px-5 text-sm text-cream/80 hover:text-cream"
-        >
-          <LogOut className="size-4" aria-hidden="true" />
-          Sign out
-        </button>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
-        <header className="border-border bg-cream sticky top-0 z-30 flex h-14 items-center border-b px-4 md:hidden">
-          <p className="font-display text-lg">Kitchen desk</p>
-        </header>
-        <main id="main" className="flex-1 px-4 py-5 sm:px-6">
-          {children}
-        </main>
-      </div>
-      <nav
-        aria-label="Admin"
-        className="border-cocoa bg-cream/95 fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t-4 md:hidden"
-      >
-        {links.map((link) => {
-          const Icon = link.icon;
-          const active = pathname.startsWith(link.href);
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`inline-flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium ${
-                active ? "text-palm" : "text-cocoa"
-              }`}
-            >
-              <Icon className="size-4" aria-hidden="true" />
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
-  );
+  return <div className="admin-root admin-workspace">
+    <a className="admin-skip" href="#main">Skip to workspace</a>
+    <aside className="admin-sidebar">
+      <Link href="/admin" className="admin-brand">
+        <Image src={site.logo.src} alt="" width={48} height={48} />
+        <span><strong className="font-display">Kitchen desk</strong><small>Play Man Lounge</small></span>
+      </Link>
+      <nav aria-label="Admin navigation">{links.map(({ href, label, icon: Icon }) => {
+        const active = href === "/admin" ? pathname === href : pathname.startsWith(href);
+        return <Link key={href} href={href} aria-current={active ? "page" : undefined}><Icon size={19} aria-hidden="true" /><span>{label}</span></Link>;
+      })}</nav>
+      <div className="admin-account"><span title={admin.email}>{admin.email}</span><button onClick={logout} disabled={signingOut}><LogOut size={18} aria-hidden="true" />{signingOut ? "Signing out…" : "Sign out"}</button></div>
+    </aside>
+    <main id="main" className="admin-main">
+      {error && <p role="alert" className="admin-error">{error}</p>}
+      {children}
+    </main>
+  </div>;
 }

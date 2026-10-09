@@ -3,6 +3,12 @@ import { pesewas, site } from "@/lib/content";
 import { siteUrl } from "@/lib/mail/config";
 import { hydrateOrder, parseOrderRequest } from "@/lib/mail/order";
 import { isMomoNetwork, normaliseSubscriberNumber } from "@/lib/payments/networks";
+import { getCatalog } from "@/lib/db/catalog";
+import { persistOrder, supersedePayment, updatePayment } from "@/lib/db/orders";
+import { nextAfterCharge } from "@/lib/payments/fallback";
+import type { HydratedOrder } from "@/lib/mail/types";
+import { checkOrigin, jsonBody, rateLimit } from "@/lib/admin/server";
+import { ApiFailure } from "@/lib/admin/validation";
 import {
   chargeMomo,
   gatewayConfig,
@@ -15,30 +21,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/**
- * Best effort throttle so one visitor cannot spray mobile money prompts at
- * other people's phones. It only covers a single server instance, so a hosting
- * rate limit is still the real ceiling.
- */
-const recentStarts = new Map<string, number[]>();
-const RATE_LIMIT = { windowMs: 60_000, max: 5 };
-
-function throttled(key: string, now = Date.now()) {
-  const hits = (recentStarts.get(key) ?? []).filter((at) => now - at < RATE_LIMIT.windowMs);
-  hits.push(now);
-  recentStarts.set(key, hits);
-  if (recentStarts.size > 500) recentStarts.clear();
-  return hits.length > RATE_LIMIT.max;
-}
-
-function callerKey(request: Request) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-    request.headers.get("x-real-ip") ||
-    "local"
-  );
-}
 
 function fail(status: number, body: Record<string, unknown>) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -75,10 +57,15 @@ async function startCheckout(
     email: string;
     /** Set when the prompt was tried first and PaySwitch turned it down. */
     promptRefusal?: PaymentResult;
+    /** The refused direct-charge attempt this checkout replaces on the same order. */
+    supersedes?: string;
+    order: HydratedOrder;
   }
 ) {
   const redirectUrl = publicReturnUrl();
   if (!redirectUrl) {
+    // The direct refusal was definitive and no checkout can replace it.
+    if (args.supersedes) await updatePayment(args.supersedes,"failed");
     return fail(503, {
       error:
         "Paying online is not available on this address. Choose pay on delivery, or call the kitchen.",
@@ -86,6 +73,8 @@ async function startCheckout(
     });
   }
 
+  if (args.supersedes) await supersedePayment(args.supersedes,args.transactionId);
+  else await persistOrder(args.order,args.transactionId);
   const started = await initiateCheckout(config, {
     transactionId: args.transactionId,
     total: args.total,
@@ -95,6 +84,8 @@ async function startCheckout(
   });
 
   if ("error" in started) {
+    // No payment page exists for this reference, so it can never be paid.
+    await updatePayment(args.transactionId,"failed");
     // Report the earlier refusal when there was one: it is the real cause.
     const refusal = args.promptRefusal;
     return fail(502, {
@@ -118,6 +109,18 @@ async function startCheckout(
 }
 
 export async function POST(request: Request) {
+  try {
+    checkOrigin(request);
+    await rateLimit(request,"payment-start",5,60);
+    return await start(request);
+  } catch (error) {
+    return fail(error instanceof ApiFailure ? error.status : 503,{
+      error:error instanceof ApiFailure ? error.message : "Payment storage is unavailable. Do not retry a charge without checking your phone.",
+    });
+  }
+}
+
+async function start(request: Request) {
   const config = gatewayConfig();
   if (!isConfigured(config)) {
     return fail(503, {
@@ -126,15 +129,9 @@ export async function POST(request: Request) {
     });
   }
 
-  if (throttled(callerKey(request))) {
-    return fail(429, {
-      error: "Too many payment attempts. Wait a minute, or call the kitchen.",
-    });
-  }
-
   let raw: unknown;
   try {
-    raw = await request.json();
+    raw = await jsonBody(request);
   } catch {
     return fail(400, { error: "Send the order as JSON." });
   }
@@ -148,7 +145,7 @@ export async function POST(request: Request) {
       error: Object.values(parsed.errors ?? {})[0] ?? "Fill in the order first.",
     });
   }
-  const hydrated = hydrateOrder(parsed.data);
+  const hydrated = hydrateOrder(parsed.data,undefined,await getCatalog());
   if (hydrated.errors || !hydrated.order) {
     return fail(400, {
       error: Object.values(hydrated.errors ?? {})[0] ?? "Check the bag and try again.",
@@ -183,6 +180,7 @@ export async function POST(request: Request) {
   if (config.flow === "prompt" && !hasWallet) {
     return fail(400, { error: "Enter a valid mobile money number and network." });
   }
+  if (subscriberNumber) await rateLimit(request,"payment-wallet",5,900,subscriberNumber);
   // Hosted checkout collects the wallet itself; "auto" also uses it for older
   // pages that do not send wallet details.
   if (config.flow === "checkout" || !isMomoNetwork(network) || !subscriberNumber) {
@@ -191,57 +189,64 @@ export async function POST(request: Request) {
       total: order.total,
       name: order.name,
       email: order.email,
+      order,
     });
   }
   const voucherCode = (typeof body.voucherCode === "string" ? body.voucherCode : "")
     .replace(/[^0-9a-zA-Z]/g, "")
     .slice(0, 20);
 
-  let result: PaymentResult;
+  await persistOrder(order,transactionId);
+  let outcome: { result: PaymentResult } | { error: unknown };
   try {
-    result = await chargeMomo(config, {
+    outcome = { result: await chargeMomo(config, {
       transactionId,
       total: order.total,
       network,
       subscriberNumber,
       description: `${site.name} order for ${order.name}`,
       voucherCode: voucherCode || undefined,
-    });
+    }) };
   } catch (error) {
-    // The direct endpoint sometimes hangs for this merchant instead of
-    // answering. Hosted checkout is the same money, so try it rather than
-    // sending the customer away.
-    if (config.flow === "auto") {
-      return startCheckout(config, {
-        transactionId: newTransactionId(),
-        total: order.total,
-        name: order.name,
-        email: order.email,
-      });
-    }
-    const timedOut = error instanceof Error && error.name === "TimeoutError";
-    return fail(502, {
-      error: timedOut
-        ? "Mobile money did not answer in time. Check your phone before trying again."
-        : "Mobile money could not be reached. Try again, or call the kitchen.",
-      transactionId,
-      retryable: true,
-    });
+    outcome = { error };
   }
 
+  const next = nextAfterCharge(config.flow, outcome);
+  if (next === "await") {
+    // The prompt may still reach the phone; never open a second charge. The
+    // client polls the status endpoint, which asks PaySwitch for the outcome.
+    return NextResponse.json(
+      { mode: "prompt", total: order.total, transactionId, state: "pending", code: "",
+        message: "Mobile money did not answer in time. Check your phone to approve the payment.",
+        retryable: false, gatewayIssue: false },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  }
+  if (next === "unreachable" || !("result" in outcome)) {
+    return fail(502, {
+      error: "Mobile money could not be reached. Check your phone before trying again, or call the kitchen.",
+      transactionId,
+      retryable: false,
+    });
+  }
+  const result = outcome.result;
+
   // Direct debit is a per-merchant permission at PaySwitch. When it is not
-  // granted the gateway answers "merchant not found", so the customer is moved
-  // to hosted checkout rather than being told the order failed.
-  if (result.gatewayIssue && config.flow === "auto") {
+  // granted the gateway refuses outright, so the same order moves to hosted
+  // checkout rather than being told the order failed.
+  if (next === "checkout") {
     return startCheckout(config, {
       transactionId: newTransactionId(),
       total: order.total,
       name: order.name,
       email: order.email,
       promptRefusal: result,
+      supersedes: transactionId,
+      order,
     });
   }
 
+  await updatePayment(transactionId,result.state,result.gatewayIssue);
   return NextResponse.json(
     { mode: "prompt", total: order.total, ...result },
     { headers: { "Cache-Control": "no-store" } }

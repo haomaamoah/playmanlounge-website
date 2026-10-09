@@ -4,7 +4,7 @@
  * rebuilt when PaySwitch sends them back, so the kitchen still gets one email
  * with the payment reference attached.
  */
-import { menu } from "@/lib/content";
+import { pesewas, type MenuItem } from "@/lib/content";
 import type { Fulfilment, OrderPayload, PaymentInfo } from "@/lib/email";
 import type { MomoNetwork } from "@/lib/payments/networks";
 
@@ -59,16 +59,21 @@ export function clearPendingOrder() {
 }
 
 /** Turns a parked order back into the payload the order form submits. */
-export function restoreOrder(pending: PendingOrder, payment: PaymentInfo): OrderPayload {
-  const lines = pending.lines.flatMap((line) => {
-    const item = menu.find((candidate) => candidate.id === line.id);
-    return item ? [{ item, qty: line.qty }] : [];
+export function restoreOrder(
+  pending: PendingOrder,
+  payment: PaymentInfo,
+  catalog: MenuItem[]
+): OrderPayload {
+  const lines = pending.lines.map((line) => {
+    const item = catalog.find((candidate) => candidate.id === line.id);
+    if (!item) throw new Error("A dish in the saved order is no longer available.");
+    return { item, qty: line.qty };
   });
 
   return {
     ...pending.customer,
     lines,
-    total: lines.reduce((sum, line) => sum + line.qty * line.item.price, 0) || pending.total,
+    total: pesewas(lines.reduce((sum, line) => sum + line.qty * line.item.price, 0)) / 100,
     payment,
   };
 }
