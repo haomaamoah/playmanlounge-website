@@ -16,10 +16,10 @@ export function HomeDashboard() {
         <div className="admin-section-heading"><h2 id="orders-overview">Orders & payments</h2><Link href="/admin/orders">View all orders</Link></div>
         <dl className="admin-stats">
           <div><dt>Orders created</dt><dd>{dashboard.totalOrders}</dd></div>
-          <div><dt>Paid</dt><dd>{dashboard.paidOrders}</dd></div>
-          <div><dt>Pending payment</dt><dd>{dashboard.pendingOrders}</dd></div>
-          <div><dt>Pay on delivery</dt><dd>{dashboard.codOrders}</dd></div>
-          <div><dt>Failed payments</dt><dd>{dashboard.failedPayments}</dd></div>
+          <div className="admin-stat-paid"><dt>Paid</dt><dd>{dashboard.paidOrders}</dd></div>
+          <div className="admin-stat-pending"><dt>Pending payment</dt><dd>{dashboard.pendingOrders}</dd></div>
+          <div className="admin-stat-cod"><dt>Pay on delivery</dt><dd>{dashboard.codOrders}</dd></div>
+          <div className="admin-stat-failed"><dt>Failed payments</dt><dd>{dashboard.failedPayments}</dd></div>
         </dl>
         <div className="admin-revenue"><span>Paid revenue</span><strong>{formatGhs(dashboard.revenue)}</strong><small>Excludes pending, failed and pay-on-delivery orders.</small></div>
         <p className="admin-footnote">Demo records are excluded from all totals{dashboard.demoOrders || dashboard.demoSupport ? ` (${dashboard.demoOrders} demo orders, ${dashboard.demoSupport} demo support requests)` : ""}.</p>

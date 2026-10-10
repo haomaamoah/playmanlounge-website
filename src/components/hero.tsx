@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ArrowUpRight, Phone } from "lucide-react";
+import { ArrowDown, Phone } from "lucide-react";
 import { site } from "@/lib/content";
 
 export function Hero() {
@@ -19,12 +19,9 @@ export function Hero() {
       />
       <div className="absolute inset-0 bg-linear-to-r from-cocoa from-15% via-cocoa/85 to-cocoa/25" />
       <div className="relative mx-auto flex min-h-[min(100svh,52rem)] max-w-6xl flex-col justify-end px-4 py-16 sm:px-6 lg:justify-center">
-        <p className="font-display text-cream/80 text-sm sm:text-base">
-          Online Accra kitchen
-        </p>
         <h1
           id="home-heading"
-          className="font-display mt-3 max-w-[14ch] text-[clamp(2.4rem,7vw,4.6rem)] leading-[1.05] text-cream"
+          className="font-display max-w-[14ch] text-[clamp(2.4rem,7vw,4.6rem)] leading-[1.05] text-cream"
         >
           Hot fried rice with beef.
         </h1>
@@ -36,11 +33,11 @@ export function Hero() {
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
           <a
-            href="/app"
+            href="#menu"
             className="bg-cream text-cocoa hover:bg-card inline-flex min-h-12 items-center justify-center gap-2 px-6 text-base font-semibold"
           >
-            Make an Order
-            <ArrowUpRight className="size-4" aria-hidden="true" />
+            Browse the menu
+            <ArrowDown className="size-4" aria-hidden="true" />
           </a>
           <a
             href={`tel:${site.phoneTel}`}

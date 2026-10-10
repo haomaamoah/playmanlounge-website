@@ -54,7 +54,7 @@ export function SiteHeader() {
               <a
                 key={item.href}
                 href={item.href}
-                className="inline-flex min-h-11 items-center px-2.5 text-sm font-medium text-cocoa hover:text-palm"
+                className="inline-flex min-h-11 items-center px-2.5 text-sm font-medium text-cocoa hover:text-palm-ink"
               >
                 {item.label}
               </a>

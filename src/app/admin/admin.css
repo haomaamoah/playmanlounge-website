@@ -1,4 +1,4 @@
-.admin-root { color: var(--cocoa); background: var(--surface); font-family: var(--font-figtree), sans-serif; font-size: 15px; line-height: 1.5; min-height: 100vh; }
+.admin-root { --admin-rule: #9d865f; --admin-control-border: #7d6a48; color: var(--cocoa); background: var(--surface); font-family: var(--font-figtree), sans-serif; font-size: 15px; line-height: 1.5; min-height: 100vh; }
 .admin-root *, .admin-root *::before, .admin-root *::after { box-sizing: border-box; }
 .admin-root ::selection { background: var(--rice-cream); color: var(--cocoa); }
 .admin-root :focus-visible { outline: 3px solid var(--fried-gold); outline-offset: 4px; }
@@ -35,7 +35,7 @@
 .admin-button-danger:hover:not(:disabled) { background: #7b180a; }
 .admin-button-text-danger { color: #9b1c0a; background: transparent; }
 .admin-button-text-danger:hover:not(:disabled) { color: #fff7e8; background: #9b1c0a; }
-.admin-report { border: 1px solid var(--border); border-radius: 5px; padding: 24px; margin-bottom: 24px; background: #fffaf0; }
+.admin-report { border: 1px solid var(--admin-rule); border-radius: 5px; padding: 24px; margin-bottom: 24px; background: #fffaf0; }
 .admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; }
 .admin-section-heading a, .admin-summary a { text-decoration: underline; font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
 .admin-section-heading > span { color: #6b4a28; font-size: 13px; }
@@ -45,6 +45,9 @@
 .admin-stats > div:last-child { border-right: none; }
 .admin-stats dt { font-size: 13px; color: #6b4a28; }
 .admin-stats dd { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.admin-stat-paid dd { color: #235137; }
+.admin-stat-pending dd, .admin-stat-cod dd { color: #805300; }
+.admin-stat-failed dd { color: #9b1c0a; }
 .admin-revenue { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 20px; margin-top: 20px; }
 .admin-revenue strong { font-size: 24px; font-variant-numeric: tabular-nums; }
 .admin-revenue small { font-size: 12px; color: #6b4a28; margin-left: auto; }
@@ -59,13 +62,14 @@
 .admin-filters button:hover { background: var(--rice-cream); }
 .admin-filters button[aria-pressed=true] { background: var(--cocoa); border-color: var(--cocoa); color: var(--rice-cream); font-weight: 600; }
 .admin-inline-label { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.admin-root input:not([type=checkbox]):not([type=file]), .admin-root select, .admin-root textarea { border: 1px solid #b19a72; background: #fffcf5; border-radius: 4px; padding: 11px 12px; color: var(--cocoa); min-height: 44px; width: 100%; caret-color: var(--palm-oil); }
-.admin-root input::placeholder, .admin-root textarea::placeholder { color: #765638; }
+.admin-root input:not([type=checkbox]):not([type=file]), .admin-root select, .admin-root textarea { border: 1px solid var(--admin-control-border); background: #fffcf5; border-radius: 4px; padding: 11px 12px; color: var(--cocoa); min-height: 44px; width: 100%; caret-color: var(--palm-oil); }
+.admin-root input::placeholder, .admin-root textarea::placeholder { color: #5f4325; opacity: 1; }
 .admin-root select { padding-right: 32px; }
 .admin-inline-label select { width: auto; }
 .admin-table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
 .admin-report .admin-table-scroll { border: 0; margin: 0 -24px -24px; border-radius: 0 0 4px 4px; }
 .admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+.admin-cell-label, .admin-table-hint { display: none; }
 .admin-table th { padding: 14px 18px; font-size: 12px; font-weight: 600; background: var(--rice-cream); color: #573614; white-space: nowrap; }
 .admin-table td { padding: 18px; border-top: 1px solid var(--border); background: #fffaf0; vertical-align: middle; }
 .admin-table tbody tr:hover td { background: #f7edda; }
@@ -194,6 +198,16 @@
   .admin-filters button { padding: 9px 12px; font-size: 13px; }
   .admin-inline-label { width: 100%; flex-wrap: wrap; }
   .admin-inline-label select { flex: 1; min-width: 180px; }
+  .admin-table-hint { display: block; margin: 0 0 8px; color: #6b4a28; font-size: 13px; }
+  .admin-table-scroll:has(.admin-order-link) { overflow: visible; border: 0; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table { display: block; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table tbody { display: grid; gap: 10px; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--admin-rule); border-radius: 4px; background: #fffaf0; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table td { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 12px; border: 0; background: transparent; overflow-wrap: anywhere; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table td:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--admin-rule); }
+  .admin-table-scroll:has(.admin-order-link) .admin-table .admin-cell-label { display: block; color: #6b4a28; font-size: 12px; }
+  .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-number { text-align: left; }
   .admin-form-grid { grid-template-columns: 1fr; }
   .admin-form-wide { grid-column: auto; }
   .admin-support-footer { align-items: flex-start; flex-direction: column; }

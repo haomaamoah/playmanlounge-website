@@ -27,7 +27,7 @@ export function TeamSection() {
               />
               <div>
                 <h3 className="font-display text-3xl">{person.name}</h3>
-                <p className="text-gold mt-1 font-medium">{person.title}</p>
+                <p className="text-gold-ink mt-1 font-medium">{person.title}</p>
                 <p className="mt-3 text-base leading-relaxed">{person.bio}</p>
               </div>
             </li>

@@ -12,7 +12,9 @@
   --color-cocoa: var(--cocoa);
   --color-cocoa-deep: var(--cocoa-deep);
   --color-palm: var(--palm-oil);
+  --color-palm-ink: var(--palm-ink);
   --color-gold: var(--fried-gold);
+  --color-gold-ink: var(--gold-ink);
   --color-cream: var(--rice-cream);
   --color-husk: var(--husk);
   --color-surface: var(--surface);
@@ -58,7 +60,9 @@
   --cocoa: #3a1a04;
   --cocoa-deep: #2a1203;
   --palm-oil: #e54102;
+  --palm-ink: #b83200;
   --fried-gold: #c27b07;
+  --gold-ink: #805300;
   --rice-cream: #f4e3bd;
   --husk: #896f18;
   --surface: #fbf6ea;

@@ -535,11 +535,7 @@ export function OrderSection() {
             .
           </p>
           <p className="mt-3 max-w-md text-base leading-relaxed">
-            Prefer the new order desk?{" "}
-            <a className="underline" href="/app">
-              Open it here
-            </a>
-            . Live MoMo checkout on this page still works.
+            Choose dishes from the menu above to start your order.
           </p>
           <div className="border-cocoa mt-8 border-t-2 pt-4">
             <h3 className="font-display text-2xl">Your bag</h3>
