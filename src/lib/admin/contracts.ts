@@ -20,8 +20,6 @@ export type AdminOrder = {
   fulfilment: "delivery" | "pickup"; preferredTime: string; notes: string;
   status: OrderStatus; paymentStatus: PaymentStatus; total: number;
   transactionId: string | null;
-  /** Labelled fixture row; excluded from Dashboard metrics. */
-  isDemo: boolean;
   lines: { itemId: string; name: string; qty: number; unitPrice: number; image: string }[];
 };
 export type SupportInput = {
@@ -29,15 +27,11 @@ export type SupportInput = {
 };
 export type SupportRequest = SupportInput & {
   id: string; status: "open" | "closed"; createdAt: string; updatedAt: string;
-  /** Labelled fixture row; excluded from Dashboard metrics. */
-  isDemo: boolean;
 };
 export type Dashboard = {
   /** Non-demo counts. pendingOrders = payment_status "pending" (awaiting mobile-money confirmation), not kitchen status. */
   totalOrders: number; paidOrders: number; pendingOrders: number; failedPayments: number;
   codOrders: number; revenue: number; openSupport: number; closedSupport: number; menuItems: number;
-  /** Demo fixture counts, reported separately and never included in the metrics above. */
-  demoOrders: number; demoSupport: number;
   recentOrders: AdminOrder[];
 };
 export type MenuResponse = { ok: true; items: MenuItem[]; groups: MenuGroup[] };

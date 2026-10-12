@@ -9,8 +9,10 @@
     "lint": "eslint",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "db:bootstrap": "tsx --env-file=.env.local scripts/bootstrap.mts",
-    "db:demo": "tsx --env-file=.env.local scripts/seed-demo.mts",
+    "db:cleanup-demo": "tsx --env-file=.env.local scripts/cleanup-demo.mts",
     "db:admin": "tsx --env-file=.env.local scripts/bootstrap-admin.mts",
+    "deals:assets": "tsx scripts/generate-deal-art.mts",
+    "db:promotions": "tsx --env-file=.env.local scripts/seed-promotions.mts",
     "db:migrate": "bash scripts/migrate.sh"
   },
   "dependencies": {

@@ -81,8 +81,6 @@
 .admin-badge-paid, .admin-badge-closed, .admin-badge-completed, .admin-badge-open-menu { color: #235137; background: #e9f1e5; border-color: #b7cbb0; }
 .admin-badge-failed, .admin-badge-open, .admin-badge-cancelled { color: #9b1c0a; background: #fbe9df; border-color: #e4b7a5; }
 .admin-badge-cod, .admin-badge-cooking, .admin-badge-out { color: #77370e; background: #f8e6cf; }
-.admin-badge-demo { color: #3f2a17; background: #fffaf0; border: 1px dashed #8a6a45; text-transform: uppercase; letter-spacing: .04em; }
-.admin-demo-note { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; color: #4b3a26; }
 .admin-badge-inactive { background: #ede7dd; color: #604e37; }
 .admin-results { margin: -6px 0 14px; color: #6b4a28; font-size: 13px; }
 .admin-empty { border: 1px dashed var(--border); padding: 44px 24px; text-align: center; margin: 24px 0; }

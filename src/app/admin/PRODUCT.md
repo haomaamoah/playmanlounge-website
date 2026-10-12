@@ -28,8 +28,10 @@ Orders have independent payment (`pending`, `paid`, `cod`, `failed`) and fulfilm
 
 ## Verification
 
-Real login was captured at desktop and mobile widths. Authenticated acceptance against Supabase verified Home totals and demo exclusions, payment filters, menu creation, image uploads, updates and deactivation, support submission and closure, and password changes. Desktop and mobile layouts were checked for horizontal overflow. Demo records carry visible labels.
+Real login was captured at desktop and mobile widths. Authenticated acceptance against Supabase verified Home totals, payment filters, menu creation, image uploads, updates and deactivation, support submission and closure, and password changes. Desktop and mobile layouts were checked for horizontal overflow. Legacy demo orders and support requests have been removed; the admin UI no longer shows demo labels or explanatory notes.
 
-The 27 logic tests, lint, type checking and production build passed. Security review found no actionable vulnerabilities; correctness review findings were addressed and regression-tested. Anonymous admin requests return HTTP 401, cross-origin mutations return HTTP 403, and invalid support submissions return HTTP 400. No bypass or mock authentication was used.
+The menu editor's Homepage placement selector supports Regular menu, Promotion and Combo deal. Available promotions and combos appear in the homepage carousel above Menu; deactivating all deals hides that section and its navigation link.
+
+The 37 logic/rendering tests, lint, type checking and production build passed. Authenticated acceptance after cleanup confirmed three real orders remain, the support desk is empty, no demo copy is displayed, and a Promotion item saves through the real admin API without changing its price. Security review found no actionable vulnerabilities; the available code-review substitute found no significant issues (the native Bugbot agent was unavailable). Anonymous admin requests return HTTP 401, cross-origin mutations return HTTP 403, and invalid support submissions return HTTP 400. No bypass or mock authentication was used for this authenticated acceptance.
 
 No real payment charges or receipt deliveries were performed during acceptance. Production deployment requires the Supabase environment values and the deployed HTTPS origin in `SITE_URL`.

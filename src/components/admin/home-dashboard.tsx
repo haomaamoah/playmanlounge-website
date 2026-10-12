@@ -22,7 +22,6 @@ export function HomeDashboard() {
           <div className="admin-stat-failed"><dt>Failed payments</dt><dd>{dashboard.failedPayments}</dd></div>
         </dl>
         <div className="admin-revenue"><span>Paid revenue</span><strong>{formatGhs(dashboard.revenue)}</strong><small>Excludes pending, failed and pay-on-delivery orders.</small></div>
-        <p className="admin-footnote">Demo records are excluded from all totals{dashboard.demoOrders || dashboard.demoSupport ? ` (${dashboard.demoOrders} demo orders, ${dashboard.demoSupport} demo support requests)` : ""}.</p>
       </section>
       <div className="admin-home-secondary">
         <section className="admin-summary"><h2>Customer care</h2><p><strong>{dashboard.openSupport}</strong> open requests <span>· {dashboard.closedSupport} closed</span></p><Link href="/admin/support">Open support desk</Link></section>

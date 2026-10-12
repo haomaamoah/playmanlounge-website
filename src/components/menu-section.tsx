@@ -8,6 +8,7 @@ import {
   type MenuItem,
 } from "@/lib/content";
 import { useOrder } from "@/lib/order-context";
+import { dealKind } from "@/lib/promotions";
 
 function Qty({ item }: { item: MenuItem }) {
   const { lines, add, setQty } = useOrder();
@@ -100,6 +101,8 @@ export function MenuSection({
   unavailable: boolean;
 }) {
   const { notice } = useOrder();
+  const visibleGroups = groups.filter((group) => group.items.length > 0 && !dealKind(group.id));
+  const hasDeals = groups.some((group) => group.items.length > 0 && dealKind(group.id));
 
   return (
     <section id="menu" aria-labelledby="menu-heading" className="bg-surface py-16 sm:py-24">
@@ -112,7 +115,7 @@ export function MenuSection({
           <a className="text-foreground underline" href="#gallery">
             gallery
           </a>
-          . Combos come with a Coke. Prices are in cedis.
+          . Prices are in cedis.
         </p>
         <p className="sr-only" aria-live="polite">
           {notice}
@@ -125,9 +128,11 @@ export function MenuSection({
                 Refresh the menu
               </button>{" "}or call the kitchen to order.
             </p>
-          ) : groups.length === 0 ? (
-            <p>No dishes are available to order right now. Please call the kitchen.</p>
-          ) : groups.map((group) => (
+          ) : visibleGroups.length === 0 ? (
+            <p>{hasDeals ? (
+              <>Browse the <a href="#promotions" className="underline">promotions and combo deals above</a> to order.</>
+            ) : "No dishes are available to order right now. Please call the kitchen."}</p>
+          ) : visibleGroups.map((group) => (
             <Ledger key={group.id} group={group} />
           ))}
         </div>

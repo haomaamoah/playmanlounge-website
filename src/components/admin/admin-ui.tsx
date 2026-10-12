@@ -64,7 +64,7 @@ export function OrderTable({ items }: { items: AdminOrder[] }) {
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
     <thead><tr><th>Order / customer</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
     <tbody>{items.map((order) => <tr key={order.id}>
-      <td><span className="admin-cell-label">Order / customer</span><Link className="admin-order-link" href={`/admin/orders/${encodeURIComponent(order.id)}`}>{order.id}</Link><small>{order.customerName}{order.isDemo && <> · <Badge value="demo">Demo</Badge></>}</small></td>
+      <td><span className="admin-cell-label">Order / customer</span><Link className="admin-order-link" href={`/admin/orders/${encodeURIComponent(order.id)}`}>{order.id}</Link><small>{order.customerName}</small></td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><Badge value={order.paymentStatus}>{paymentLabels[order.paymentStatus]}</Badge></td>
       <td><span className="admin-cell-label">Kitchen status</span><Badge value={order.status}>{orderLabels[order.status]}</Badge></td>

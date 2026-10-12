@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Plus, Upload } from "lucide-react";
 import type { AdminMenuItem, ItemResponse, ListResponse, MenuInput, UploadResponse } from "@/lib/admin/contracts";
 import { formatGhs, type MenuCategory } from "@/lib/content";
+import { dealKind } from "@/lib/promotions";
 import { Badge, EmptyState, PageHeading, ResourceState, adminRequest, useAdminResource } from "./admin-ui";
 
 const blank: MenuInput = { id: "", name: "", description: "", price: 0, category: "food", image: "", width: 1100, height: 733, groupId: "", groupTitle: "", groupBlurb: "", sortOrder: 0, isActive: true };
@@ -94,6 +95,15 @@ export function MenuEditor() {
             <label>Item ID<input value={draft.id} onChange={(event) => patch("id", event.target.value)} pattern="[a-z0-9](?:[a-z0-9]|-)*" title="Lowercase letters, numbers and hyphens" required disabled={Boolean(editingId)} /><small>Unique, e.g. chicken-shawarma. Cannot change after creation.</small></label>
             <label>Price (GH₵)<input type="number" min="0" step="0.01" value={draft.price} onChange={(event) => patch("price", Number(event.target.value))} required /></label>
             <label>Category<select value={draft.category} onChange={(event) => { if (isMenuCategory(event.target.value)) patch("category", event.target.value); }}>{categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
+            <label className="admin-form-wide">Homepage placement<select value={dealKind(draft.groupId) ?? "regular"} onChange={(event) => {
+              const placement = event.target.value;
+              setDraft((current) => {
+                if (!current) return current;
+                if (placement === "promotion") return { ...current, groupId: "promo", groupTitle: "Promotions", groupBlurb: "Featured bites and kitchen favourites." };
+                if (placement === "combo") return { ...current, groupId: "combos", groupTitle: "Combo deals", groupBlurb: "Your favourites, bundled together." };
+                return dealKind(current.groupId) ? { ...current, groupId: "", groupTitle: "", groupBlurb: "" } : current;
+              });
+            }}><option value="regular">Regular menu</option><option value="promotion">Promotion</option><option value="combo">Combo deal</option></select><small>Promotions and combo deals appear in the carousel above the Menu. Uncheck availability to hide a deal; the carousel disappears when no deals are available.</small></label>
             <label className="admin-form-wide">Description<textarea value={draft.description} onChange={(event) => patch("description", event.target.value)} maxLength={2000} rows={3} required /></label>
             <label>Menu group ID<input value={draft.groupId} onChange={(event) => patch("groupId", event.target.value)} required pattern="[a-z0-9](?:[a-z0-9]|-)*" list="menu-group-ids" /><datalist id="menu-group-ids">{Array.from(new Set(data?.items.map((item) => item.groupId))).map((id) => <option key={id} value={id} />)}</datalist><small>Use an existing group ID to keep items together.</small></label>
             <label>Group title<input value={draft.groupTitle} onChange={(event) => patch("groupTitle", event.target.value)} required maxLength={160} /></label>

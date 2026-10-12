@@ -134,6 +134,29 @@
   font-family: var(--font-display);
 }
 
+.deals-slider {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cocoa) var(--rice-cream);
+  scroll-padding-inline-start: 0;
+}
+
+.deals-slider::after {
+  content: "";
+  flex: 0 0 calc(14% - 1.25rem);
+}
+
+@media (min-width: 640px) {
+  .deals-slider::after {
+    flex-basis: calc((100% - 1.25rem) / 2);
+  }
+}
+
+@media (min-width: 1024px) {
+  .deals-slider::after {
+    flex-basis: calc(2 * (100% - 2.5rem) / 3 + 1.25rem);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -26,7 +26,7 @@ export function SupportDesk() {
     {mutationError && <p className="admin-error" role="alert">{mutationError}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
     <ResourceState loading={loading} error={error} retry={reload} />
     {data && (data.items.length ? <ul className="admin-support-list">{data.items.map((item) => <li key={item.id}>
-      <div className="admin-support-heading"><div><h2>{item.subject}</h2><p>{item.customerName} · {dateLabel(item.createdAt)}{item.isDemo && <> · <Badge value="demo">Demo</Badge></>}</p></div><Badge value={item.status}>{item.status === "open" ? "Open" : "Closed"}</Badge></div>
+      <div className="admin-support-heading"><div><h2>{item.subject}</h2><p>{item.customerName} · {dateLabel(item.createdAt)}</p></div><Badge value={item.status}>{item.status === "open" ? "Open" : "Closed"}</Badge></div>
       <p className="admin-preserve admin-support-message">{item.message}</p>
       <div className="admin-support-footer"><div><a href={`mailto:${item.customerEmail}`}>{item.customerEmail}</a>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div><button className="admin-button admin-button-secondary" disabled={Boolean(busyId)} onClick={() => toggle(item)}>{busyId === item.id ? "Saving…" : item.status === "open" ? "Mark closed" : "Reopen request"}</button></div>
     </li>)}</ul> : <EmptyState title={filter === "closed" ? "No closed requests yet" : "No requests to show"}>Customer submissions will appear here. Use the filters to check open and resolved requests.</EmptyState>)}

@@ -13,13 +13,12 @@ export function orderDTO(r: Record<string, unknown>): AdminOrder {
     customerName:String(r.customer_name),customerEmail:String(r.customer_email),customerPhone:String(r.customer_phone),
     fulfilment:r.fulfilment as AdminOrder["fulfilment"],preferredTime:String(r.preferred_time),notes:String(r.notes),
     status:r.status as AdminOrder["status"],paymentStatus:r.payment_status as AdminOrder["paymentStatus"],
-    total:Number(r.total),transactionId:r.transaction_id ? String(r.transaction_id) : null,lines:r.lines as AdminOrder["lines"],
-    isDemo:r.is_demo === true};
+    total:Number(r.total),transactionId:r.transaction_id ? String(r.transaction_id) : null,lines:r.lines as AdminOrder["lines"]};
 }
 export function supportDTO(r: Record<string, unknown>): SupportRequest {
   return {id:String(r.id),customerName:String(r.customer_name),customerEmail:String(r.customer_email),
     phone:String(r.phone),subject:String(r.subject),message:String(r.message),status:r.status as SupportRequest["status"],
-    createdAt:String(r.created_at),updatedAt:String(r.updated_at),isDemo:r.is_demo === true};
+    createdAt:String(r.created_at),updatedAt:String(r.updated_at)};
 }
 export async function persistOrder(order: HydratedOrder, transactionId?: string, requestKey?: string) {
   const lines = order.lines.map(l => ({itemId:l.item.id,name:l.item.name,qty:l.qty,unitPrice:l.item.price,image:l.item.image}));

@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 import { nav, site } from "@/lib/content";
 import { useOrder } from "@/lib/order-context";
 
-export function SiteHeader() {
+export function SiteHeader({ hasDeals = false }: { hasDeals?: boolean }) {
   const { count } = useOrder();
+  const links = hasDeals ? [nav[0], { label: "Deals", href: "#promotions" }, ...nav.slice(1)] : nav;
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function SiteHeader() {
             aria-label="Primary"
             className="ml-auto hidden items-center gap-1 lg:flex"
           >
-            {nav.map((item) => (
+            {links.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
@@ -114,7 +115,7 @@ export function SiteHeader() {
             </button>
           </div>
           <nav className="mt-6 flex flex-col gap-1">
-            {nav.map((item) => (
+            {links.map((item) => (
               <a
                 key={item.href}
                 href={item.href}

@@ -27,7 +27,6 @@ export function OrderDetail() {
     <ResourceState loading={loading} error={error} retry={reload} />
     {order && <>
       <PageHeading title={order.id} description={`Placed ${dateLabel(order.createdAt)} · Accra time`} />
-      {order.isDemo && <p className="admin-demo-note" role="note"><Badge value="demo">Demo</Badge> Sample order for training. Not a real customer order and excluded from Home totals.</p>}
       <div className="admin-detail-grid">
         <section className="admin-report"><h2>Order ticket</h2>
           <ul className="admin-line-items">{order.lines.map((line, index) => <li key={`${line.itemId}-${index}`}><span>{line.qty} × {line.name}</span><strong>{formatGhs(line.qty * line.unitPrice)}</strong></li>)}</ul>

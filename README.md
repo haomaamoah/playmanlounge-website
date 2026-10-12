@@ -4,7 +4,7 @@ Marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE) �
 
 Tagline: **Life is tasty.**
 
-This is a single scrolling page with six sections (Home, Menu, Gallery, Meet The Team, Make an Order, Contact Us). Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document: see the board, send an email for delivery or arranged hub pickup.
+This is a single scrolling page with Home, Promotions + Combo deals (when available), Menu, Gallery, Meet The Team, Make an Order, and Contact Us. Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document: see the board, send an email for delivery or arranged hub pickup.
 
 ## Run it
 
@@ -55,6 +55,23 @@ Do **not** replace the real phone (`+233 54 753 9942`, set by the Managing Direc
 - **Printed menu poster** (`assets/images/director-menu-poster.jpg`): Ben 10 15, Mini Bite 35, Jumbo Bite 60, the Playboy trays at 20 / 10 / 10, and the Play Man trays at 30 / 50.
 
 The production catalog is stored in Supabase `menu_items` and edited through `/admin/menu`. The homepage renders server-side from `loadMenuGroups()` and shows an explicit “menu unavailable” error if the database cannot be read. `menuGroups` is the initial bootstrap source and pure-test fixture only. `/api/menu` and server pricing read the same active DB catalog; database outages return an explicit error, never a static-success fallback.
+
+### Promotions + Combo deals
+
+The `#promotions` carousel sits above the regular Menu and displays active items from `promo`, `promos`, `promotions`, `combo`, and `combos` groups. Deals are not duplicated in the regular menu, but use the same order bag and server-side pricing. When no active deals exist (or the catalog cannot be loaded), both the section and its header link disappear. It supports touch scrolling, previous/next arrows, slide selectors, and keyboard arrows/Home/End, without automatic motion.
+
+In `/admin/menu`, choose **Homepage placement → Promotion / Combo deal / Regular menu**. Edit the name, image, price, description and display order using the existing fields. Uncheck **Available on customer menu** to hide a deal. There is no static fallback that republishes disabled deals.
+
+Five original promotional artworks are generated from existing Play Man food photographs, without copying chain branding or baking prices into images. Three refresh existing combos; two accompany new Snack Duo (GH₵ 20) and Rice + Bites (GH₵ 45) promotions. These bundles use the fixture's component prices, with no unverified discount or expiry claims. The other two existing combos remain available.
+
+```bash
+npm run deals:assets       # regenerate five WebP artworks and receipt thumbnails
+npm run db:promotions      # publish missing deals without overwriting admin edits
+# Explicitly refresh artwork on the three existing combos, preserving other fields:
+npm run db:promotions -- --refresh-combo-art
+```
+
+The seed uploads artwork and email thumbnails to the menu-images bucket. For another database, review prices before running the seed; subsequent price and availability changes belong in the admin editor.
 
 ## Paying for an order
 
@@ -183,13 +200,11 @@ Copy `env.example` into `.env.local` without overwriting existing payment/email 
 npm run db:bootstrap
 # ADMIN_EMAIL and ADMIN_PASSWORD are one-time bootstrap inputs; remove them from .env.local afterwards and change the password in /admin/settings.
 npm run db:admin
-# Optional, DEVELOPMENT PROJECT ONLY:
-ALLOW_DEMO_SEED=1 npm run db:demo
 ```
 
 `db:bootstrap` uploads existing menu images as WebP, stores durable bucket URLs, then inserts missing items. Reruns do not overwrite admin edits. The payment-only `kitchen-test` fixture starts **inactive**; explicitly enable it only when a consenting wallet test is authorized. `db:admin` creates a confirmed Supabase Auth user and allowlisted `admin_profiles` row; existing passwords are not overwritten. Disable **Allow new users to sign up** in Supabase Auth settings; no signup API exists here and ordinary Auth users never receive admin access. Enable leaked-password protection if available on the selected plan. Never use a service-role key in a browser.
 
-Demo orders/support are an explicitly opt-in, idempotent operation separate from production catalog setup. They are marked `is_demo` and excluded from dashboard production metrics. No script sends emails or charges a wallet.
+The demo seeder has been removed. To clean up legacy records explicitly marked `is_demo`, run `REMOVE_DEMO_RECORDS=1 npm run db:cleanup-demo`. This removes only marked orders, their payment attempts (receipt ledger rows cascade with the order), and marked support requests; real customer records are preserved. The dashboard retains the database exclusion safeguard but displays no demo counts or labels. No setup or cleanup script sends emails or charges a wallet.
 
 ### API contract and protections
 
