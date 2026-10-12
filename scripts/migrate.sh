@@ -5,8 +5,8 @@ if [[ "${APPLY_DB_MIGRATIONS:-}" != "1" || -z "${SUPABASE_DB_URL:-}" ]]; then
   exit 1
 fi
 command -v psql >/dev/null || { echo "Install PostgreSQL client tools (psql) first."; exit 1; }
-export PGDATABASE="$SUPABASE_DB_URL"
-psql -X -v ON_ERROR_STOP=1 <<'SQL'
+# PGDATABASE only ever holds a bare database name, so a connection URI must be handed to psql itself.
+psql -X -v ON_ERROR_STOP=1 "$SUPABASE_DB_URL" <<'SQL'
 begin;
 select pg_advisory_xact_lock(202610090001);
 create schema if not exists app_migrations;
