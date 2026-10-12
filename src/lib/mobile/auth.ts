@@ -3,11 +3,11 @@ import type { User } from "@supabase/supabase-js";
 import { audit, jsonBody } from "../admin/server";
 import { LIMITS } from "./constants";
 import { mobileCustomer, mobileSession } from "./dto";
-import { MobileFailure, unauthorized, unavailable, validationFailure } from "./errors";
+import { MobileFailure, unauthorized, validationFailure } from "./errors";
 import { limit } from "./limits";
 import { checkPepper, derivePassword } from "./password";
 import { created, ok } from "./reply";
-import { authErrorKind, db, publicClient, throwIfAuthDown } from "./supabase";
+import { authErrorKind, db, failed, publicClient, throwIfAuthDown } from "./supabase";
 import { parseChangePassword, parseDeleteAccount, parseLogin, parseProfilePatch, parseRefresh, parseSignup } from "./validation";
 
 type Row = Record<string, unknown>;
@@ -52,7 +52,7 @@ export async function requireCustomer(request: Request): Promise<Customer> {
 
 async function findProfile(id: string): Promise<Row | null> {
   const { data, error } = await db().from("customer_profiles").select("*").eq("id", id).maybeSingle();
-  if (error) throw unavailable();
+  if (error) throw failed("read customer profile", error);
   return data;
 }
 
@@ -68,7 +68,7 @@ async function profileFor(user: User): Promise<Row> {
     const raced = await findProfile(user.id);
     if (raced) return raced;
   }
-  if (error || !data) throw unavailable();
+  if (error || !data) throw failed("repair customer profile", error);
   return data;
 }
 
@@ -79,7 +79,7 @@ async function signIn(email: string, secret: string) {
     throwIfAuthDown(error);
     return null;
   }
-  if (!data.session || !data.user) throw unavailable();
+  if (!data.session || !data.user) throw failed("sign-in returned no session");
   return { session: data.session, user: data.user };
 }
 
@@ -101,14 +101,16 @@ export async function signUp(request: Request) {
       throw new MobileFailure(409, message, { code: "email_taken", fieldErrors: { email: message } });
     }
     throwIfAuthDown(made.error);
+    // Supabase rejecting the derived secret itself is a deployment problem, not something the customer typed.
+    if (made.error.code === "weak_password") throw failed("createUser refused the derived secret: relax Supabase Auth password requirements to 'no required characters'", made.error);
     throw validationFailure({ email: "Enter a valid email address." });
   }
   const user = made.data.user;
   try {
     const signedIn = await signIn(email, secret);
-    if (!signedIn) throw unavailable();
+    if (!signedIn) throw failed("sign-in right after sign-up was rejected");
     const { data: profile, error } = await admin.from("customer_profiles").insert({ id: user.id, email }).select("*").single();
-    if (error || !profile) throw unavailable();
+    if (error || !profile) throw failed("create customer profile", error);
     await auditQuietly(user.id, "customer_signup", user.id);
     return created({ session: mobileSession(signedIn.session), customer: mobileCustomer(profile) });
   } catch (error) {
@@ -146,7 +148,7 @@ export async function refresh(request: Request) {
 export async function logout(request: Request) {
   const customer = await requireCustomer(request);
   const { error } = await db().auth.admin.signOut(customer.jwt, "local");
-  if (error && authErrorKind(error) === "down") throw unavailable();
+  if (error && authErrorKind(error) === "down") throw failed("revoke session", error);
   return ok();
 }
 
@@ -159,7 +161,7 @@ export async function updateProfile(request: Request) {
   const customer = await requireCustomer(request);
   const patch = parseProfilePatch(await jsonBody(request));
   const { data, error } = await db().from("customer_profiles").update(patch).eq("id", customer.id).select("*").single();
-  if (error || !data) throw unavailable();
+  if (error || !data) throw failed("update customer profile", error);
   return ok({ customer: mobileCustomer(data) });
 }
 
@@ -185,7 +187,7 @@ export async function changePassword(request: Request) {
   const { error } = await db().auth.admin.updateUserById(customer.id, { password: secret });
   if (error) {
     throwIfAuthDown(error);
-    throw unavailable();
+    throw failed("update password", error);
   }
   // Every session must end with the old password, on every device. GoTrue already does this on an admin password
   // update; the explicit revoke keeps the guarantee independent of that behaviour (the call fails harmlessly once
@@ -205,11 +207,11 @@ export async function deleteAccount(request: Request) {
   await audit(customer.id, "customer_delete", customer.id);
   // Orders stay with the kitchen for bookkeeping (customer_id is cleared by the foreign key); tickets go with the customer.
   const tickets = await db().from("support_requests").delete().eq("customer_id", customer.id);
-  if (tickets.error) throw unavailable();
+  if (tickets.error) throw failed("delete customer tickets", tickets.error);
   const { error } = await db().auth.admin.deleteUser(customer.id);
   if (error) {
     throwIfAuthDown(error);
-    throw unavailable();
+    throw failed("delete user", error);
   }
   return ok();
 }

@@ -21,6 +21,10 @@ type Reply = { status: number; body: Obj; headers: Headers };
 const BASE = (process.env.PML_BASE_URL ?? process.argv[2] ?? "http://127.0.0.1:43123").replace(/\/$/, "");
 const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, "");
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+// Optional: a LOCAL admin (infra/scripts/create-admin.sh) lets the smoke test prove the kitchen's admin desk sees and
+// can manage what the app creates.
+const ADMIN_EMAIL = process.env.PML_ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.PML_ADMIN_PASSWORD;
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
@@ -261,6 +265,7 @@ async function main() {
   const lines = () => [{ id: first().id, qty: 2 }, { id: second().id, qty: 1 }];
   const total = () => (pesewas(first().price) * 2 + pesewas(second().price)) / 100;
   let orderA: Obj = {};
+  let orderPickup: Obj = {};
 
   await step("the Idempotency-Key header is required and checked", async () => {
     const missing = await call("POST", "/api/mobile/orders", { token: a.value.access, body: deliveryOrder(lines(), total()), actor: "a" });
@@ -407,6 +412,7 @@ async function main() {
     assert.equal(res.body.order.notes, "Call when ready");
     assert.equal(res.body.order.fulfilment, "pickup");
     assert.equal(res.body.order.customerPhone, "0200000000");
+    orderPickup = res.body.order;
   });
   await step("pickup works without notes or expectedTotal, and 23:00 is accepted", async () => {
     const res = await call("POST", "/api/mobile/orders", {
@@ -537,6 +543,61 @@ async function main() {
     const patch = await call("PATCH", `/api/admin/orders/${orderA.id}`, { body: { status: "cooking" }, headers: { Origin: BASE }, token: a.value.access });
     assert.ok(patch.status === 401 || patch.status === 403, `admin order update answered ${patch.status}`);
   });
+
+  if (ADMIN_EMAIL && ADMIN_PASSWORD) {
+    section("The kitchen's admin desk sees what the app creates");
+    let cookie = "";
+    const admin = (method: string, path: string, body?: unknown) => call(method, path, { body, headers: { Origin: BASE, Cookie: cookie }, actor: "admin" });
+    await step("a local admin signs in", async () => {
+      const res = await call("POST", "/api/admin/login", { body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }, headers: { Origin: BASE }, actor: "admin" });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      cookie = res.headers.getSetCookie().map((entry) => entry.split(";")[0]).join("; ");
+      assert.ok(cookie, "the admin session cookie");
+    });
+    await step("the admin order list shows the app's orders: COD, customer e-mail, address folded into the notes", async () => {
+      const res = await admin("GET", "/api/admin/orders?limit=100");
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      const row = res.body.items.find((item: Obj) => item.id === orderA.id);
+      assert.ok(row, "the mobile order is listed");
+      assert.equal(row.customerEmail, a.value.email);
+      assert.equal(row.paymentStatus, "cod");
+      assert.equal(row.notes, orderA.notes);
+      assert.equal(row.total, orderA.total);
+      assert.equal(row.lines.length, orderA.lines.length);
+    });
+    await step("the Support desk shows the app's tickets under the account's name and e-mail", async () => {
+      const res = await admin("GET", "/api/admin/support?limit=100");
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      const row = res.body.items.find((item: Obj) => item.id === ticketA.id);
+      assert.ok(row, "the mobile ticket is listed");
+      assert.equal(row.customerEmail, a.value.email);
+      assert.equal(row.customerName, "Kofi Mensah", "the profile name (the e-mail's local part when none is set)");
+      assert.equal(row.status, "open");
+    });
+    await step("moving an order along the kitchen board shows up in the app", async () => {
+      const res = await admin("PATCH", `/api/admin/orders/${orderPickup.id}`, { status: "cooking" });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body.item.status, "cooking");
+      const seen = await call("GET", `/api/mobile/orders/${orderPickup.id}`, { token: a.value.access });
+      assert.equal(seen.body.order.status, "cooking");
+      assert.notEqual(seen.body.order.updatedAt, orderPickup.updatedAt, "updatedAt moves with the status");
+    });
+    await step("closing a ticket in the Support desk shows up in the app", async () => {
+      const res = await admin("PATCH", `/api/admin/support/${ticketA.id}`, { status: "closed" });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      const seen = await call("GET", "/api/mobile/support", { token: a.value.access });
+      assert.equal(seen.body.tickets.find((ticket: Obj) => ticket.id === ticketA.id).status, "closed");
+    });
+    await step("the dashboard counts mobile orders like any other", async () => {
+      const res = await admin("GET", "/api/admin/dashboard");
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.ok(res.body.dashboard.codOrders >= 5);
+      assert.ok(res.body.dashboard.totalOrders >= 5);
+    });
+  } else {
+    section("Admin desk");
+    console.log("  - skipped (set PML_ADMIN_EMAIL / PML_ADMIN_PASSWORD of a LOCAL admin, or run infra/scripts/smoke.sh)");
+  }
 
   section("Password change");
   const s1 = { value: "" };

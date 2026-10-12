@@ -3,10 +3,9 @@ import { jsonBody } from "../admin/server";
 import type { Customer } from "./auth";
 import { LIMITS, SUPPORT_LIST_MAX } from "./constants";
 import { mobileTicket, supportContactName } from "./dto";
-import { unavailable } from "./errors";
 import { limit } from "./limits";
 import { created, ok } from "./reply";
-import { db, userClient } from "./supabase";
+import { db, failed, userClient } from "./supabase";
 import { parseSupport } from "./validation";
 
 // Exactly the columns the customer role may read (see the migration's column grants).
@@ -28,7 +27,7 @@ export async function createTicket(request: Request, customer: Customer) {
     })
     .select(TICKET_COLUMNS)
     .single();
-  if (error || !data) throw unavailable();
+  if (error || !data) throw failed("create support ticket", error);
   return created({ ticket: mobileTicket(data) });
 }
 
@@ -40,6 +39,6 @@ export async function listTickets(customer: Customer) {
     .eq("customer_id", customer.id)
     .order("created_at", { ascending: false })
     .limit(SUPPORT_LIST_MAX);
-  if (error) throw unavailable();
+  if (error) throw failed("list support tickets", error);
   return ok({ tickets: data.map((row) => mobileTicket(row)) });
 }

@@ -10,18 +10,19 @@ import { gatewayConfig } from "../payments/theteller";
 import type { Customer } from "./auth";
 import { LIMITS } from "./constants";
 import { mobileOrder } from "./dto";
-import { MobileFailure, notFound, unavailable, validationFailure } from "./errors";
+import { MobileFailure, notFound, validationFailure } from "./errors";
 import { requestKeyFor, sameSubmission } from "./idempotency";
 import { limit } from "./limits";
 import { Reply, ok } from "./reply";
-import { db, userClient } from "./supabase";
+import { db, failed, userClient } from "./supabase";
 import { UUID_PATTERN, parseIdempotencyKey, parseMobileOrder, parseOrdersQuery, type MobileOrderInput } from "./validation";
 
 type Row = Record<string, unknown>;
 
 // Exactly the columns the customer role may read (see the migration's column grants).
 const ORDER_COLUMNS = "id,order_ref,status,payment_status,fulfilment,preferred_time,notes,total,customer_name,customer_phone,lines,created_at,updated_at";
-const RECEIPT_TIMEOUT_MS = 8000;
+// The app waits for this response (20 s receive timeout) and serverless functions are billed and limited by it.
+const RECEIPT_TIMEOUT_MS = 5000;
 
 /** Receipts always describe the stored order, so a replay carries the original ticket. */
 export function receiptOrder(row: Row): HydratedOrder {
@@ -82,7 +83,7 @@ async function deliverReceipts(row: Row): Promise<boolean> {
 
 async function findByRequestKey(requestKey: string): Promise<Row | null> {
   const { data, error } = await db().from("orders").select("*").eq("request_key", requestKey).maybeSingle();
-  if (error) throw unavailable();
+  if (error) throw failed("read order by request key", error);
   return data;
 }
 
@@ -148,7 +149,7 @@ export async function placeOrder(request: Request, customer: Customer): Promise<
       const winner = await findByRequestKey(requestKey);
       if (winner) return replay(winner, input);
     }
-    throw unavailable();
+    throw failed("create_order (is migration 202610120001 applied?)", error);
   }
   const saved = data as Row;
   return new Reply(201, { ok: true, order: mobileOrder(saved), receiptSent: await deliverReceipts(saved) });
@@ -165,7 +166,7 @@ export async function listOrders(request: Request, customer: Customer) {
     .limit(pageSize + 1);
   if (before) query = query.lt("created_at", before);
   const { data, error } = await query;
-  if (error) throw unavailable();
+  if (error) throw failed("list orders", error);
   const orders = data.slice(0, pageSize).map((row) => mobileOrder(row));
   return ok({ orders, nextBefore: data.length > pageSize ? orders[orders.length - 1].createdAt : null });
 }
@@ -174,7 +175,7 @@ export async function getOrder(customer: Customer, id: string) {
   // Another customer's order, an unknown id and a malformed id are all the same 404: ownership is never revealed.
   if (!UUID_PATTERN.test(id)) throw notFound("We could not find that order.");
   const { data, error } = await userClient(customer.jwt).from("orders").select(ORDER_COLUMNS).eq("id", id).eq("customer_id", customer.id).maybeSingle();
-  if (error) throw unavailable();
+  if (error) throw failed("read order", error);
   if (!data) throw notFound("We could not find that order.");
   return ok({ order: mobileOrder(data) });
 }
