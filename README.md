@@ -185,7 +185,7 @@ The cocoa bar has **Terms and Conditions** and **Return Policy** buttons, then *
 
 ## Supabase backend setup
 
-Use a user-approved Supabase project; these scripts never create a project. The versioned migrations are `supabase/migrations/202610090001_backend.sql`, `202610090002_email_thumbnails.sql` and `202610090003_delivery_and_attempts.sql` (receipt delivery ledger, superseded payment attempts). Apply each **once**, in order, through that project's SQL editor, or use the idempotent CLI wrapper (requires `psql`):
+Use a user-approved Supabase project; these scripts never create a project. The versioned migrations are `supabase/migrations/202610090001_backend.sql`, `202610090002_email_thumbnails.sql`, `202610090003_delivery_and_attempts.sql` (receipt delivery ledger, superseded payment attempts) and `202610120001_mobile_customers.sql` (mobile app customers, see [Mobile API](#mobile-api)). Apply each **once**, in order, through that project's SQL editor, or use the idempotent CLI wrapper (requires `psql`):
 
 ```bash
 # Supply the database connection privately; do not paste it into chat or commit it.
@@ -217,3 +217,44 @@ Atomic DB rate limits span all application instances. `TRUST_PROXY_IP=1` is appr
 Payment starts persist the priced order snapshot and attempt **before** calling the gateway. Gateway confirmations atomically update persisted payment state, with paid states never downgraded. Order submissions cannot replay an unrelated payment reference: it must match a server-recorded attempt, customer and basket total. Orders paid before a later menu price change remain in the admin ledger even if a new submission is rejected for stale pricing. COD submissions persist independently; send an `Idempotency-Key` header (16–100 `[A-Za-z0-9-]`) so a retried submit returns the same order and receipts. Dashboard `pendingOrders` counts `payment_status = pending` (awaiting mobile-money confirmation), not kitchen status. Receipt transport errors expose `persisted:true` and `orderId`, so operators can find an accepted order rather than blindly resubmit it. No database failure is hidden behind a successful static catalog or mock order. Analytics revenue counts confirmed paid orders only, not promised COD collections.
 
 Focused validation: `npm test`, `npx eslint src/lib/admin src/lib/db src/app/api scripts --quiet`, and `npx tsc --noEmit`. Without configured project credentials, cloud migration, actual storage uploads, live login and end-to-end DB persistence remain blocked; pure tests can still run. Do not exercise live payment endpoints as part of backend setup.
+
+## Mobile API
+
+The Flutter customer app (`playmanlounge-mobile` repo) talks to this backend only, through JSON routes under `/api/mobile/**`. It never sees Supabase URLs or keys, and pays on delivery (mobile money from the app is a later phase). The contract — paths, bodies, status codes, error codes — is `docs/API_CONTRACT.md` in the mobile repo; the code is `src/app/api/mobile/**` (thin routes) and `src/lib/mobile/**` (logic, validation, DTOs).
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/mobile/config` | Hours, limits, payment methods, contact details (public) |
+| `POST /api/mobile/auth/signup` · `login` · `refresh` · `logout` | Customer session. Sign-up takes **only** `{email, password}` (4–128 characters) and answers already signed in |
+| `GET` · `PATCH` · `DELETE /api/mobile/me`, `POST /api/mobile/me/password` | Profile, password change, account deletion (App Store 5.1.1(v)) |
+| `GET` · `POST /api/mobile/orders`, `GET /api/mobile/orders/:id` | Place pay-on-delivery orders (`Idempotency-Key` required), list and read the caller's own orders |
+| `GET` · `POST /api/mobile/support` | The caller's tickets; new tickets land in the admin Support desk |
+
+The menu is the existing public `GET /api/menu`.
+
+**Customers are Supabase Auth users** created by the backend (`auth.admin.createUser`, which works with public sign-ups switched off, so keep **Allow new users to sign up** disabled) plus a `customer_profiles` row. Admins are still only the allowlisted `admin_profiles`; a customer can never become one, and every mobile route requires a profile, so an admin or a user minted directly in Supabase Auth is refused. An e-mail that already belongs to an admin or customer answers `409 email_taken`.
+
+**Why a pepper.** The product accepts a 4-character password, Supabase Auth requires 6, and a 4-character secret should not be what actually protects an account. So the backend never forwards the typed password: it sends `hex(HMAC-SHA256(key = CUSTOMER_AUTH_PEPPER, msg = "pml-customer-v1\0" + lower(email) + "\0" + password))` (64 characters, deterministic) to Supabase Auth, and the pepper never leaves the server. Set `CUSTOMER_AUTH_PEPPER` (at least 32 characters; `openssl rand -base64 48`) on the host and in your password manager. **Losing or changing it locks every customer out.** Without it, the sign-up, login, password-change and delete routes answer `503 unavailable` (fail closed); existing sessions keep working. See `src/lib/mobile/password.ts` and its golden test vectors.
+
+**Protections**
+
+- Bearer tokens only (no cookies, so no CSRF surface and no `Origin` check); `Cache-Control: no-store` everywhere; unknown request fields and malformed JSON are `400 validation` with per-field `fieldErrors`; bodies are limited to 32 KB.
+- Ownership (BOLA): every query filters by the authenticated customer id, which comes from the verified token and never from the body. List and detail reads additionally run with the caller's own JWT, so **Row Level Security** (`customer_id = auth.uid()`) re-checks them; writes use the service role with the server-derived id. Another customer's order is `404 not_found`, never `403`.
+- Pricing: totals are recomputed from the live menu (`hydrateOrder`); a client total that no longer matches is `409 price_changed` with the new `total`. Orders above `MAX_ORDER_TOTAL` (default 5000) are refused (they go by phone).
+- Idempotency: `Idempotency-Key` (16–100 `[A-Za-z0-9-]`) is stored per customer in `orders.request_key`. The same key and body replays the saved order (`200`), a different body is `409 idempotency_conflict`, and concurrent duplicates still create one order.
+- Receipts are best effort: the order is saved first, then `sendOrderReceipts` runs; an unset or failing mail provider only turns `receiptSent` false.
+- Abuse limits (atomic, shared by every instance): sign-up 10/hour per IP bucket, login 10 per 15 minutes per e-mail plus 100 per 15 minutes per IP bucket, orders 20/hour and tickets 5/hour per customer, password change and account deletion 5 per 15 minutes per customer; `429 rate_limited` carries `Retry-After`. IP buckets use `x-forwarded-for` only when `TRUST_PROXY_IP=1` (set it on Vercel, which overwrites the header); otherwise they collapse into one shared bucket.
+- Sign-up, password change and account deletion are written to `audit_events` (never passwords, tokens or the pepper). A wrong password on a sensitive action is `403 invalid_credentials`, never `401`, because the app treats `401` as "session expired".
+
+**Database.** `supabase/migrations/202610120001_mobile_customers.sql` adds `customer_profiles`, `orders.customer_id` + `orders.source` (`web` | `mobile`), `support_requests.customer_id`, their indexes, an extended `create_order()` (same signature, so the website's own order route is untouched) and select-own-row policies for `authenticated`. It is re-runnable and `npm run db:migrate` applies it after the first three. Mobile orders appear in `/admin/orders` and the dashboard like any other order (their notes start with `Delivery address:`); filter on `source = 'mobile'` in the database. Deleting an account removes the customer's tickets and unlinks their orders, which stay for bookkeeping.
+
+**Known limits (by product decision, "for now")**: no e-mail verification and no password reset. Treat the 4-character minimum as intentionally weak; the pepper and the per-account limits are what protect it.
+
+**Try it locally** — the mobile repo's `infra/` runs the whole thing in Docker with throw-away keys (`infra/scripts/up.sh`, `website.sh`, `smoke.sh`). The same smoke script can be run by hand against any **local** stack:
+
+```bash
+npm test
+SUPABASE_URL=http://127.0.0.1:54421 SUPABASE_ANON_KEY=<local anon key> npx tsx scripts/smoke-mobile-api.mts http://127.0.0.1:43123
+```
+
+It signs up throw-away customers, places and replays orders, checks cross-customer isolation, rate limits and Row Level Security over real HTTP, and deletes what it created. Never point it at production.
