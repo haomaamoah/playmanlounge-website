@@ -240,7 +240,9 @@ export function parseMobileOrder(raw: unknown, accountEmail: string): MobileOrde
   const phone = asText("phone").replace(/\s/g, "");
   const preferredTime = asText("preferredTime");
   const notes = asText("notes", true).trim();
-  const deliveryAddress = asText("deliveryAddress", true).trim();
+  // One line, always: the stored notes read "Delivery address: <address>\n\n<notes>", so the app, the kitchen board
+  // and anything that splits at the first blank line can rely on the address never containing one.
+  const deliveryAddress = asText("deliveryAddress", true).replace(/\s*[\r\n]+\s*/g, ", ").replace(/[ \t]+/g, " ").trim();
 
   const fulfilment = body.fulfilment === "delivery" || body.fulfilment === "pickup" ? body.fulfilment : undefined;
   if (!fulfilment) errors.fulfilment = "Choose pickup or delivery.";

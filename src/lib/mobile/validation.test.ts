@@ -160,6 +160,15 @@ test("order: pickup keeps the notes as typed and rejects an address", () => {
   assert.deepEqual(fields(() => order(delivery({ fulfilment: "pickup" }))), ["deliveryAddress"]);
 });
 
+test("order: the stored address is always one line, so splitting at the first blank line is safe", () => {
+  const parsed = order(delivery({ deliveryAddress: "  Nikoi Olai St\n\n\nbehind   the blue gate\r\n 2nd floor\t" }));
+  assert.equal(parsed.deliveryAddress, "Nikoi Olai St, behind the blue gate, 2nd floor");
+  assert.equal(parsed.storedNotes, "Delivery address: Nikoi Olai St, behind the blue gate, 2nd floor\n\nExtra pepper please");
+  assert.equal(parsed.storedNotes.split("\n\n")[0], "Delivery address: Nikoi Olai St, behind the blue gate, 2nd floor");
+  assert.deepEqual(fields(() => order(delivery({ deliveryAddress: "\n\n  \n" }))), ["deliveryAddress"], "only line breaks is still empty");
+  assert.deepEqual(fields(() => order(delivery({ deliveryAddress: `${"a".repeat(299)}\nb` }))), ["deliveryAddress"], "length is judged after normalising");
+});
+
 test("order: the delivery address is required for delivery, 3-300 characters", () => {
   assert.deepEqual(fields(() => order(delivery({ deliveryAddress: undefined }))), ["deliveryAddress"]);
   assert.deepEqual(fields(() => order(delivery({ deliveryAddress: "   " }))), ["deliveryAddress"]);

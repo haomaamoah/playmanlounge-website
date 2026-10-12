@@ -323,6 +323,18 @@ async function main() {
     expectFailure(res, 400, "validation");
   });
 
+  await step("a multi-line address is stored on one line, so the first blank line always ends it", async () => {
+    const res = await call("POST", "/api/mobile/orders", {
+      token: v.value.access,
+      body: deliveryOrder([{ id: first().id, qty: 1 }], undefined, { deliveryAddress: "Nikoi Olai St\n\nbehind the blue gate\n2nd floor", notes: "Ring twice" }),
+      headers: { "Idempotency-Key": keyFor("multiline") },
+      actor: "v",
+    });
+    expectOk(res, 201);
+    assert.equal(res.body.order.notes, "Delivery address: Nikoi Olai St, behind the blue gate, 2nd floor\n\nRing twice");
+    assert.equal(res.body.order.notes.split("\n\n")[0], "Delivery address: Nikoi Olai St, behind the blue gate, 2nd floor");
+  });
+
   await step("the delivery address and the notes together must fit the 800-character notes limit", async () => {
     const address = "a".repeat(300);
     const tooLong = await call("POST", "/api/mobile/orders", {
