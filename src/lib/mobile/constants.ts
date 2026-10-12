@@ -40,3 +40,13 @@ export const LIMITS = {
   ordersPerCustomer: [20, 3600],
   supportPerCustomer: [5, 3600],
 } as const satisfies Record<string, readonly [number, number]>;
+
+/**
+ * Per-address limits only make sense when the client address is known, i.e. TRUST_PROXY_IP=1 behind a proxy that
+ * overwrites x-forwarded-for (Vercel does). Without it the shared `rateLimit()` helper puts every visitor into ONE
+ * bucket, and a ceiling meant for one address (10 sign-ups an hour) would lock out the whole customer base. That
+ * shared bucket therefore gets a ceiling sized for everybody: it only guards against floods. Per-account limits
+ * (e-mail, customer id) are never scaled.
+ */
+export const SHARED_IP_BUCKET_FACTOR = 20;
+export const ipBucketCeiling = (max: number, trustProxyIp: boolean) => (trustProxyIp ? max : max * SHARED_IP_BUCKET_FACTOR);

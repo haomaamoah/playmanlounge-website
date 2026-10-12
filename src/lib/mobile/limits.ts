@@ -4,6 +4,7 @@ import { ApiFailure } from "../admin/validation";
 import { rateLimit } from "../admin/server";
 import { db } from "../db/server";
 import { MobileFailure } from "./errors";
+import { ipBucketCeiling } from "./constants";
 
 function wait(seconds: number) {
   if (seconds >= 3600) return "an hour";
@@ -33,8 +34,9 @@ async function secondsUntilReset(request: Request, scope: string, identity: stri
  * per-account limits (the shared helper only stores a SHA-256 of scope + identity).
  */
 export async function limit(request: Request, scope: string, [max, seconds]: readonly [number, number], identity = "") {
+  const ceiling = identity ? max : ipBucketCeiling(max, process.env.TRUST_PROXY_IP === "1");
   try {
-    await rateLimit(request, scope, max, seconds, identity);
+    await rateLimit(request, scope, ceiling, seconds, identity);
   } catch (error) {
     if (error instanceof ApiFailure && error.status === 429) {
       const retryAfter = await secondsUntilReset(request, scope, identity, seconds);
