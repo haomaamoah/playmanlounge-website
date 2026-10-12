@@ -181,14 +181,19 @@ export async function changePassword(request: Request) {
   const { currentPassword, newPassword } = parseChangePassword(await jsonBody(request));
   await confirmPassword(customer, currentPassword, key, "Your current password is incorrect.", "customer_password_denied");
   await audit(customer.id, "customer_password_change", customer.id);
-  const { error } = await db().auth.admin.updateUserById(customer.id, { password: derivePassword(customer.email, newPassword, key) });
+  const secret = derivePassword(customer.email, newPassword, key);
+  const { error } = await db().auth.admin.updateUserById(customer.id, { password: secret });
   if (error) {
     throwIfAuthDown(error);
     throw unavailable();
   }
-  // Other devices must sign in again with the new password; this session carries on.
-  await db().auth.admin.signOut(customer.jwt, "others").catch(() => undefined);
-  return ok();
+  // Every session must end with the old password, on every device. GoTrue already does this on an admin password
+  // update; the explicit revoke keeps the guarantee independent of that behaviour (the call fails harmlessly once
+  // the session is gone). This device is then signed straight back in and receives the new session, so changing a
+  // password never bounces the customer to the login screen.
+  await db().auth.admin.signOut(customer.jwt, "global").catch(() => undefined);
+  const renewed = await signIn(customer.email, secret);
+  return ok(renewed ? { session: mobileSession(renewed.session) } : {});
 }
 
 export async function deleteAccount(request: Request) {

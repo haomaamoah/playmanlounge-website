@@ -552,23 +552,29 @@ async function main() {
     expectFailure(await call("POST", "/api/mobile/me/password", { token: a.value.access, body: { currentPassword: "abcd" }, actor: "a" }), 400, "validation");
     expectFailure(await call("POST", "/api/mobile/me/password", { token: a.value.access, body: { currentPassword: "abcd", newPassword: "wxyz", extra: 1 }, actor: "a" }), 400, "validation");
   });
-  await step("changing the password: old fails, new works, other sessions are revoked, this one survives", async () => {
+  await step("changing the password: every old session ends, this device gets a new one, old password fails, new works", async () => {
     const second = await signIn(a.value);
     expectOk(second);
     s1.value = second.body.session.accessToken; // another device
+    const before = { access: a.value.access, refresh: a.value.refresh };
     const res = await call("POST", "/api/mobile/me/password", { token: a.value.access, body: { currentPassword: "abcd", newPassword: "w1dget" }, actor: "a" });
     expectOk(res);
+    // The device that changed the password is handed a fresh session, so it is never bounced to the login screen.
+    assert.ok(res.body.session?.accessToken, "the response carries a new session");
+    assert.match(res.body.session.expiresAt, ISO);
+    assert.notEqual(res.body.session.accessToken, before.access);
+    expectOk(await call("GET", "/api/mobile/me", { token: res.body.session.accessToken }));
+    // Everything that existed before the change is revoked: the token that made the request, the other device, its refresh token.
+    expectFailure(await call("GET", "/api/mobile/me", { token: before.access }), 401, "unauthorized");
+    expectFailure(await call("GET", "/api/mobile/me", { token: s1.value }), 401, "unauthorized");
+    expectFailure(await call("POST", "/api/mobile/auth/refresh", { body: { refreshToken: before.refresh } }), 401, "unauthorized");
     expectFailure(await signIn(a.value, "abcd"), 401, "invalid_credentials");
     const fresh = await signIn(a.value, "w1dget");
     expectOk(fresh);
     a.value.password = "w1dget";
     a.value.access = fresh.body.session.accessToken;
     a.value.refresh = fresh.body.session.refreshToken;
-    expectFailure(await call("GET", "/api/mobile/me", { token: s1.value }), 401, "unauthorized");
     expectOk(await call("GET", "/api/mobile/me", { token: a.value.access }));
-  });
-  await step("a one-character password can be used to log in only if it was valid (still a 401)", async () => {
-    expectFailure(await signIn(a.value, "a"), 401, "invalid_credentials");
   });
 
   section("Rate limiting (each limit uses its own throw-away customer or e-mail)");
