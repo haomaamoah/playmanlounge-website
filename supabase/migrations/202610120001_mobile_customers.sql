@@ -71,3 +71,6 @@ create policy "Own orders" on public.orders for select to authenticated
 drop policy if exists "Own support requests" on public.support_requests;
 create policy "Own support requests" on public.support_requests for select to authenticated
   using (customer_id = (select auth.uid()));
+
+-- Hosted projects: make the Data API notice the new table and columns right away.
+notify pgrst, 'reload schema';
