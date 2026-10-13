@@ -68,13 +68,16 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
         <Link href="/app" className="mb-8 flex min-h-12 items-center gap-3 px-1.5">
           <Image src={site.logo.src} alt="" width={43} height={43} className="size-11 object-contain" />
           <span>
-            <strong className="font-display block text-lg font-normal">Customer portal</strong>
+            <strong className="font-display block text-lg font-normal">Hi {firstName}</strong>
             <small className="mt-1 block text-xs">Play Man Lounge</small>
           </span>
         </Link>
         {customerNav}
         <div className="mt-auto border-t border-cream/20 pt-5">
-          <p className="mb-2 break-all px-2 text-xs text-cream/80">Hi {firstName}</p>
+          <Link href="/app/bag" className="mb-2 inline-flex min-h-11 items-center gap-3 px-2 text-sm hover:text-white">
+            <ShoppingBag className="size-4" aria-hidden="true" />
+            Bag{bagCount > 0 ? ` (${bagCount})` : ""}
+          </Link>
           <button
             type="button"
             onClick={() => void logout()}
@@ -86,8 +89,8 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
         </div>
       </aside>
       <div className="flex min-h-dvh min-w-0 flex-col">
-        <header className="bg-cocoa text-cream sticky top-0 z-40">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+        <header className="border-border bg-surface sticky top-0 z-40 border-b md:hidden">
+          <div className="flex h-16 items-center gap-3 px-4">
             <button
               type="button"
               aria-label="Open customer menu"
@@ -98,19 +101,9 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
             >
               <Menu className="size-5" aria-hidden="true" />
             </button>
-            <Link href="/" className="flex min-h-11 min-w-0 items-center gap-2">
-            <Image
-              src={site.logo.src}
-              alt=""
-              width={36}
-              height={36}
-              className="size-9 object-contain"
-            />
-              <span className="font-display truncate text-lg leading-none">Hi {firstName}</span>
-            </Link>
             <Link
               href="/app/bag"
-              className="relative ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 border border-cream/30 px-3 text-sm font-medium"
+              className="text-cocoa relative ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 border border-border px-3 text-sm font-medium"
             >
               <ShoppingBag className="size-4" aria-hidden="true" />
               Bag
@@ -143,7 +136,10 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
             <div className="mb-8 flex items-center justify-between">
               <Link href="/app" onClick={() => setMobileMenuOpen(false)} className="flex min-h-11 items-center gap-3">
                 <Image src={site.logo.src} alt="" width={40} height={40} className="size-10 object-contain" />
-                <span className="font-display text-lg">Customer portal</span>
+                <span>
+                  <strong className="font-display block text-lg font-normal">Hi {firstName}</strong>
+                  <small className="block text-xs">Play Man Lounge</small>
+                </span>
               </Link>
               <button
                 type="button"
@@ -156,7 +152,6 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
             </div>
             {customerNav}
             <div className="mt-auto border-t border-cream/20 pt-5">
-              <p className="mb-2 break-all px-2 text-xs text-cream/80">Hi {firstName}</p>
               <button
                 type="button"
                 onClick={() => void logout()}
