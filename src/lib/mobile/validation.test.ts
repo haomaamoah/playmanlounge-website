@@ -26,67 +26,82 @@ function failure(fn: () => unknown): MobileFailure {
 }
 const fields = (fn: () => unknown) => Object.keys(failure(fn).fieldErrors ?? {}).sort();
 
-test("sign-up: the password floor is 4 characters and the ceiling 128", () => {
-  const f3 = failure(() => parseSignup({ email: "kofi@example.com", password: "abc" }));
-  assert.equal(f3.status, 400);
-  assert.equal(f3.code, "validation");
-  assert.equal(f3.fieldErrors?.password, "Use at least 4 characters.");
-  assert.equal(parseSignup({ email: "kofi@example.com", password: "abcd" }).password, "abcd");
-  assert.equal(parseSignup({ email: "kofi@example.com", password: "x".repeat(128) }).password.length, 128);
-  assert.equal(failure(() => parseSignup({ email: "kofi@example.com", password: "x".repeat(129) })).fieldErrors?.password, "Use at most 128 characters.");
-  assert.deepEqual(fields(() => parseSignup({ email: "kofi@example.com" })), ["password"]);
-  assert.deepEqual(fields(() => parseSignup({ email: "kofi@example.com", password: 1234 })), ["password"]);
+const signup = (extra: Record<string, unknown> = {}) => ({
+  name: "Kofi Mensah",
+  email: "kofi@example.com",
+  phone: "0547539942",
+  password: "secret1",
+  ...extra,
+});
+
+test("sign-up requires name, email, Ghana phone, and a 6-128 character password", () => {
+  const f5 = failure(() => parseSignup(signup({ password: "abcde" })));
+  assert.equal(f5.status, 400);
+  assert.equal(f5.code, "validation");
+  assert.equal(f5.fieldErrors?.password, "Use at least 6 characters.");
+  assert.deepEqual(parseSignup(signup()), {
+    name: "Kofi Mensah", email: "kofi@example.com", phone: "0547539942", password: "secret1",
+  });
+  assert.equal(parseSignup(signup({ password: "x".repeat(128) })).password.length, 128);
+  assert.equal(failure(() => parseSignup(signup({ password: "x".repeat(129) }))).fieldErrors?.password, "Use at most 128 characters.");
+  assert.deepEqual(fields(() => parseSignup({ ...signup(), name: undefined, phone: undefined, password: undefined })), ["name", "password", "phone"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ password: 123456 }))), ["password"]);
 });
 
 test("passwords are never trimmed: spaces are legitimate characters", () => {
-  assert.equal(parseSignup({ email: "kofi@example.com", password: " a b " }).password, " a b ");
-  assert.deepEqual(fields(() => parseSignup({ email: "kofi@example.com", password: "   " })), ["password"], "3 spaces is 3 characters");
-  assert.equal(parseSignup({ email: "kofi@example.com", password: "    " }).password, "    ", "4 spaces is a valid 4-character password");
+  assert.equal(parseSignup(signup({ password: " a b c " })).password, " a b c ");
+  assert.deepEqual(fields(() => parseSignup(signup({ password: "     " }))), ["password"], "5 spaces is 5 characters");
+  assert.equal(parseSignup(signup({ password: "      " })).password, "      ", "6 spaces is a valid 6-character password");
 });
 
 test("sign-up: e-mail is trimmed, lower-cased and checked; every problem is reported at once", () => {
-  assert.equal(parseSignup({ email: "  Kofi.Mensah@Example.COM ", password: "abcd" }).email, "kofi.mensah@example.com");
-  assert.deepEqual(fields(() => parseSignup({ email: "nope", password: "abcd" })), ["email"]);
-  assert.deepEqual(fields(() => parseSignup({ email: "a b@example.com", password: "abcd" })), ["email"]);
-  assert.deepEqual(fields(() => parseSignup({ email: "", password: "abc" })), ["email", "password"]);
-  assert.deepEqual(fields(() => parseSignup({ password: "abcd" })), ["email"]);
-  assert.equal(failure(() => parseSignup({ email: "", password: "abcd" })).fieldErrors?.email, "Enter your email.");
-  assert.equal(failure(() => parseSignup({ email: "nope", password: "abcd" })).fieldErrors?.email, "Enter a valid email address.");
+  assert.equal(parseSignup(signup({ email: "  Kofi.Mensah@Example.COM " })).email, "kofi.mensah@example.com");
+  assert.deepEqual(fields(() => parseSignup(signup({ email: "nope" }))), ["email"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ email: "a b@example.com" }))), ["email"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ email: "", password: "abcde" }))), ["email", "password"]);
+  assert.equal(failure(() => parseSignup(signup({ email: "" }))).fieldErrors?.email, "Enter your email.");
+  assert.equal(failure(() => parseSignup(signup({ email: "nope" }))).fieldErrors?.email, "Enter a valid email address.");
   const long = `${"a".repeat(250)}@example.com`;
-  assert.deepEqual(fields(() => parseSignup({ email: long, password: "abcd" })), ["email"]);
-  assert.deepEqual(fields(() => parseSignup({ email: "a\u0000@example.com", password: "abcd" })), ["email"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ email: long }))), ["email"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ email: "a\u0000@example.com" }))), ["email"]);
 });
 
-test("unknown fields and non-objects are rejected everywhere", () => {
+test("sign-up name and phone are checked and unknown fields are rejected", () => {
+  assert.deepEqual(fields(() => parseSignup(signup({ name: "" }))), ["name"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ name: "K".repeat(101) }))), ["name"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ phone: "233547539942" }))), ["phone"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ phone: "054 753 9942" }))), ["phone"]);
+  assert.deepEqual(fields(() => parseSignup(signup({ phone: "054753994\u0000" }))), ["phone"]);
+  assert.equal(failure(() => parseSignup({ ...signup(), confirmPassword: "secret1" })).code, "validation");
+  assert.equal(failure(() => parseLogin({ identifier: "0547539942", password: "x", name: "Kofi" })).code, "validation");
   for (const parse of [parseSignup, parseLogin]) {
-    const unknown = failure(() => parse({ email: "kofi@example.com", password: "abcd", name: "Kofi" }));
-    assert.equal(unknown.status, 400);
-    assert.equal(unknown.code, "validation");
-    assert.equal(unknown.fieldErrors?.name, "Unknown field.");
     for (const raw of [null, undefined, [], "text", 7]) assert.equal(failure(() => parse(raw)).code, "validation");
   }
-  assert.equal(failure(() => parseSignup({ email: "kofi@example.com", password: "abcd", __proto__x: 1, role: "admin" })).code, "validation");
+  assert.equal(failure(() => parseSignup({ ...signup(), role: "admin" })).code, "validation");
   assert.equal(failure(() => parseProfilePatch({ name: "Kofi", email: "x@y.zz" })).code, "validation");
   assert.equal(failure(() => parseChangePassword({ currentPassword: "abcd", newPassword: "wxyz", extra: true })).code, "validation");
   assert.equal(failure(() => parseDeleteAccount({ password: "abcd", confirm: true })).code, "validation");
   assert.equal(failure(() => parseRefresh({ refreshToken: "abc", extra: 1 })).code, "validation");
   assert.equal(failure(() => parseSupport({ subject: "Late order", message: "My order is very late.", status: "closed" })).code, "validation");
-  assert.equal(failure(() => parseSignup(JSON.parse('{"email":"kofi@example.com","password":"abcd","__proto__":{"admin":true}}'))).code, "validation");
+  assert.equal(failure(() => parseSignup(JSON.parse('{"name":"Kofi","email":"kofi@example.com","phone":"0547539942","password":"secret1","__proto__":{"admin":true}}'))).code, "validation");
 });
 
 test("login only checks shape: a too-short password is a failed login later, not a policy leak", () => {
-  assert.deepEqual(parseLogin({ email: "Kofi@Example.com", password: "x" }), { email: "kofi@example.com", password: "x" });
+  assert.deepEqual(parseLogin({ email: "Kofi@Example.com", password: "x" }), { identifier: "kofi@example.com", password: "x" });
+  assert.deepEqual(parseLogin({ identifier: "0547539942", password: "abcde" }), { identifier: "0547539942", password: "abcde" });
+  assert.deepEqual(parseLogin({ identifier: "0547539942", email: "ignored@example.com", password: "x" }), { identifier: "0547539942", password: "x" });
   assert.deepEqual(fields(() => parseLogin({ email: "kofi@example.com", password: "" })), ["password"]);
-  assert.deepEqual(fields(() => parseLogin({ email: "kofi@example.com", password: "x".repeat(129) })), ["password"]);
+  assert.deepEqual(fields(() => parseLogin({ identifier: "bad", password: "x" })), ["identifier"]);
+  assert.deepEqual(fields(() => parseLogin({ identifier: "kofi@example.com", password: "x".repeat(129) })), ["password"]);
 });
 
 test("refresh, change-password and delete bodies", () => {
   assert.equal(parseRefresh({ refreshToken: "abcdef123456" }).refreshToken, "abcdef123456");
   assert.deepEqual(fields(() => parseRefresh({})), ["refreshToken"]);
   assert.deepEqual(fields(() => parseRefresh({ refreshToken: "" })), ["refreshToken"]);
-  assert.deepEqual(parseChangePassword({ currentPassword: "old", newPassword: "wxyz" }), { currentPassword: "old", newPassword: "wxyz" });
+  assert.deepEqual(parseChangePassword({ currentPassword: "old", newPassword: "wxyz12" }), { currentPassword: "old", newPassword: "wxyz12" });
   assert.deepEqual(fields(() => parseChangePassword({ currentPassword: "old", newPassword: "abc" })), ["newPassword"]);
-  assert.deepEqual(fields(() => parseChangePassword({ newPassword: "abcd" })), ["currentPassword"]);
+  assert.deepEqual(fields(() => parseChangePassword({ newPassword: "abcd" })), ["currentPassword", "newPassword"]);
   assert.deepEqual(fields(() => parseChangePassword({ currentPassword: "old", newPassword: "x".repeat(129) })), ["newPassword"]);
   assert.deepEqual(parseDeleteAccount({ password: "abcd" }), { password: "abcd" });
   assert.deepEqual(fields(() => parseDeleteAccount({})), ["password"]);

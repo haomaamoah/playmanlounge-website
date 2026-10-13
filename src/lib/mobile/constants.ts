@@ -2,12 +2,13 @@
  * Product rules shared with the Flutter app (`lib/core/rules.dart`, `lib/data/models/*`) and described in
  * docs/API_CONTRACT.md of the mobile repo. Change the app, the contract and this file together.
  */
-export const PASSWORD_MIN = 4; // "For now signup requires only email and password of minimum 4 characters."
+export const PASSWORD_MIN = 6;
 export const PASSWORD_MAX = 128;
 export const EMAIL_MAX = 254;
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const NAME_MAX = 100;
 export const PHONE_MAX = 30;
+export const GHANA_PHONE_PATTERN = /^0[0-9]{9}$/;
 
 export const ADDRESS_MIN = 3;
 export const ADDRESS_MAX = 300;

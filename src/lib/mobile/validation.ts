@@ -5,6 +5,7 @@ import {
   ADDRESS_MIN,
   EMAIL_MAX,
   EMAIL_PATTERN,
+  GHANA_PHONE_PATTERN,
   IDEMPOTENCY_KEY_PATTERN,
   MAX_LINES,
   MAX_QTY_PER_LINE,
@@ -95,22 +96,37 @@ function textField(
 }
 
 export function parseSignup(raw: unknown) {
-  const body = strictObject(raw, ["email", "password"]);
+  const body = strictObject(raw, ["name", "email", "phone", "password"]);
   const errors: FieldErrors = {};
+  const name = textField(body.name, errors, "name", { min: 1, max: NAME_MAX, message: "Enter your full name." });
   const email = emailField(body.email, errors);
-  const password = passwordField(body.password, errors);
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  if (!phone) errors.phone = "Enter your 10-digit Ghana phone number.";
+  else if (!GHANA_PHONE_PATTERN.test(phone) || SINGLE_LINE_CONTROLS.test(phone)) errors.phone = "Enter a valid 10-digit Ghana phone number.";
+  const password = passwordField(body.password, errors, "password", PASSWORD_MIN);
   throwIfAny(errors);
-  return { email, password };
+  return { name, email, phone, password };
 }
 
 /** A password that cannot possibly be valid is a failed login (401), not a 400, so the form rules never leak. */
 export function parseLogin(raw: unknown) {
-  const body = strictObject(raw, ["email", "password"]);
+  const body = strictObject(raw, ["identifier", "email", "password"]);
   const errors: FieldErrors = {};
-  const email = emailField(body.email, errors);
+  const isNewIdentifier = body.identifier !== undefined;
+  const key = isNewIdentifier ? "identifier" : "email";
+  const rawIdentifier = isNewIdentifier ? body.identifier : body.email;
+  const identifier = typeof rawIdentifier === "string" ? rawIdentifier.trim() : "";
+  if (!identifier) errors[key] = "Enter your email or phone number.";
+  else if (identifier.length > EMAIL_MAX || SINGLE_LINE_CONTROLS.test(identifier) ||
+    (!EMAIL_PATTERN.test(identifier) && !GHANA_PHONE_PATTERN.test(identifier))) {
+    errors[key] = "Enter a valid email address or 10-digit Ghana phone number.";
+  }
   const password = passwordField(body.password, errors, "password", 1);
   throwIfAny(errors);
-  return { email, password };
+  return {
+    identifier: EMAIL_PATTERN.test(identifier) ? identifier.toLowerCase() : identifier,
+    password,
+  };
 }
 
 export function parseRefresh(raw: unknown) {
