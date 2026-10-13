@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MenuItem } from "./content.ts";
-import { restoreOrder, type PendingOrder } from "./pending-order.ts";
+import { readPendingOrder, rememberPendingOrder, restoreOrder, type PendingOrder } from "./pending-order.ts";
 
 const item: MenuItem = {
   id: "admin-created-dish",
@@ -42,4 +42,41 @@ test("checkout does not silently drop dishes missing from the live catalog", () 
     () => restoreOrder(pending, { method: "delivery" }, []),
     /no longer available/
   );
+});
+
+test("portal payment details survive reload even when the start outcome has no reference", (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  const storage = new Map<string, string>();
+  Object.defineProperty(globalThis, "sessionStorage", {
+    configurable: true,
+    value: {
+      setItem: (key: string, value: string) => storage.set(key, value),
+      getItem: (key: string) => storage.get(key) ?? null,
+    },
+  });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, "sessionStorage", original);
+    else Reflect.deleteProperty(globalThis, "sessionStorage");
+  });
+  assert.equal(rememberPendingOrder({
+    ...pending, customerPortal: true, startUnconfirmed: true, transactionId: "", savedAt: 0,
+  }), true);
+  const restored = readPendingOrder();
+  assert.equal(restored?.customerPortal, true);
+  assert.equal(restored?.startUnconfirmed, true);
+  assert.equal(restored?.customer.email, pending.customer.email);
+  assert.ok(restored && restored.savedAt > 0);
+});
+
+test("payment detail persistence reports unavailable browser storage", (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  Object.defineProperty(globalThis, "sessionStorage", {
+    configurable: true,
+    get: () => { throw new Error("Storage unavailable"); },
+  });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, "sessionStorage", original);
+    else Reflect.deleteProperty(globalThis, "sessionStorage");
+  });
+  assert.equal(rememberPendingOrder(pending), false);
 });

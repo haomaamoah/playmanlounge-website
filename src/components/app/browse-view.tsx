@@ -16,8 +16,7 @@ export function BrowseView() {
       <p className="text-husk text-sm">Kaneshie kitchen · 12 PM – 11 PM</p>
       <h1 className="font-display mt-1 text-4xl leading-none">What are you eating?</h1>
       <p className="text-muted-foreground mt-3 max-w-md text-base leading-relaxed">
-        Combos come with a Coke. This desk is a design preview — Pay now does
-        not charge mobile money yet.
+        Combos come with a Coke.
       </p>
       <div className="mt-8 space-y-10">
         <CustomerDealsCarousel groups={menuGroups} />

@@ -22,11 +22,13 @@ export type StartedPayment =
 export class PaymentError extends Error {
   readonly gatewayIssue: boolean;
   readonly retryable: boolean;
-  constructor(message: string, options?: { gatewayIssue?: boolean; retryable?: boolean }) {
+  readonly transactionId?: string;
+  constructor(message: string, options?: { gatewayIssue?: boolean; retryable?: boolean; transactionId?: string }) {
     super(message);
     this.name = "PaymentError";
     this.gatewayIssue = options?.gatewayIssue ?? false;
     this.retryable = options?.retryable ?? true;
+    this.transactionId = options?.transactionId;
   }
 }
 
@@ -58,13 +60,15 @@ async function readError(response: Response) {
       error?: string;
       gatewayIssue?: boolean;
       retryable?: boolean;
+      transactionId?: string;
     };
     return new PaymentError(data.error ?? "The payment could not be started.", {
       gatewayIssue: data.gatewayIssue,
-      retryable: data.retryable,
+      retryable: data.retryable ?? response.status < 500,
+      transactionId: data.transactionId,
     });
   } catch {
-    return new PaymentError("The payment could not be started.");
+    return new PaymentError("The payment service returned an unreadable response. Check your wallet before trying again.", { retryable: false });
   }
 }
 
@@ -81,6 +85,7 @@ export type StartPaymentInput = {
   network?: MomoNetwork;
   momoNumber?: string;
   voucherCode?: string;
+  customerPortal?: boolean;
 };
 
 export async function startPayment(input: StartPaymentInput): Promise<StartedPayment> {
@@ -92,7 +97,7 @@ export async function startPayment(input: StartPaymentInput): Promise<StartedPay
       body: JSON.stringify(input),
     });
   } catch {
-    throw new PaymentError("We could not reach the payment service. Check your connection.");
+    throw new PaymentError("We could not confirm whether the payment started. Check your wallet or call the kitchen before trying again.", { retryable: false });
   }
 
   if (!response.ok) throw await readError(response);

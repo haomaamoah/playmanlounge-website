@@ -74,10 +74,6 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
         </Link>
         {customerNav}
         <div className="mt-auto border-t border-cream/20 pt-5">
-          <Link href="/app/bag" className="mb-2 inline-flex min-h-11 items-center gap-3 px-2 text-sm hover:text-white">
-            <ShoppingBag className="size-4" aria-hidden="true" />
-            Bag{bagCount > 0 ? ` (${bagCount})` : ""}
-          </Link>
           <button
             type="button"
             onClick={() => void logout()}
@@ -101,9 +97,14 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
             >
               <Menu className="size-5" aria-hidden="true" />
             </button>
+          </div>
+        </header>
+        {logoutError && <p role="alert" className="bg-destructive/10 px-4 py-2 text-center text-sm">{logoutError}</p>}
+        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-10">
+          <div className="mb-4 flex justify-end">
             <Link
               href="/app/bag"
-              className="text-cocoa relative ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 border border-border px-3 text-sm font-medium"
+              className="text-cocoa relative inline-flex min-h-11 items-center gap-2 border border-border px-3 text-sm font-semibold hover:bg-cream"
             >
               <ShoppingBag className="size-4" aria-hidden="true" />
               Bag
@@ -114,9 +115,6 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
               )}
             </Link>
           </div>
-        </header>
-        {logoutError && <p role="alert" className="bg-destructive/10 px-4 py-2 text-center text-sm">{logoutError}</p>}
-        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-10">
           {children}
         </main>
       </div>

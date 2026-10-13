@@ -9,6 +9,7 @@ import { nextAfterCharge } from "@/lib/payments/fallback";
 import type { HydratedOrder } from "@/lib/mail/types";
 import { checkOrigin, jsonBody, rateLimit } from "@/lib/admin/server";
 import { ApiFailure } from "@/lib/admin/validation";
+import { requireCustomer } from "@/lib/customer/server";
 import {
   chargeMomo,
   gatewayConfig,
@@ -33,7 +34,7 @@ function fail(status: number, body: Record<string, unknown>) {
  * PaySwitch refuses a return address it cannot reach, so a localhost `SITE_URL`
  * is rejected before the gateway is called.
  */
-function publicReturnUrl() {
+function publicReturnUrl(customerPortal = false) {
   let url: URL;
   try {
     url = new URL(siteUrl());
@@ -45,7 +46,7 @@ function publicReturnUrl() {
     url.hostname === "127.0.0.1" ||
     url.hostname.endsWith(".local");
   if (url.protocol !== "https:" || local) return null;
-  return `${url.origin}/`;
+  return `${url.origin}${customerPortal ? "/app/checkout" : "/"}`;
 }
 
 async function startCheckout(
@@ -59,10 +60,11 @@ async function startCheckout(
     promptRefusal?: PaymentResult;
     /** The refused direct-charge attempt this checkout replaces on the same order. */
     supersedes?: string;
+    customerPortal?: boolean;
     order: HydratedOrder;
   }
 ) {
-  const redirectUrl = publicReturnUrl();
+  const redirectUrl = publicReturnUrl(args.customerPortal);
   if (!redirectUrl) {
     // The direct refusal was definitive and no checkout can replace it.
     if (args.supersedes) await updatePayment(args.supersedes,"failed");
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return fail(error instanceof ApiFailure ? error.status : 503,{
       error:error instanceof ApiFailure ? error.message : "Payment storage is unavailable. Do not retry a charge without checking your phone.",
+      retryable: error instanceof ApiFailure && error.status < 500,
     });
   }
 }
@@ -153,13 +156,21 @@ async function start(request: Request) {
   }
 
   const order = hydrated.order;
+  const body = raw as Record<string, unknown>;
+  const customerPortal = body.customerPortal === true;
+  if (customerPortal) {
+    const { profile } = await requireCustomer();
+    if (profile.email.toLowerCase() !== order.email.toLowerCase()) {
+      return fail(403, { error: "Sign in with the account placing this order." });
+    }
+  }
+
   if (order.total > config.maxTotal) {
     return fail(400, {
       error: `Orders over GH₵ ${config.maxTotal} are arranged by phone.`,
     });
   }
 
-  const body = raw as Record<string, unknown>;
   const expectedTotal = Number(body.expectedTotal);
   if (
     Number.isFinite(expectedTotal) &&
@@ -190,6 +201,7 @@ async function start(request: Request) {
       name: order.name,
       email: order.email,
       order,
+      customerPortal,
     });
   }
   const voucherCode = (typeof body.voucherCode === "string" ? body.voucherCode : "")
@@ -243,6 +255,7 @@ async function start(request: Request) {
       promptRefusal: result,
       supersedes: transactionId,
       order,
+      customerPortal,
     });
   }
 

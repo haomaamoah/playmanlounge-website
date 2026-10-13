@@ -74,6 +74,10 @@ async function submit(request: Request) {
             : "The receipt emails did not send.",
         persisted: true,
         orderId: saved.id,
+        payment: {
+          method: payment.method,
+          state: payment.method === "momo" ? payment.state : undefined,
+        },
         fallbackBody: formatOrderBody({
           ...hydrated.order,
           lines: hydrated.order.lines,

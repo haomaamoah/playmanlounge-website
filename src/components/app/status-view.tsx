@@ -23,8 +23,7 @@ export function StatusView() {
       <div>
         <h1 className="font-display text-4xl">We cannot find that ticket</h1>
         <p className="text-muted-foreground mt-3 max-w-md text-base">
-          This preview keeps orders in this browser tab. If you closed it, the
-          ticket is gone.
+          Check your order history or contact the kitchen for help with your order.
         </p>
         <Link
           href="/app"

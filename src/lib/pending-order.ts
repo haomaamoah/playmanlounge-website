@@ -9,6 +9,8 @@ import type { Fulfilment, OrderPayload, PaymentInfo } from "@/lib/email";
 import type { MomoNetwork } from "@/lib/payments/networks";
 
 export type PendingOrder = {
+  customerPortal?: boolean;
+  startUnconfirmed?: boolean;
   transactionId: string;
   savedAt: number;
   total: number;
@@ -30,10 +32,12 @@ const MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 export function rememberPendingOrder(pending: PendingOrder) {
   try {
-    sessionStorage.setItem(KEY, JSON.stringify(pending));
+    sessionStorage.setItem(KEY, JSON.stringify({ ...pending, savedAt: Date.now() }));
+    return true;
   } catch {
     // Private browsing can refuse storage. The payment still works; the page
     // just cannot email the order by itself when the customer returns.
+    return false;
   }
 }
 
@@ -42,7 +46,7 @@ export function readPendingOrder(): PendingOrder | null {
     const raw = sessionStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingOrder;
-    if (!parsed?.transactionId) return null;
+    if (!parsed?.transactionId && !(parsed?.customerPortal && parsed.startUnconfirmed)) return null;
     if (Date.now() - parsed.savedAt > MAX_AGE_MS) return null;
     return parsed;
   } catch {

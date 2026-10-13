@@ -79,7 +79,7 @@ The order form offers two choices:
 
 **Pay on delivery** — nothing changes for the customer. Both receipts carry a `PAY ON DELIVERY` stamp telling the kitchen to collect the cedis on arrival, and the kitchen subject line ends with `pay on delivery` so it reads without opening the mail.
 
-**Pay now with mobile money** — the form asks for the wallet number and network (the network is preselected from the Ghanaian prefix), the submit button becomes **Pay GH₵ n now**, and payment is handled by PaySwitch (theTeller). Once the money lands the receipts go out stamped `PAID ONLINE`, with the wallet and the PaySwitch reference, and the kitchen subject line ends with `PAID`.
+**Pay now with mobile money** — the homepage order form and signed-in customer checkout ask for the wallet number and network (the network is preselected from the Ghanaian prefix), then start payment through PaySwitch (theTeller). The customer checkout returns hosted payments to the authenticated account before finalizing the saved order. Once the money lands the receipts go out stamped `PAID ONLINE`, with the wallet and the PaySwitch reference, and the kitchen subject line ends with `PAID`.
 
 ### Where the money logic lives
 
@@ -107,7 +107,7 @@ Use `prompt` for the in-page flow. If wallet details are missing, prompt mode re
 
 Hosted checkout only works from a public HTTPS address, because PaySwitch has to be able to reach the return URL — `/initiate` answers `code 999` for a `SITE_URL` on `127.0.0.1`. The route checks for that first and tells the customer to pay on delivery instead.
 
-Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side, sends the receipts, and clears the bag. If the payment cannot be confirmed the bag comes back so the customer can retry or pay the rider — the site never claims a payment PaySwitch has not confirmed.
+Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side before sending receipts or marking it paid. Customer-portal orders remain available to recheck if the payment is unsettled, and the portal will not start another charge while that payment is unresolved. The site never claims a payment PaySwitch has not confirmed.
 
 ### Merchant account status (October 2026)
 
