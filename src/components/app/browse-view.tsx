@@ -4,9 +4,12 @@ import Image from "next/image";
 import { Minus, Plus } from "lucide-react";
 import { formatGhs, menuGroups } from "@/lib/content";
 import { useMockStore } from "@/lib/mocks/store";
+import { dealKind } from "@/lib/promotions";
+import { CustomerDealsCarousel } from "./customer-deals-carousel";
 
 export function BrowseView() {
   const { bag, addToBag, setBagQty, menuOverrides, resolvedMenu } = useMockStore();
+  const customerMenuGroups = menuGroups.filter((group) => !dealKind(group.id));
 
   return (
     <div>
@@ -17,7 +20,8 @@ export function BrowseView() {
         not charge mobile money yet.
       </p>
       <div className="mt-8 space-y-10">
-        {menuGroups.map((group) => (
+        <CustomerDealsCarousel groups={menuGroups} />
+        {customerMenuGroups.map((group) => (
           <section key={group.id} aria-labelledby={`app-${group.id}`}>
             <h2 id={`app-${group.id}`} className="font-display border-cocoa border-b-2 pb-2 text-3xl">
               {group.title}

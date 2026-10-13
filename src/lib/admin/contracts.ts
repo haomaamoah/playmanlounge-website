@@ -32,6 +32,7 @@ export type Dashboard = {
   /** Non-demo counts. pendingOrders = payment_status "pending" (awaiting mobile-money confirmation), not kitchen status. */
   totalOrders: number; paidOrders: number; pendingOrders: number; failedPayments: number;
   codOrders: number; revenue: number; openSupport: number; closedSupport: number; menuItems: number;
+  customerCount: number | null;
   recentOrders: AdminOrder[];
 };
 export type MenuResponse = { ok: true; items: MenuItem[]; groups: MenuGroup[] };
