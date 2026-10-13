@@ -9,6 +9,8 @@ export type MobileErrorCode =
   | "price_changed"
   | "idempotency_conflict"
   | "rate_limited"
+  | "payment_unavailable"
+  | "payment_conflict"
   | "unavailable";
 
 export type FieldErrors = Record<string, string>;

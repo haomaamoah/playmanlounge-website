@@ -1,5 +1,6 @@
 import type { Fulfilment } from "../email";
 import { parseOrderRequest } from "../mail/order";
+import { isMomoNetwork, isValidMomoNumber, normaliseSubscriberNumber, type MomoNetwork } from "../payments/networks";
 import {
   ADDRESS_MAX,
   ADDRESS_MIN,
@@ -190,9 +191,44 @@ export type MobileOrderInput = {
   storedNotes: string;
   lines: { id: string; qty: number }[];
   expectedTotal?: number;
+  payment: MobilePayment;
 };
 
-const ORDER_KEYS = ["name", "phone", "fulfilment", "preferredTime", "deliveryAddress", "notes", "lines", "expectedTotal"] as const;
+/** How the customer pays. The wallet number is normalised to 233XXXXXXXXX for the gateway. */
+export type MobilePayment = { method: "delivery" } | { method: "momo"; network: MomoNetwork; momoNumber: string };
+
+const ORDER_KEYS = ["name", "phone", "fulfilment", "preferredTime", "deliveryAddress", "notes", "lines", "expectedTotal", "payment"] as const;
+const PAYMENT_KEYS = ["method", "network", "momoNumber"] as const;
+
+/** Absent means pay on delivery, so older app builds keep working unchanged. */
+function paymentField(value: unknown, errors: FieldErrors): MobilePayment {
+  if (value === undefined || value === null) return { method: "delivery" };
+  if (!isRecord(value) || Object.keys(value).some((key) => !(PAYMENT_KEYS as readonly string[]).includes(key))) {
+    errors.payment = "Choose how you want to pay.";
+    return { method: "delivery" };
+  }
+  if (value.method === "delivery") return { method: "delivery" };
+  if (value.method !== "momo") {
+    errors.payment = "Choose pay on delivery or mobile money.";
+    return { method: "delivery" };
+  }
+  const network = value.network;
+  if (!isMomoNetwork(network)) errors.network = "Choose your mobile money network.";
+  const raw = typeof value.momoNumber === "string" ? value.momoNumber : "";
+  const momoNumber = isValidMomoNumber(raw) ? normaliseSubscriberNumber(raw) : null;
+  if (!momoNumber) errors.momoNumber = "Enter a 10-digit mobile money number.";
+  return isMomoNetwork(network) && momoNumber ? { method: "momo", network, momoNumber } : { method: "delivery" };
+}
+
+/** Body of `POST /api/mobile/orders/{id}/payment`: `{ payment: { method, network?, momoNumber? } }`. */
+export function parsePaymentRetry(raw: unknown): MobilePayment {
+  const body = strictObject(raw, ["payment"]);
+  const errors: FieldErrors = {};
+  if (body.payment === undefined || body.payment === null) errors.payment = "Choose how you want to pay.";
+  const payment = paymentField(body.payment, errors);
+  throwIfAny(errors);
+  return payment;
+}
 
 function orderLines(value: unknown, errors: FieldErrors): { id: string; qty: number }[] {
   const lines: { id: string; qty: number }[] = [];
@@ -276,6 +312,7 @@ export function parseMobileOrder(raw: unknown, accountEmail: string): MobileOrde
   else if (!errors.notes && storedNotes.length > NOTES_MAX) errors.notes = `Keep the notes shorter: the address and notes together fit in ${NOTES_MAX} characters.`;
 
   const lines = orderLines(body.lines, errors);
+  const payment = paymentField(body.payment, errors);
 
   let expectedTotal: number | undefined;
   if (body.expectedTotal !== undefined && body.expectedTotal !== null) {
@@ -290,7 +327,7 @@ export function parseMobileOrder(raw: unknown, accountEmail: string): MobileOrde
     errors[field] ??= message;
   }
   throwIfAny(errors);
-  return { name, phone, fulfilment: fulfilment!, preferredTime, deliveryAddress, notes, storedNotes, lines, expectedTotal };
+  return { name, phone, fulfilment: fulfilment!, preferredTime, deliveryAddress, notes, storedNotes, lines, expectedTotal, payment };
 }
 
 const ISO_UTC = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,6})?(Z|\+00:00)$/;

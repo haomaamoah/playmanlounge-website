@@ -21,7 +21,7 @@ function withEnv(values: Record<string, string | undefined>, fn: () => void) {
 }
 
 test("config matches docs/API_CONTRACT.md", () => {
-  withEnv({ MAX_ORDER_TOTAL: undefined, NEXT_PUBLIC_CONTACT_EMAIL: undefined }, () => {
+  withEnv({ MAX_ORDER_TOTAL: undefined, NEXT_PUBLIC_CONTACT_EMAIL: undefined, THETELLER_API_USER: undefined }, () => {
     assert.deepEqual(mobileConfig(), {
       ok: true,
       ordering: { opensAt: "12:00", closesAt: "23:00", timezone: "Africa/Accra", maxQtyPerLine: 20, maxLines: 30, maxOrderTotal: 5000 },
@@ -29,6 +29,13 @@ test("config matches docs/API_CONTRACT.md", () => {
       contact: { phone: "+233547539942", followUpPhone: "+233538409046", email: "amoahinfotech@gmail.com" },
     });
   });
+});
+
+test("mobile money is offered only when the PaySwitch credentials are configured", () => {
+  withEnv({ THETELLER_API_USER: "user", THETELLER_API_KEY: "key", THETELLER_MERCHANT_ID: "TTM-1" }, () =>
+    assert.equal(mobileConfig().payments.mobileMoney, true));
+  withEnv({ THETELLER_API_USER: "user", THETELLER_API_KEY: undefined, THETELLER_MERCHANT_ID: "TTM-1" }, () =>
+    assert.equal(mobileConfig().payments.mobileMoney, false));
 });
 
 test("maxOrderTotal follows MAX_ORDER_TOTAL and ignores junk", () => {

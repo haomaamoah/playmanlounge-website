@@ -48,6 +48,12 @@ test("any difference in what was asked for is a conflict", () => {
   assert.ok(!sameSubmission(saved, { ...same, expectedTotal: 50 }));
 });
 
+test("a replay must ask for the same way to pay", () => {
+  assert.ok(sameSubmission(saved, { ...same, payment: { method: "delivery" } }));
+  assert.ok(!sameSubmission(saved, { ...same, payment: { method: "momo" } }));
+  assert.ok(sameSubmission({ ...saved, transaction_id: "123456789012" }, { ...same, payment: { method: "momo" } }));
+});
+
 test("prices are not compared: a replay after a menu change is still the same order", () => {
   const repriced = { ...saved, lines: saved.lines.map((line) => ({ ...line, unitPrice: line.unitPrice * 2 })) };
   assert.ok(sameSubmission(repriced, { ...same, expectedTotal: undefined }));
