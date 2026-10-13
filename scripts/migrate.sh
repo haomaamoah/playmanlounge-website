@@ -26,10 +26,20 @@ select not exists(select 1 from app_migrations.versions where version='202610090
 \i supabase/migrations/202610090003_delivery_and_attempts.sql
 insert into app_migrations.versions(version) values('202610090003');
 \endif
-select not exists(select 1 from app_migrations.versions where version='202610120001') as apply4 \gset
+select not exists(select 1 from app_migrations.versions where version='202610130001') as apply4 \gset
 \if :apply4
+\i supabase/migrations/202610130001_customer_portal.sql
+insert into app_migrations.versions(version) values('202610130001');
+\endif
+select not exists(select 1 from app_migrations.versions where version='202610120001') as apply5 \gset
+\if :apply5
 \i supabase/migrations/202610120001_mobile_customers.sql
 insert into app_migrations.versions(version) values('202610120001');
+\endif
+select not exists(select 1 from app_migrations.versions where version='202610130002') as apply6 \gset
+\if :apply6
+\i supabase/migrations/202610130002_mobile_customer_phone.sql
+insert into app_migrations.versions(version) values('202610130002');
 \endif
 commit;
 SQL

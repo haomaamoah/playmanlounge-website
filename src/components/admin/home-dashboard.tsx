@@ -25,6 +25,10 @@ export function HomeDashboard() {
       </section>
       <div className="admin-home-secondary">
         <section className="admin-summary"><h2>Customer care</h2><p><strong>{dashboard.openSupport}</strong> open requests <span>· {dashboard.closedSupport} closed</span></p><Link href="/admin/support">Open support desk</Link></section>
+        <section className="admin-summary"><h2>Customers</h2><p><strong>{dashboard.customerCount ?? "—"}</strong> registered customers</p>
+          {dashboard.customerCount === null ? <p>Customer records are not set up yet.</p> : null}
+          <Link href="/admin/customers">View customers</Link>
+        </section>
         <section className="admin-summary"><h2>On the menu</h2><p><strong>{dashboard.menuItems}</strong> menu items</p><Link href="/admin/menu">Manage the menu</Link></section>
       </div>
       <section className="admin-report"><div className="admin-section-heading"><h2>Recent orders</h2><span>Latest activity</span></div>

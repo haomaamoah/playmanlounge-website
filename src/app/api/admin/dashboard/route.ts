@@ -11,15 +11,22 @@ export const GET = endpoint(async () => {
     if (error) throw error;
     return count ?? 0;
   };
-  const [totalOrders,paidOrders,pendingOrders,failedPayments,codOrders,openSupport,closedSupport,menu,recent,revenue] = await Promise.all([
+  const countCustomers = async () => {
+    const {count,error} = await client.from("customer_profiles").select("id",{count:"exact"}).limit(1);
+    if (error?.code === "PGRST205") return null;
+    if (error) throw error;
+    return count ?? 0;
+  };
+  const [totalOrders,paidOrders,pendingOrders,failedPayments,codOrders,openSupport,closedSupport,menu,recent,revenue,customerCount] = await Promise.all([
     count("orders"),count("orders","payment_status","paid"),count("orders","payment_status","pending"),
     count("orders","payment_status","failed"),count("orders","payment_status","cod"),
     count("support_requests","status","open"),count("support_requests","status","closed"),
     client.from("menu_items").select("id",{count:"exact",head:true}).eq("is_active",true),
     client.from("orders").select("*").eq("is_demo",false).order("created_at",{ascending:false}).limit(8),
     client.rpc("dashboard_revenue"),
+    countCustomers(),
   ]);
   if (menu.error || revenue.error) throw menu.error ?? revenue.error;
   return {ok:true,dashboard:{totalOrders,paidOrders,pendingOrders,failedPayments,codOrders,openSupport,closedSupport,
-    menuItems:menu.count ?? 0,revenue:Number(revenue.data ?? 0),recentOrders:checked(recent.data,recent.error).map(orderDTO)}};
+    menuItems:menu.count ?? 0,customerCount,revenue:Number(revenue.data ?? 0),recentOrders:checked(recent.data,recent.error).map(orderDTO)}};
 });

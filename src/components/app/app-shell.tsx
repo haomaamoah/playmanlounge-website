@@ -2,73 +2,168 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ShoppingBag, UtensilsCrossed } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { ClipboardList, LogOut, Menu, MessagesSquare, Settings, ShoppingBag, UtensilsCrossed, X } from "lucide-react";
+import { useState } from "react";
 import { site } from "@/lib/content";
-import { formatGhs } from "@/lib/content";
 import { useMockStore } from "@/lib/mocks/store";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, customerName }: { children: React.ReactNode; customerName: string }) {
   const pathname = usePathname();
-  const { bagCount, bagTotal } = useMockStore();
-  const onBag = pathname === "/app/bag" || pathname === "/app/checkout";
+  const router = useRouter();
+  const { bagCount } = useMockStore();
+  const [logoutError, setLogoutError] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const firstName = customerName.trim().split(/\s+/)[0] || "there";
+  const navItems = [
+    { href: "/app", label: "Menu", icon: UtensilsCrossed },
+    { href: "/app/orders", label: "Orders", icon: ClipboardList },
+    { href: "/app/support", label: "Support", icon: MessagesSquare },
+    { href: "/app/settings", label: "Settings", icon: Settings },
+  ];
+  const customerNav = (
+    <nav aria-label="Customer navigation" className="flex flex-col gap-1">
+      {navItems.map(({ href, label, icon: Icon }) => {
+        const active = href === "/app" ? pathname === href : pathname.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            onClick={() => setMobileMenuOpen(false)}
+            className={`inline-flex min-h-12 items-center gap-3 px-3 text-sm font-medium transition-colors ${active ? "bg-cream text-cocoa font-semibold" : "text-cream hover:bg-cocoa-deep"}`}
+          >
+            <Icon className="size-5 shrink-0" aria-hidden="true" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  async function logout() {
+    setLogoutError("");
+    const response = await fetch("/api/customer/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.ok !== true) {
+      setLogoutError(data?.error ?? "Could not sign out. Please try again.");
+      return;
+    }
+    router.replace("/customer/login");
+  }
 
   return (
-    <div className="bg-surface flex min-h-full flex-col">
-      <header className="bg-cocoa text-cream sticky top-0 z-40">
-        <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4">
-          <Link href="/" className="flex min-h-11 items-center gap-2">
-            <Image
-              src={site.logo.src}
-              alt=""
-              width={36}
-              height={36}
-              className="size-9 object-contain"
-            />
-            <span className="font-display text-lg leading-none">Order desk</span>
-          </Link>
-          <Link
-            href="/app/bag"
-            className="border-cream/30 relative ml-auto inline-flex min-h-11 items-center gap-2 border px-3 text-sm font-medium"
-          >
-            <ShoppingBag className="size-4" aria-hidden="true" />
-            Bag
-            {bagCount > 0 && (
-              <span className="bg-palm text-cream grid size-5 place-items-center text-[11px] font-bold">
-                {bagCount}
-              </span>
-            )}
-          </Link>
-        </div>
-      </header>
-      <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-28">
-        {children}
-      </main>
-      <nav
-        aria-label="Order desk"
-        className="border-cocoa bg-cream/95 fixed inset-x-0 bottom-0 z-40 border-t-4 backdrop-blur-md"
+    <div className="bg-surface min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
+      <a
+        href="#main"
+        className="sr-only z-[60] bg-cream px-4 py-3 text-cocoa focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
       >
-        <div className="mx-auto grid max-w-3xl grid-cols-2">
-          <Link
-            href="/app"
-            className={`inline-flex min-h-14 flex-col items-center justify-center gap-0.5 text-sm font-medium ${
-              pathname === "/app" ? "text-palm" : "text-cocoa"
-            }`}
-          >
-            <UtensilsCrossed className="size-4" aria-hidden="true" />
-            Menu
-          </Link>
-          <Link
-            href="/app/bag"
-            className={`inline-flex min-h-14 flex-col items-center justify-center gap-0.5 text-sm font-medium ${
-              onBag ? "text-palm" : "text-cocoa"
-            }`}
-          >
+        Skip to main content
+      </a>
+      <aside className="bg-cocoa text-cream sticky top-0 hidden h-dvh flex-col px-[18px] py-[30px] md:flex">
+        <Link href="/app" className="mb-8 flex min-h-12 items-center gap-3 px-1.5">
+          <Image src={site.logo.src} alt="" width={43} height={43} className="size-11 object-contain" />
+          <span>
+            <strong className="font-display block text-lg font-normal">Hi {firstName}</strong>
+            <small className="mt-1 block text-xs">Play Man Lounge</small>
+          </span>
+        </Link>
+        {customerNav}
+        <div className="mt-auto border-t border-cream/20 pt-5">
+          <Link href="/app/bag" className="mb-2 inline-flex min-h-11 items-center gap-3 px-2 text-sm hover:text-white">
             <ShoppingBag className="size-4" aria-hidden="true" />
-            {bagCount > 0 ? `Bag · ${formatGhs(bagTotal)}` : "Bag"}
+            Bag{bagCount > 0 ? ` (${bagCount})` : ""}
           </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="inline-flex min-h-11 items-center gap-2 px-2 text-sm hover:text-white"
+          >
+            <LogOut className="size-4" aria-hidden="true" />
+            Sign out
+          </button>
         </div>
-      </nav>
+      </aside>
+      <div className="flex min-h-dvh min-w-0 flex-col">
+        <header className="border-border bg-surface sticky top-0 z-40 border-b md:hidden">
+          <div className="flex h-16 items-center gap-3 px-4">
+            <button
+              type="button"
+              aria-label="Open customer menu"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="customer-mobile-menu"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex size-11 items-center justify-center md:hidden"
+            >
+              <Menu className="size-5" aria-hidden="true" />
+            </button>
+            <Link
+              href="/app/bag"
+              className="text-cocoa relative ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 border border-border px-3 text-sm font-medium"
+            >
+              <ShoppingBag className="size-4" aria-hidden="true" />
+              Bag
+              {bagCount > 0 && (
+                <span className="bg-palm text-cream grid size-5 place-items-center text-[11px] font-bold">
+                  {bagCount}
+                </span>
+              )}
+            </Link>
+          </div>
+        </header>
+        {logoutError && <p role="alert" className="bg-destructive/10 px-4 py-2 text-center text-sm">{logoutError}</p>}
+        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-10">
+          {children}
+        </main>
+      </div>
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            aria-label="Close customer menu"
+            onClick={() => setMobileMenuOpen(false)}
+            className="absolute inset-0 size-full cursor-default bg-black/50"
+          />
+          <aside
+            id="customer-mobile-menu"
+            aria-label="Customer menu"
+            className="bg-cocoa text-cream absolute inset-y-0 left-0 flex w-[min(82vw,280px)] flex-col px-5 py-6 shadow-xl"
+          >
+            <div className="mb-8 flex items-center justify-between">
+              <Link href="/app" onClick={() => setMobileMenuOpen(false)} className="flex min-h-11 items-center gap-3">
+                <Image src={site.logo.src} alt="" width={40} height={40} className="size-10 object-contain" />
+                <span>
+                  <strong className="font-display block text-lg font-normal">Hi {firstName}</strong>
+                  <small className="block text-xs">Play Man Lounge</small>
+                </span>
+              </Link>
+              <button
+                type="button"
+                aria-label="Close customer menu"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex size-11 items-center justify-center"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            {customerNav}
+            <div className="mt-auto border-t border-cream/20 pt-5">
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="inline-flex min-h-11 items-center gap-2 px-2 text-sm"
+              >
+                <LogOut className="size-4" aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

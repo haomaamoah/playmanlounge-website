@@ -1,24 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { Menu, Phone, ShoppingBag, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ShoppingBag } from "lucide-react";
+import Link from "next/link";
 import { nav, site } from "@/lib/content";
 import { useOrder } from "@/lib/order-context";
 
 export function SiteHeader({ hasDeals = false }: { hasDeals?: boolean }) {
   const { count } = useOrder();
   const links = hasDeals ? [nav[0], { label: "Deals", href: "#promotions" }, ...nav.slice(1)] : nav;
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
 
   return (
     <>
@@ -47,87 +37,47 @@ export function SiteHeader({ hasDeals = false }: { hasDeals?: boolean }) {
               {site.name}
             </span>
           </a>
-          <nav
-            aria-label="Primary"
-            className="ml-auto hidden items-center gap-1 lg:flex"
-          >
-            {links.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="inline-flex min-h-11 items-center px-2.5 text-sm font-medium text-cocoa hover:text-palm-ink"
+          <div className="ml-auto flex items-center gap-2">
+            <nav aria-label="Primary" className="hidden items-center gap-0.5 2xl:flex">
+              {links.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="inline-flex min-h-11 items-center whitespace-nowrap px-2 text-[13px] font-medium text-cocoa hover:text-palm-ink"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+            <div className="flex items-center gap-1">
+              <Link
+                href="/customer/login"
+                className="bg-palm text-cream hover:bg-palm-ink inline-flex min-h-11 items-center whitespace-nowrap px-3 text-sm font-semibold"
               >
-                {item.label}
+                Log in
+              </Link>
+              <Link
+                href="/customer/signup"
+                className="bg-cocoa text-cream hover:bg-cocoa-deep inline-flex min-h-11 items-center whitespace-nowrap px-3 text-sm font-semibold"
+              >
+                Sign up
+              </Link>
+              <a
+                href="#order"
+                className="border-border text-cocoa relative inline-flex min-h-11 min-w-11 items-center justify-center border px-3"
+              >
+                <ShoppingBag className="size-4" aria-hidden="true" />
+                <span className="sr-only">Make an Order</span>
+                {count > 0 && (
+                  <span className="bg-cocoa text-cream absolute -top-1 -right-1 grid size-5 place-items-center text-[11px] font-bold">
+                    {count}
+                  </span>
+                )}
               </a>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-1 lg:ml-2">
-            <a
-              href={`tel:${site.phoneTel}`}
-              className="bg-cocoa text-cream hover:bg-cocoa-deep inline-flex min-h-11 min-w-11 items-center justify-center gap-2 px-3 text-sm font-medium"
-            >
-              <Phone className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">{site.phoneDisplay}</span>
-              <span className="sm:hidden">Call</span>
-            </a>
-            <a
-              href="#order"
-              className="border-border text-cocoa relative inline-flex min-h-11 min-w-11 items-center justify-center border px-3"
-            >
-              <ShoppingBag className="size-4" aria-hidden="true" />
-              <span className="sr-only">Make an Order</span>
-              {count > 0 && (
-                <span className="bg-cocoa text-cream absolute -top-1 -right-1 grid size-5 place-items-center text-[11px] font-bold">
-                  {count}
-                </span>
-              )}
-            </a>
-            <button
-              type="button"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center lg:hidden"
-              onClick={() => setOpen(true)}
-              aria-expanded={open}
-              aria-controls="mobile-nav"
-            >
-              <Menu className="size-5" aria-hidden="true" />
-              <span className="sr-only">Open menu</span>
-            </button>
+            </div>
           </div>
         </div>
       </header>
-      {open && (
-        <div
-          id="mobile-nav"
-          className="bg-surface fixed inset-0 z-50 flex flex-col p-4 lg:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Site menu"
-        >
-          <div className="flex items-center justify-between">
-            <p className="font-display text-xl">{site.name}</p>
-            <button
-              type="button"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center"
-              onClick={() => setOpen(false)}
-            >
-              <X className="size-5" aria-hidden="true" />
-              <span className="sr-only">Close menu</span>
-            </button>
-          </div>
-          <nav className="mt-6 flex flex-col gap-1">
-            {links.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className="inline-flex min-h-11 items-center px-2 text-lg font-medium"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-        </div>
-      )}
     </>
   );
 }
