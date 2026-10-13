@@ -15,6 +15,7 @@ export type Submission = {
   storedNotes: string;
   lines: { id: string; qty: number }[];
   expectedTotal?: number;
+  payment?: { method: "delivery" | "momo" };
 };
 
 const signature = (lines: { id: string; qty: number }[]) =>
@@ -37,6 +38,7 @@ export function sameSubmission(saved: Record<string, unknown>, incoming: Submiss
     saved.preferred_time === incoming.preferredTime &&
     saved.notes === incoming.storedNotes &&
     signature(savedLines) === signature(incoming.lines) &&
+    (incoming.payment === undefined || (saved.transaction_id ? "momo" : "delivery") === incoming.payment.method) &&
     (incoming.expectedTotal === undefined || pesewas(Number(saved.total)) === pesewas(incoming.expectedTotal))
   );
 }

@@ -40,6 +40,10 @@ export const LIMITS = {
   deletePerCustomer: [5, 900],
   ordersPerCustomer: [20, 3600],
   supportPerCustomer: [5, 3600],
+  // A wallet prompt per attempt: the same caps the website puts on /api/payments/start.
+  paymentPerCustomer: [10, 900],
+  paymentPerWallet: [5, 900],
+  paymentStatusPerCustomer: [240, 900],
 } as const satisfies Record<string, readonly [number, number]>;
 
 /**

@@ -1,6 +1,6 @@
 import { site } from "../content";
 import { contactEmail } from "../email";
-import { gatewayConfig } from "../payments/theteller";
+import { gatewayConfig, isConfigured } from "../payments/theteller";
 import { MAX_LINES, MAX_QTY_PER_LINE, ORDERING_WINDOW } from "./constants";
 
 /** Server-driven values the app uses instead of hard-coding hours, limits, payment methods and contact details. */
@@ -16,8 +16,8 @@ export function mobileConfig() {
       // The same MAX_ORDER_TOTAL the payment routes use (default 5000): bigger orders go by phone.
       maxOrderTotal: gatewayConfig().maxTotal,
     },
-    // Mobile money from the app is a later phase; the app only offers pay on delivery for now.
-    payments: { cashOnDelivery: true, mobileMoney: false },
+    // Mobile money is offered whenever the PaySwitch merchant credentials are configured on the server.
+    payments: { cashOnDelivery: true, mobileMoney: isConfigured(gatewayConfig()) },
     contact: { phone: site.phoneTel, followUpPhone: site.followUpPhoneTel, email: contactEmail() },
   };
 }

@@ -231,14 +231,15 @@ The Flutter customer app (`playmanlounge-mobile` repo) talks to this backend onl
 | `GET /api/mobile/config` | Hours, limits, payment methods, contact details (public) |
 | `POST /api/mobile/auth/signup` · `login` · `refresh` · `logout` | Customer session. Sign-up takes **only** `{email, password}` (4–128 characters) and answers already signed in |
 | `GET` · `PATCH` · `DELETE /api/mobile/me`, `POST /api/mobile/me/password` | Profile, password change, account deletion (App Store 5.1.1(v)) |
-| `GET` · `POST /api/mobile/orders`, `GET /api/mobile/orders/:id` | Place pay-on-delivery orders (`Idempotency-Key` required), list and read the caller's own orders |
+| `GET` · `POST /api/mobile/orders`, `GET /api/mobile/orders/:id` | Place orders paid on delivery or by mobile money (`Idempotency-Key` required), list and read the caller's own orders |
+| `GET` · `POST /api/mobile/orders/:id/payment` | Check a pending PaySwitch mobile-money payment, or retry a failed one / switch it to pay on delivery |
 | `GET` · `POST /api/mobile/support` | The caller's tickets; new tickets land in the admin Support desk |
 
 The menu is the existing public `GET /api/menu`.
 
 **Customers are Supabase Auth users** created by the backend (`auth.admin.createUser`, which works with public sign-ups switched off, so keep **Allow new users to sign up** disabled) plus a `customer_profiles` row. Admins are still only the allowlisted `admin_profiles`; a customer can never become one, and every mobile route requires a profile, so an admin or a user minted directly in Supabase Auth is refused. An e-mail that already belongs to an admin or customer answers `409 email_taken`.
 
-**Why a pepper.** The product accepts a 4-character password, Supabase Auth requires 6, and a 4-character secret should not be what actually protects an account. So the backend never forwards the typed password: it sends `hex(HMAC-SHA256(key = CUSTOMER_AUTH_PEPPER, msg = "pml-customer-v1\0" + lower(email) + "\0" + password))` (64 characters, deterministic) to Supabase Auth, and the pepper never leaves the server. Set `CUSTOMER_AUTH_PEPPER` (at least 32 characters; `openssl rand -base64 48`) on the host and in your password manager. **Losing or changing it locks every customer out.** Without it, the sign-up, login, password-change and delete routes answer `503 unavailable` (fail closed); existing sessions keep working. See `src/lib/mobile/password.ts` and its golden test vectors.
+**Why a pepper.** Older accounts may have 4–5 character passwords (new ones need 6), and a short secret should not be what actually protects an account. So the backend never forwards the typed password: it sends `hex(HMAC-SHA256(key = CUSTOMER_AUTH_PEPPER, msg = "pml-customer-v1\0" + lower(email) + "\0" + password))` (64 characters, deterministic) to Supabase Auth, and the pepper never leaves the server. Set `CUSTOMER_AUTH_PEPPER` (at least 32 characters; `openssl rand -base64 48`) on the host and in your password manager. **Losing or changing it locks every customer out.** Without it, the sign-up, login, password-change and delete routes answer `503 unavailable` (fail closed); existing sessions keep working. See `src/lib/mobile/password.ts` and its golden test vectors.
 
 **Protections**
 

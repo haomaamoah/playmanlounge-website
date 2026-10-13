@@ -8,6 +8,7 @@ import {
   parseLogin,
   parseMobileOrder,
   parseOrdersQuery,
+  parsePaymentRetry,
   parseProfilePatch,
   parseRefresh,
   parseSignup,
@@ -209,6 +210,25 @@ test("order: the e-mail comes from the account, never the body", () => {
   assert.equal(failure(() => order(delivery({ email: "someone.else@example.com" }))).code, "validation");
   assert.equal(failure(() => order(delivery({ company: "bot" }))).code, "validation");
   assert.equal(failure(() => order(delivery({ payment: "momo" }))).code, "validation");
+});
+
+test("order: payment defaults to pay on delivery; mobile money needs a network and a valid wallet", () => {
+  assert.deepEqual(order(delivery()).payment, { method: "delivery" });
+  assert.deepEqual(order(delivery({ payment: { method: "delivery" } })).payment, { method: "delivery" });
+  assert.deepEqual(order(delivery({ payment: { method: "momo", network: "MTN", momoNumber: "054 753 9942" } })).payment,
+    { method: "momo", network: "MTN", momoNumber: "233547539942" });
+  assert.deepEqual(fields(() => order(delivery({ payment: { method: "momo", network: "XYZ", momoNumber: "0547539942" } }))), ["network"]);
+  assert.deepEqual(fields(() => order(delivery({ payment: { method: "momo", network: "VDF", momoNumber: "12345" } }))), ["momoNumber"]);
+  assert.deepEqual(fields(() => order(delivery({ payment: { method: "card" } }))), ["payment"]);
+  assert.deepEqual(fields(() => order(delivery({ payment: { method: "momo", network: "MTN", momoNumber: "0547539942", reference: "1" } }))), ["payment"]);
+});
+
+test("payment retry: a payment is required and parsed like checkout", () => {
+  assert.deepEqual(parsePaymentRetry({ payment: { method: "delivery" } }), { method: "delivery" });
+  assert.deepEqual(parsePaymentRetry({ payment: { method: "momo", network: "ATL", momoNumber: "0261234567" } }),
+    { method: "momo", network: "ATL", momoNumber: "233261234567" });
+  assert.deepEqual(fields(() => parsePaymentRetry({})), ["payment"]);
+  assert.equal(failure(() => parsePaymentRetry({ payment: { method: "delivery" }, total: 1 })).code, "validation");
 });
 
 test("order: name, phone, fulfilment and the kitchen window follow the website's rules", () => {

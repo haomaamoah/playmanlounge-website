@@ -13,9 +13,10 @@ import { mobileOrder } from "./dto";
 import { MobileFailure, notFound, validationFailure } from "./errors";
 import { requestKeyFor, sameSubmission } from "./idempotency";
 import { limit } from "./limits";
+import { chargeOrder, checkPayment, newTransactionId, paymentView, requireMobileMoney, supersedePayment, updatePayment, type MobilePaymentView } from "./payments";
 import { Reply, ok } from "./reply";
 import { db, failed, userClient } from "./supabase";
-import { UUID_PATTERN, parseIdempotencyKey, parseMobileOrder, parseOrdersQuery, type MobileOrderInput } from "./validation";
+import { UUID_PATTERN, parseIdempotencyKey, parseMobileOrder, parseOrdersQuery, parsePaymentRetry, type MobileOrderInput, type MobilePayment } from "./validation";
 
 type Row = Record<string, unknown>;
 
@@ -55,15 +56,22 @@ export function receiptOrder(row: Row): HydratedOrder {
     notes: String(row.notes),
     lines,
     total: Number(row.total),
-    payment: { method: "delivery" },
+    payment:
+      row.payment_status === "cod" || !row.transaction_id
+        ? { method: "delivery" }
+        : { method: "momo", state: row.payment_status === "paid" ? "paid" : "pending", reference: String(row.transaction_id) },
   };
 }
+
+/** Receipts go out once the kitchen should cook: pay on delivery straight away, mobile money once it is paid. */
+const receiptDue = (row: Row) => row.payment_status === "cod" || row.payment_status === "paid";
 
 /**
  * Receipts are best effort: the order is already saved, so an unconfigured or failing mail provider (or a slow one)
  * only turns `receiptSent` false. The delivery ledger makes a retry resend just the missing receipts.
  */
 async function deliverReceipts(row: Row): Promise<boolean> {
+  if (!receiptDue(row)) return false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const orderId = String(row.id);
@@ -91,13 +99,15 @@ async function replay(saved: Row, input: MobileOrderInput) {
   if (!sameSubmission(saved, input)) {
     throw new MobileFailure(409, "That Idempotency-Key was already used for a different order.", { code: "idempotency_conflict" });
   }
-  return new Reply(200, { ok: true, order: mobileOrder(saved), receiptSent: await deliverReceipts(saved) });
+  // A replay never opens a second wallet prompt; the app polls the payment endpoint instead.
+  return new Reply(200, { ok: true, order: mobileOrder(saved), payment: paymentView(saved), receiptSent: await deliverReceipts(saved) });
 }
 
 export async function placeOrder(request: Request, customer: Customer): Promise<Reply> {
   await limit(request, "mobile-orders", LIMITS.ordersPerCustomer, customer.id);
   const idempotencyKey = parseIdempotencyKey(request.headers.get("idempotency-key"));
   const input = parseMobileOrder(await jsonBody(request), customer.email);
+  if (input.payment.method === "momo") requireMobileMoney();
   const requestKey = requestKeyFor(customer.id, idempotencyKey);
 
   // A retried request is answered from what was saved, before anything is re-priced against a menu that may have moved.
@@ -135,8 +145,8 @@ export async function placeOrder(request: Request, customer: Customer): Promise<
       notes: order.notes,
       total: order.total,
       lines,
-      payment_status: "cod",
-      transaction_id: null,
+      payment_status: input.payment.method === "momo" ? "pending" : "cod",
+      transaction_id: input.payment.method === "momo" ? newTransactionId() : null,
       request_key: requestKey,
       // Both come from the verified session on the server, never from the request body.
       customer_id: customer.id,
@@ -151,8 +161,84 @@ export async function placeOrder(request: Request, customer: Customer): Promise<
     }
     throw failed("create_order (is migration 202610120001 applied?)", error);
   }
-  const saved = data as Row;
-  return new Reply(201, { ok: true, order: mobileOrder(saved), receiptSent: await deliverReceipts(saved) });
+  let saved = data as Row;
+  let payment = paymentView(saved);
+  if (input.payment.method === "momo") {
+    // The order is already saved, so a gateway problem from here on is reported on the payment, never as a failed order.
+    payment = await chargeSaved(request, customer, saved, input.payment);
+    saved = await ownedOrder(customer, String(saved.id));
+  }
+  return new Reply(201, { ok: true, order: mobileOrder(saved), payment, receiptSent: await deliverReceipts(saved) });
+}
+
+async function chargeSaved(request: Request, customer: Customer, row: Row, wallet: Extract<MobilePayment, { method: "momo" }>): Promise<MobilePaymentView> {
+  try {
+    await limit(request, "mobile-payment-wallet", LIMITS.paymentPerWallet, wallet.momoNumber);
+    return await chargeOrder(row, wallet);
+  } catch (error) {
+    if (error instanceof MobileFailure && error.code === "rate_limited") {
+      // No prompt was sent, so the attempt is definitively over and the order can be retried or switched later.
+      await updatePayment(String(row.transaction_id), "failed").catch(() => undefined);
+      return { state: "failed", message: "Too many payment attempts on this number. Try again later, or pay on delivery." };
+    }
+    return { state: "pending", message: "Mobile money could not be reached. Check your phone before trying again, or call the kitchen." };
+  }
+}
+
+/** Service-role read scoped to the caller: another customer's order is indistinguishable from a missing one. */
+async function ownedOrder(customer: Customer, id: string): Promise<Row> {
+  if (!UUID_PATTERN.test(id)) throw notFound("We could not find that order.");
+  const { data, error } = await db().from("orders").select("*").eq("id", id).eq("customer_id", customer.id).maybeSingle();
+  if (error) throw failed("read order", error);
+  if (!data) throw notFound("We could not find that order.");
+  return data;
+}
+
+/** `GET /api/mobile/orders/{id}/payment`: re-checks a pending mobile money attempt with PaySwitch. */
+export async function getPayment(request: Request, customer: Customer, id: string) {
+  await limit(request, "mobile-payment-status", LIMITS.paymentStatusPerCustomer, customer.id);
+  let row = await ownedOrder(customer, id);
+  const wasPending = row.payment_status === "pending";
+  const message = await checkPayment(row);
+  if (wasPending) row = await ownedOrder(customer, id);
+  const receiptSent = wasPending && row.payment_status === "paid" ? await deliverReceipts(row) : false;
+  return ok({ order: mobileOrder(row), payment: paymentView(row, row.payment_status === "pending" ? message : ""), receiptSent });
+}
+
+/**
+ * `POST /api/mobile/orders/{id}/payment`: after a failed attempt only, either a fresh wallet prompt on the same
+ * order or a switch to pay on delivery. A pending attempt may still debit the wallet, so it is never replaced here.
+ */
+export async function retryPayment(request: Request, customer: Customer, id: string) {
+  await limit(request, "mobile-payment", LIMITS.paymentPerCustomer, customer.id);
+  const payment = parsePaymentRetry(await jsonBody(request));
+  const row = await ownedOrder(customer, id);
+  if (row.payment_status !== "failed") {
+    throw new MobileFailure(409, row.payment_status === "pending"
+      ? "This payment is still waiting for approval. Check your phone."
+      : "This order no longer needs a payment.", { code: "payment_conflict", extra: { order: mobileOrder(row), payment: paymentView(row) } });
+  }
+
+  if (payment.method === "delivery") {
+    const { data, error } = await db().from("orders").update({ payment_status: "cod" })
+      .eq("id", id).eq("customer_id", customer.id).eq("payment_status", "failed").select("*").maybeSingle();
+    if (error) throw failed("switch to pay on delivery", error);
+    if (!data) throw new MobileFailure(409, "This order changed. Pull to refresh.", { code: "payment_conflict" });
+    return ok({ order: mobileOrder(data), payment: paymentView(data), receiptSent: await deliverReceipts(data) });
+  }
+
+  requireMobileMoney();
+  const attemptId = newTransactionId();
+  let fresh: Row;
+  try {
+    await supersedePayment(String(row.transaction_id), attemptId);
+    fresh = await ownedOrder(customer, id);
+  } catch {
+    throw new MobileFailure(409, "This order changed. Pull to refresh.", { code: "payment_conflict" });
+  }
+  const view = await chargeSaved(request, customer, fresh, payment);
+  const saved = await ownedOrder(customer, id);
+  return ok({ order: mobileOrder(saved), payment: view, receiptSent: await deliverReceipts(saved) });
 }
 
 export async function listOrders(request: Request, customer: Customer) {
