@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  isNotFound,
   describeCode,
   describeStatus,
   formatAmount,
@@ -63,4 +64,10 @@ test("the status endpoint's words are read alongside the code", () => {
   assert.equal(describeStatus("pending", "111"), "pending");
   assert.equal(describeStatus("processing", ""), "pending");
   assert.equal(describeStatus("declined", "101"), "failed");
+});
+
+test("code 999 is only treated as an unknown reference when PaySwitch says so", () => {
+  assert.equal(isNotFound("999", "Transaction not found"), true);
+  assert.equal(isNotFound("999", "Merchant not set up"), false);
+  assert.equal(isNotFound("100", "Transaction not found"), false);
 });

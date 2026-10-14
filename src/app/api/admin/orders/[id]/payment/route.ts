@@ -6,6 +6,9 @@ import { fetchStatus, gatewayConfig, isConfigured, isTransactionId } from "@/lib
 
 type Context = { params: Promise<{ id: string }> };
 
+// A charge PaySwitch still cannot find after this long was never submitted.
+const NOT_FOUND_GRACE_MS = 15 * 60 * 1000;
+
 export async function POST(request: Request, context: Context) {
   return endpoint(async (req) => {
     checkOrigin(req);
@@ -25,11 +28,15 @@ export async function POST(request: Request, context: Context) {
     try { result = await fetchStatus(config, reference); }
     catch { throw new ApiFailure(502, "Could not reach PaySwitch. Try again in a moment."); }
     await audit(admin.id, "payment_check", id);
-    await updatePayment(reference, result.state, result.gatewayIssue);
+    const abandoned = Boolean(result.notFound) && Date.now() - new Date(row.created_at).getTime() > NOT_FOUND_GRACE_MS;
+    if (abandoned) await updatePayment(reference, "failed");
+    else await updatePayment(reference, result.state, result.gatewayIssue);
 
     const updated = await db().from("orders").select("*").eq("id", id).single();
     const item = orderDTO(checked(updated.data, updated.error));
-    const message = result.gatewayIssue
+    const message = abandoned ? "PaySwitch: Failed (transaction not found)."
+      : result.notFound ? "PaySwitch has no record of this payment yet. Check again in a few minutes."
+      : result.gatewayIssue
       ? `PaySwitch could not confirm (code ${result.code || "unknown"}).`
       : item.paymentStatus === "paid" ? "PaySwitch: Success."
       : item.paymentStatus === "failed" ? `PaySwitch: Failed (code ${result.code || "unknown"}).`

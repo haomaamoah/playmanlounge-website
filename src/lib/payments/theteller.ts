@@ -26,7 +26,14 @@ export type PaymentResult = {
   retryable: boolean;
   /** True when the failure is our configuration, not the customer's wallet. */
   gatewayIssue: boolean;
+  /** True when PaySwitch has no record of the reference at all. */
+  notFound?: boolean;
 };
+
+/** Code 999 doubles as "unknown reference"; only the reason tells them apart. */
+export function isNotFound(code: string, reason: string) {
+  return code === "999" && /not\s+found/i.test(reason);
+}
 
 /**
  * "auto" asks for the in-page mobile money prompt and falls back to hosted
@@ -337,5 +344,6 @@ export async function fetchStatus(
     message: state === "paid" ? "Payment received." : described.message,
     retryable: described.retryable,
     gatewayIssue: described.gatewayIssue,
+    notFound: isNotFound(code, reason),
   };
 }
