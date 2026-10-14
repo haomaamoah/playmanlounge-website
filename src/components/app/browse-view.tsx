@@ -1,17 +1,22 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { formatGhs } from "@/lib/content";
 import { useCatalog } from "./catalog-context";
 import { useMockStore } from "@/lib/mocks/store";
 import { dealKind } from "@/lib/promotions";
 import { CustomerDealsCarousel } from "./customer-deals-carousel";
+import { PortalSearch } from "@/components/portal-search";
+import { searchMenuGroups } from "@/lib/search";
 
 export function BrowseView() {
   const { bag, addToBag, setBagQty, menuOverrides, resolvedMenu } = useMockStore();
   const { groups: menuGroups, unavailable } = useCatalog();
-  const customerMenuGroups = menuGroups.filter((group) => !dealKind(group.id));
+  const [query, setQuery] = useState("");
+  const filteredGroups = searchMenuGroups(menuGroups, query);
+  const customerMenuGroups = filteredGroups.filter((group) => !dealKind(group.id));
 
   return (
     <div>
@@ -20,13 +25,18 @@ export function BrowseView() {
       <p className="text-muted-foreground mt-3 max-w-md text-base leading-relaxed">
         Combos come with a Coke.
       </p>
+      <PortalSearch label="Search menu by name, description, or group" placeholder="Search dishes, drinks, or deals" onSearch={setQuery} />
+      {!unavailable && query && <p role="status" className="mt-4 text-sm">
+        {filteredGroups.reduce((total, group) => total + group.items.length, 0)} matching menu items
+        {!filteredGroups.length && ". Try another dish, drink, or deal, or clear your search."}
+      </p>}
       {unavailable && (
         <p role="alert" className="mt-8 border border-border p-4 text-sm">
           The menu could not be loaded right now. Please refresh in a moment.
         </p>
       )}
       <div className="mt-8 space-y-10">
-        <CustomerDealsCarousel groups={menuGroups} />
+        <CustomerDealsCarousel key={query} groups={filteredGroups} />
         {customerMenuGroups.map((group) => (
           <section key={group.id} aria-labelledby={`app-${group.id}`}>
             <h2 id={`app-${group.id}`} className="font-display border-cocoa border-b-2 pb-2 text-3xl">

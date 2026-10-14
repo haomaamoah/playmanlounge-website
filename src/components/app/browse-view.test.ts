@@ -19,6 +19,9 @@ test("portal menu lists only items in the live catalog", () => {
   assert.doesNotMatch(html, /Chairman/);
   assert.match(html, /Playboy/);
   assert.match(html, /Snack Duo/);
+  assert.match(html, /role="search"/);
+  assert.match(html, /type="search"/);
+  assert.match(html, /Search dishes, drinks, or deals/);
 });
 
 test("portal menu shows an error instead of a stale menu when the catalog is unavailable", () => {

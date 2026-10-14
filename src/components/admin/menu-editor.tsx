@@ -6,6 +6,8 @@ import { Plus, Upload } from "lucide-react";
 import type { AdminMenuItem, ItemResponse, ListResponse, MenuInput, UploadResponse } from "@/lib/admin/contracts";
 import { formatGhs, type MenuCategory } from "@/lib/content";
 import { dealKind } from "@/lib/promotions";
+import { matchesSearch } from "@/lib/search";
+import { PortalSearch } from "@/components/portal-search";
 import { Badge, EmptyState, PageHeading, ResourceState, adminRequest, useAdminResource } from "./admin-ui";
 
 const blank: MenuInput = { id: "", name: "", description: "", price: 0, category: "food", image: "", width: 1100, height: 733, groupId: "", groupTitle: "", groupBlurb: "", sortOrder: 0, isActive: true };
@@ -32,6 +34,7 @@ export function MenuEditor() {
   const [notice, setNotice] = useState("");
   const [deleting, setDeleting] = useState<AdminMenuItem | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [query, setQuery] = useState("");
   const editor = useRef<HTMLElement>(null);
   const confirmation = useRef<HTMLElement>(null);
   const returnFocus = useRef<HTMLButtonElement | null>(null);
@@ -81,7 +84,8 @@ export function MenuEditor() {
     } catch (err) { setMutationError((err as Error).message); }
     finally { setBusy(false); }
   }
-  const items = data?.items.filter((item) => showInactive || item.isActive) ?? [];
+  const items = data?.items.filter((item) => (showInactive || item.isActive) &&
+    matchesSearch(query, item.name, item.description, item.groupTitle, item.category, item.id)) ?? [];
   return <>
     <PageHeading title="Menu" description="Keep the customer menu fresh. Changes are saved to the live kitchen menu." action={<button ref={addButton} className="admin-button" disabled={busy || uploading} onClick={() => open()}><Plus size={18} aria-hidden="true" />Add menu item</button>} />
     {notice && <p className="admin-success" role="status">{notice}</p>}
@@ -121,12 +125,13 @@ export function MenuEditor() {
       </form>
     </section>}
     {deleting && <section ref={confirmation} tabIndex={-1} className="admin-confirm" aria-labelledby="menu-delete-title"><h2 id="menu-delete-title">Remove {deleting.name}?</h2><p>This item will no longer be available to customers. Existing orders keep their original details. You can restore it by editing inactive items.</p><div className="admin-actions"><button className="admin-button admin-button-danger" disabled={busy} onClick={remove}>{busy ? "Removing…" : "Remove from menu"}</button><button className="admin-button admin-button-secondary" disabled={busy} onClick={() => { setDeleting(null); returnFocus.current?.focus(); }}>Keep item</button></div></section>}
-    <div className="admin-toolbar"><p>{data ? `${items.length} ${showInactive ? "total" : "active"} menu items` : "Live menu"}</p><label className="admin-check"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Include inactive items</label></div>
+    <PortalSearch admin label="Search menu by name, description, or group" placeholder="Search menu name, description, or group" onSearch={setQuery} />
+    <div className="admin-toolbar"><p role="status">{data ? `${items.length} ${query ? "matching" : showInactive ? "total" : "active"} menu items` : "Live menu"}</p><label className="admin-check"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />Include inactive items</label></div>
     <ResourceState loading={loading} error={error} retry={reload} />
     {data && (items.length ? <><p className="admin-table-hint">Swipe the menu table to see every column.</p><div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Live menu items</caption><thead><tr><th>Item</th><th>Group</th><th>Price</th><th>Availability</th><th>Actions</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}>
       <td><div className="admin-menu-name"><Image src={item.image} alt="" width={64} height={52} unoptimized /><div><strong>{item.name}</strong><small>{item.description}</small></div></div></td>
       <td>{item.groupTitle}</td><td className="admin-number">{formatGhs(item.price)}</td><td><Badge value={item.isActive ? "open-menu" : "inactive"}>{item.isActive ? "Available" : "Inactive"}</Badge></td>
       <td><div className="admin-actions"><button className="admin-button admin-button-secondary" disabled={busy || uploading} onClick={() => open(item)} aria-label={`Edit ${item.name}`}>Edit</button>{item.isActive && <button className="admin-button admin-button-text-danger" disabled={busy || uploading} aria-label={`Remove ${item.name}`} onClick={(event) => { returnFocus.current = event.currentTarget; setDeleting(item); setDraft(null); setMutationError(""); }}>Remove</button>}</div></td>
-    </tr>)}</tbody></table></div></> : <EmptyState title="No menu items to show">Add your first item, or include inactive items to restore a previously removed dish.</EmptyState>)}
+    </tr>)}</tbody></table></div></> : <EmptyState title={query ? "No matching menu items" : "No menu items to show"}>{query ? "Try another name, description, or group, or clear your search." : "Add your first item, or include inactive items to restore a previously removed dish."}</EmptyState>)}
   </>;
 }

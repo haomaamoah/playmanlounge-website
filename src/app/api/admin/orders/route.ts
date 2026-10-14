@@ -3,10 +3,13 @@ import { pagination } from "@/lib/admin/pagination";
 import { ApiFailure, orderStatuses } from "@/lib/admin/validation";
 import { orderDTO } from "@/lib/db/orders";
 import { db } from "@/lib/db/server";
+import { orderSearchFilter, searchQuery } from "@/lib/admin/search";
 export const GET = endpoint(async request => {
   await requireAdmin(); const {url,limit,offset} = pagination(request);
+  const search = searchQuery(url);
   let q = db().from("orders").select("*",{count:"exact"}).order("created_at",{ascending:false}).range(offset,offset+limit-1);
   const status = url.searchParams.get("status"), payment = url.searchParams.get("paymentStatus");
+  if (search) q = q.or(orderSearchFilter(search));
   if (status) {
     if (!orderStatuses.includes(status as never)) throw new ApiFailure(400,"Invalid order status.");
     q = q.eq("status",status);

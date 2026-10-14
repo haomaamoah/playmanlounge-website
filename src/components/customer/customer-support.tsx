@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import type { ListResponse, SupportRequest } from "@/lib/admin/contracts";
+import { Badge, dateLabel } from "@/components/admin/admin-ui";
+import { PortalSearch } from "@/components/portal-search";
+import { useCustomerResource } from "./customer-orders";
 
 export function CustomerSupport() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [revision, setRevision] = useState(0);
+  const { data, error: historyError } = useCustomerResource<ListResponse<SupportRequest>>(
+    `/api/customer/support?q=${encodeURIComponent(query)}&limit=50&offset=${offset}&revision=${revision}`,
+    "Could not load your support requests.",
+  );
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -15,16 +26,10 @@ export function CustomerSupport() {
     setBusy(true);
     const values = new FormData(form);
     try {
-      const profileResponse = await fetch("/api/customer/profile", { cache: "no-store" });
-      const profileData = await profileResponse.json().catch(() => null);
-      if (!profileResponse.ok || profileData?.ok !== true) throw new Error(profileData?.error ?? "Your account details could not be loaded.");
-      const response = await fetch("/api/support", {
+      const response = await fetch("/api/customer/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName: profileData.profile.name,
-          customerEmail: profileData.profile.email,
-          phone: profileData.profile.phone,
           subject: String(values.get("subject") ?? ""),
           message: String(values.get("message") ?? ""),
         }),
@@ -33,6 +38,8 @@ export function CustomerSupport() {
       if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Your message could not be sent.");
       form.reset();
       setNotice("Your message has been sent. Our team will get back to you.");
+      setOffset(0);
+      setRevision((value) => value + 1);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Your message could not be sent.");
     } finally {
@@ -60,5 +67,34 @@ export function CustomerSupport() {
         {busy ? "Sending…" : "Send message"}
       </button>
     </form>
+    <section className="mt-12" aria-labelledby="support-history-title">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="support-history-title" className="font-display text-3xl">Your requests</h2>
+        <button type="button" className="min-h-11 rounded border border-border px-4 text-sm font-semibold"
+          onClick={() => setRevision((value) => value + 1)}>Refresh requests</button>
+      </div>
+      <PortalSearch label="Search your support requests by subject, message, or status"
+        placeholder="Search subject, message, or status"
+        onSearch={(value) => { setQuery(value); setOffset(0); }} />
+      {historyError && <p role="alert" className="text-destructive">{historyError}</p>}
+      {!data && !historyError && <p role="status">Loading your requests…</p>}
+      {data && <>
+        <p role="status" className="text-muted-foreground text-sm">{data.total} {query ? "matching " : ""}requests</p>
+        {data.items.length ? <ul className="mt-4 space-y-4">{data.items.map((item) => <li key={item.id} className="rounded border border-border p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div><h3 className="font-semibold">{item.subject}</h3><p className="text-muted-foreground mt-1 text-sm">{dateLabel(item.createdAt)}</p></div>
+            <Badge value={item.status}>{item.status === "open" ? "Open" : "Closed"}</Badge>
+          </div>
+          <p className="mt-3 whitespace-pre-wrap break-words">{item.message}</p>
+        </li>)}</ul> : <p className="mt-4">{query ? "No matching requests. Try another search or clear it." : "No requests yet. Messages sent from your account will appear here."}</p>}
+        {data.total > 50 && <div className="mt-6 flex flex-wrap items-center gap-4">
+          <button type="button" disabled={!offset} className="min-h-11 rounded border border-border px-4 disabled:opacity-50"
+            onClick={() => setOffset(Math.max(0, offset - 50))}>Previous</button>
+          <span>{offset + 1}–{Math.min(offset + 50, data.total)} of {data.total}</span>
+          <button type="button" disabled={offset + 50 >= data.total} className="min-h-11 rounded border border-border px-4 disabled:opacity-50"
+            onClick={() => setOffset(offset + 50)}>Next</button>
+        </div>}
+      </>}
+    </section>
   </section>;
 }
