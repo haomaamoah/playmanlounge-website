@@ -90,7 +90,7 @@ export function OrderTable({ items, hrefBase = "/admin/orders", showCustomer = t
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
     <thead><tr><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
     <tbody>{items.map((order) => <tr key={order.id}>
-      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${hrefBase}/${encodeURIComponent(order.id)}`}>{order.id}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
+      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${hrefBase}/${encodeURIComponent(order.id)}`}>{`${order.id.slice(0, 8)}......`}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><PaymentCell key={order.paymentStatus} order={order} canCheck={checkPayments} /></td>
       <td><span className="admin-cell-label">Kitchen status</span><Badge value={order.status}>{orderLabels[order.status]}</Badge></td>

@@ -19,7 +19,7 @@ test("customer orders table shows Order and Payment without customer names", () 
   assert.match(html, /<th>Payment<\/th>/);
   assert.doesNotMatch(html, /Order \/ customer/);
   assert.doesNotMatch(html, /Ama Mensah/);
-  assert.match(html, /href="\/app\/orders\/PML-1001"/);
+  assert.match(html, /href="\/app\/orders\/PML-1001">PML-1001\.\.\.\.\.\.<\/a>/);
   assert.match(html, /Paid/);
 });
 

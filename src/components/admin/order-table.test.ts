@@ -14,6 +14,8 @@ const base: AdminOrder = {
 test("pending PaySwitch payments are clickable in the admin table", () => {
   const html = renderToStaticMarkup(createElement(OrderTable, { items: [base] }));
   assert.match(html, /<button[^>]*aria-label="Check PaySwitch payment status for PML-2001"/);
+  assert.match(html, />PML-2001\.\.\.\.\.\.<\/a>/);
+  assert.doesNotMatch(html, />PML-2001<\/a>/);
 });
 
 test("settled, pay-on-delivery and customer-portal payments are not clickable", () => {
