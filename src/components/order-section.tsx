@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatGhs, site } from "@/lib/content";
 import { useOrder } from "@/lib/order-context";
 import {
@@ -15,12 +18,17 @@ import {
 } from "@/lib/email";
 import {
   clearPendingOrder,
+  MAX_PAYMENT_RETRIES,
+  PAYMENT_TIMEOUT_MS,
   readPendingOrder,
   rememberPendingOrder,
   restoreOrder,
+  startPaymentAttempt,
+  type PendingOrder,
 } from "@/lib/pending-order";
 import {
   loadPaymentConfig,
+  fetchPaymentStatus,
   readCheckoutReturn,
   startPayment,
   stripCheckoutParams,
@@ -72,7 +80,7 @@ type Status =
       payment: PaymentInfo;
       total: number;
     }
-  | { kind: "payment-failed"; message: string; reference?: string; gatewayIssue: boolean }
+  | { kind: "payment-failed"; message: string; reference?: string; gatewayIssue: boolean; paymentState?: "pending" | "failed" }
   | { kind: "error"; message: string };
 
 function validate(order: OrderPayload): FieldErrors {
@@ -121,6 +129,9 @@ export function OrderSection() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [canPayOnline, setCanPayOnline] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<PendingOrder | null>(null);
+  const [walletConfirmedUnpaid, setWalletConfirmedUnpaid] = useState(false);
+  const [paymentProgressOpen, setPaymentProgressOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -208,6 +219,8 @@ export function OrderSection() {
       if (!returned) return;
       stripCheckoutParams();
       const pending = readPendingOrder();
+      if (pending) setPendingPayment(pending);
+      setPaymentProgressOpen(true);
       setStatus({ kind: "verifying" });
 
       const settled = await waitForPayment(returned.transactionId, {
@@ -227,16 +240,19 @@ export function OrderSection() {
       // hands: the bag comes back so they can retry or pay the rider.
       if (settled.state !== "paid") {
         if (pending) restore(pending.lines);
+        setPaymentProgressOpen(false);
         setStatus({
           kind: "payment-failed",
           message: settled.message,
           reference: settled.transactionId,
           gatewayIssue: settled.gatewayIssue,
+          paymentState: settled.state,
         });
         return;
       }
 
       if (!pending) {
+        setPaymentProgressOpen(false);
         setStatus({
           kind: "payment-failed",
           message:
@@ -248,6 +264,7 @@ export function OrderSection() {
       }
 
       if (pending.lines.some((line) => !items.some((item) => item.id === line.id))) {
+        setPaymentProgressOpen(false);
         setStatus({
           kind: "payment-failed",
           message: "Payment received, but a dish is no longer on the menu. Call the kitchen with your payment reference; do not pay again.",
@@ -259,6 +276,7 @@ export function OrderSection() {
       const payload = restoreOrder(pending, payment, items);
       const sent = await sendOrder(payload);
       if (!sent.ok) {
+        setPaymentProgressOpen(false);
         setStatus({
           kind: "error",
           message:
@@ -268,6 +286,8 @@ export function OrderSection() {
       }
 
       clearPendingOrder();
+      setPendingPayment(null);
+      setPaymentProgressOpen(false);
       clear();
       setStatus({
         kind: "success",
@@ -277,7 +297,13 @@ export function OrderSection() {
         payment,
         total: payload.total,
       });
-    })();
+    })().catch((error: unknown) => {
+      setPaymentProgressOpen(false);
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "We could not confirm the payment status.",
+      });
+    });
     // Runs once, for the redirect it arrived on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -305,9 +331,9 @@ export function OrderSection() {
     };
   }
 
-  async function finishPaidOrder(payment: PaymentInfo) {
-    const payload = currentPayload(payment);
+  async function finishPaidOrder(payment: PaymentInfo, payload = currentPayload(payment)) {
     const sent = await sendOrder(payload);
+    setPaymentProgressOpen(false);
     if (!sent.ok) {
       setStatus({
         kind: "error",
@@ -318,6 +344,8 @@ export function OrderSection() {
     }
 
     clear();
+    clearPendingOrder();
+    setPendingPayment(null);
     setStatus({
       kind: "success",
       summary: sent.body,
@@ -330,6 +358,19 @@ export function OrderSection() {
 
   async function payWithMomo(payload: OrderPayload) {
     setStatus({ kind: "starting" });
+    setPaymentProgressOpen(true);
+
+    const pending = startPaymentAttempt({
+      transactionId: "",
+      savedAt: Date.now(),
+      retriesUsed: 0,
+      lastPaymentState: "pending",
+      total: payload.total,
+      network: network || undefined,
+      momoNumber,
+      customer: { name, phone, email, fulfilment, preferredTime, notes },
+      lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
+    });
 
     let started;
     try {
@@ -347,6 +388,14 @@ export function OrderSection() {
         momoNumber,
       });
     } catch (error) {
+      setPaymentProgressOpen(false);
+      const uncertain = error instanceof PaymentError && error.transactionId
+        ? { ...pending, transactionId: error.transactionId }
+        : null;
+      if (uncertain) {
+        rememberPendingOrder(uncertain);
+        setPendingPayment(uncertain);
+      }
       setStatus({
         kind: "payment-failed",
         message:
@@ -354,20 +403,16 @@ export function OrderSection() {
             ? error.message
             : "The payment could not be started. Try again, or choose pay on delivery.",
         gatewayIssue: error instanceof PaymentError ? error.gatewayIssue : false,
+        reference: uncertain?.transactionId,
+        paymentState: uncertain ? "pending" : undefined,
       });
       return;
     }
 
     if (started.mode === "checkout") {
-      rememberPendingOrder({
-        transactionId: started.transactionId,
-        savedAt: Date.now(),
-        total: payload.total,
-        network: network || undefined,
-        momoNumber,
-        customer: { name, phone, email, fulfilment, preferredTime, notes },
-        lines: payload.lines.map((line) => ({ id: line.item.id, qty: line.qty })),
-      });
+      const stored = { ...pending, transactionId: started.transactionId };
+      rememberPendingOrder(stored);
+      setPendingPayment(stored);
       setStatus({ kind: "redirecting" });
       window.location.assign(started.checkoutUrl);
       return;
@@ -380,17 +425,22 @@ export function OrderSection() {
       network: network || undefined,
       momoNumber,
     });
+    const tracked = { ...pending, transactionId: started.transactionId };
+    rememberPendingOrder(tracked);
+    setPendingPayment(tracked);
 
     if (started.state === "paid") {
       await finishPaidOrder(payment("paid"));
       return;
     }
-    if (started.state === "failed") {
+    if (started.state === "failed" && !started.gatewayIssue && started.code !== "999") {
+      setPaymentProgressOpen(false);
       setStatus({
         kind: "payment-failed",
         message: started.message,
         reference: started.transactionId,
         gatewayIssue: started.gatewayIssue,
+        paymentState: "failed",
       });
       return;
     }
@@ -405,6 +455,7 @@ export function OrderSection() {
     const controller = new AbortController();
     pollRef.current = controller;
     const settled = await waitForPayment(started.transactionId, {
+      timeoutMs: PAYMENT_TIMEOUT_MS,
       signal: controller.signal,
       onUpdate: (update) =>
         setStatus({
@@ -419,12 +470,154 @@ export function OrderSection() {
       await finishPaidOrder(payment("paid"));
       return;
     }
+    setPaymentProgressOpen(false);
+    const updated = { ...tracked, lastPaymentState: settled.state === "failed" && !settled.gatewayIssue ? "failed" as const : "pending" as const };
+    rememberPendingOrder(updated);
+    setPendingPayment(updated);
     setStatus({
       kind: "payment-failed",
       message: settled.message,
       reference: settled.transactionId,
       gatewayIssue: settled.gatewayIssue,
+      paymentState: settled.state === "failed" && !settled.gatewayIssue ? "failed" : "pending",
     });
+  }
+
+  async function checkPaymentNow() {
+    if (!pendingPayment?.transactionId || busy) return;
+    setPaymentProgressOpen(true);
+    setStatus({ kind: "verifying" });
+    try {
+      const result = await fetchPaymentStatus(pendingPayment.transactionId);
+      if (result.state === "paid" && !result.gatewayIssue) {
+        const payment: PaymentInfo = {
+          method: "momo",
+          state: "paid",
+          reference: result.transactionId,
+          network: pendingPayment.network,
+          momoNumber: pendingPayment.momoNumber,
+        };
+        await finishPaidOrder(payment, restoreOrder(pendingPayment, payment, items));
+        return;
+      }
+      const settledFailed = result.state === "failed" && result.code !== "999" && !result.gatewayIssue;
+      const updated = { ...pendingPayment, lastPaymentState: settledFailed ? "failed" as const : "pending" as const };
+      rememberPendingOrder(updated);
+      setPendingPayment(updated);
+      setPaymentProgressOpen(false);
+      setStatus({
+        kind: "payment-failed",
+        message: settledFailed
+          ? result.message
+          : "Payment is not confirmed yet. Check your mobile wallet before choosing another option.",
+        reference: result.transactionId,
+        gatewayIssue: result.gatewayIssue,
+        paymentState: settledFailed ? "failed" : "pending",
+      });
+    } catch (error) {
+      setPaymentProgressOpen(false);
+      setStatus({
+        kind: "payment-failed",
+        message: error instanceof Error ? error.message : "Could not check payment status. Try again.",
+        reference: pendingPayment.transactionId,
+        gatewayIssue: true,
+        paymentState: "pending",
+      });
+    }
+  }
+
+  async function retryPayment() {
+    if (!pendingPayment || !pendingPayment.transactionId || busy ||
+        (pendingPayment.retriesUsed ?? 0) >= MAX_PAYMENT_RETRIES ||
+        (pendingPayment.lastPaymentState !== "failed" && !walletConfirmedUnpaid)) return;
+    const retryOrder = startPaymentAttempt({
+      ...pendingPayment,
+      retriesUsed: (pendingPayment.retriesUsed ?? 0) + 1,
+    });
+    setPaymentProgressOpen(true);
+    setStatus({ kind: "starting" });
+    try {
+      const started = await startPayment({
+        ...retryOrder.customer,
+        lines: retryOrder.lines,
+        expectedTotal: retryOrder.total,
+        acceptedTerms: true,
+        network: retryOrder.network,
+        momoNumber: retryOrder.momoNumber,
+        retryTransactionId: pendingPayment.transactionId,
+      });
+      const nextAttempt = { ...retryOrder, transactionId: started.transactionId };
+      rememberPendingOrder(nextAttempt);
+      setPendingPayment(nextAttempt);
+      setWalletConfirmedUnpaid(false);
+      if (started.mode === "checkout") {
+        setStatus({ kind: "redirecting" });
+        window.location.assign(started.checkoutUrl);
+        return;
+      }
+      if (started.state === "paid" && !started.gatewayIssue) {
+        const payment: PaymentInfo = {
+          method: "momo",
+          state: "paid",
+          reference: started.transactionId,
+          network: retryOrder.network,
+          momoNumber: retryOrder.momoNumber,
+        };
+        await finishPaidOrder(payment, restoreOrder(nextAttempt, payment, items));
+        return;
+      }
+      if (started.state === "failed" && started.code !== "999" && !started.gatewayIssue) {
+        const failed = { ...nextAttempt, lastPaymentState: "failed" as const };
+        rememberPendingOrder(failed);
+        setPendingPayment(failed);
+        setPaymentProgressOpen(false);
+        setStatus({
+          kind: "payment-failed",
+          message: `${started.message} ${retryOrder.retriesUsed} of ${MAX_PAYMENT_RETRIES} retries used.`,
+          reference: started.transactionId,
+          gatewayIssue: false,
+          paymentState: "failed",
+        });
+        return;
+      }
+      setStatus({ kind: "awaiting", reference: started.transactionId, message: started.message });
+      const result = await waitForPayment(started.transactionId, {
+        timeoutMs: PAYMENT_TIMEOUT_MS,
+        onUpdate: (update) => setStatus({ kind: "awaiting", reference: update.transactionId, message: update.message }),
+      });
+      if (result.state === "paid" && !result.gatewayIssue) {
+        const payment: PaymentInfo = {
+          method: "momo",
+          state: "paid",
+          reference: result.transactionId,
+          network: retryOrder.network,
+          momoNumber: retryOrder.momoNumber,
+        };
+        await finishPaidOrder(payment, restoreOrder(nextAttempt, payment, items));
+        return;
+      }
+      const settledFailed = result.state === "failed" && result.code !== "999" && !result.gatewayIssue;
+      const updated = { ...nextAttempt, lastPaymentState: settledFailed ? "failed" as const : "pending" as const };
+      rememberPendingOrder(updated);
+      setPendingPayment(updated);
+      setPaymentProgressOpen(false);
+      setStatus({
+        kind: "payment-failed",
+        message: result.message,
+        reference: result.transactionId,
+        gatewayIssue: result.gatewayIssue,
+        paymentState: settledFailed ? "failed" : "pending",
+      });
+    } catch (error) {
+      setPaymentProgressOpen(false);
+      setStatus({
+        kind: "payment-failed",
+        message: error instanceof Error ? error.message : "The retry could not be started. Check your wallet before continuing.",
+        reference: pendingPayment.transactionId,
+        gatewayIssue: error instanceof PaymentError && error.gatewayIssue,
+        paymentState: "pending",
+      });
+    }
   }
 
   async function onSubmit(event: React.FormEvent) {
@@ -489,6 +682,10 @@ export function OrderSection() {
 
   function switchToPayOnDelivery() {
     pollRef.current?.abort();
+    clearPendingOrder();
+    setPendingPayment(null);
+    setWalletConfirmedUnpaid(false);
+    setPaymentProgressOpen(false);
     setPayMethod("delivery");
     setStatus({ kind: "idle" });
   }
@@ -610,41 +807,13 @@ export function OrderSection() {
             </div>
           )}
 
-          {(status.kind === "starting" ||
-            status.kind === "redirecting" ||
-            status.kind === "verifying" ||
-            status.kind === "awaiting") && (
-            <div
-              ref={statusRef}
-              tabIndex={-1}
-              role="status"
-              aria-live="polite"
-              className="border-cocoa mb-6 border p-4"
-            >
-              <p className="font-semibold motion-safe:animate-pulse">
-                {status.kind === "starting" && "Asking mobile money for your payment…"}
-                {status.kind === "redirecting" && "Opening the secure payment page…"}
-                {status.kind === "verifying" && "Confirming your payment…"}
-                {status.kind === "awaiting" && "Check your phone"}
+          {status.kind === "awaiting" && (
+            <div ref={statusRef} tabIndex={-1} role="status" aria-live="polite" className="border-cocoa mb-6 border p-4">
+              <p className="font-semibold">Check your phone</p>
+              <p className="mt-2 text-sm leading-relaxed">
+                {status.message} We are watching for {formatGhs(total)}. Keep this page open.
               </p>
-              {status.kind === "awaiting" && (
-                <>
-                  <p className="mt-2 text-sm leading-relaxed">
-                    {status.message} We are watching for {formatGhs(total)}. Keep
-                    this page open.
-                  </p>
-                  <p className="text-muted-foreground mt-2 text-sm">
-                    Reference {status.reference}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={switchToPayOnDelivery}
-                    className="mt-3 min-h-11 text-sm underline"
-                  >
-                    Stop waiting and pay on delivery instead
-                  </button>
-                </>
-              )}
+              <p className="text-muted-foreground mt-2 text-sm">Reference {status.reference}</p>
             </div>
           )}
 
@@ -657,21 +826,54 @@ export function OrderSection() {
             >
               <p className="font-semibold">Payment not completed</p>
               <p className="mt-2 text-sm leading-relaxed">{status.message}</p>
-              {status.reference && (
+              {status.reference && pendingPayment && (
                 <p className="mt-2 text-sm">Reference {status.reference}</p>
               )}
               <p className="mt-3 text-sm leading-relaxed text-foreground">
-                If no prompt appeared, check your mobile money menu for a
-                pending approval, then try again.
+                {status.paymentState === "pending"
+                  ? "If you approved the prompt or your wallet shows a debit, check the payment status before choosing another option."
+                  : "If no prompt appeared, check your mobile money menu for a pending approval before trying again."}
               </p>
-              <div className="mt-3 flex flex-wrap gap-4">
+              {status.reference && (
                 <button
                   type="button"
-                  onClick={switchToPayOnDelivery}
-                  className="min-h-11 text-sm underline"
+                  disabled={busy}
+                  onClick={() => void checkPaymentNow()}
+                  className="border-border mt-4 inline-flex min-h-11 items-center border px-4 text-sm font-semibold disabled:opacity-60"
                 >
-                  Pay on delivery instead
+                  Check Payment Status
                 </button>
+              )}
+              {status.paymentState === "pending" && pendingPayment && (
+                <label className="mt-3 flex items-start gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={walletConfirmedUnpaid}
+                    onChange={(event) => setWalletConfirmedUnpaid(event.target.checked)}
+                  />
+                  <span>I checked my mobile wallet and this payment was not taken.</span>
+                </label>
+              )}
+              <div className="mt-3 flex flex-wrap gap-4">
+                {pendingPayment && (pendingPayment.retriesUsed ?? 0) < MAX_PAYMENT_RETRIES && (
+                  <button
+                    type="button"
+                    disabled={busy || (status.paymentState === "pending" && !walletConfirmedUnpaid)}
+                    onClick={() => void retryPayment()}
+                    className="bg-cocoa text-cream inline-flex min-h-11 items-center px-4 text-sm font-semibold disabled:opacity-60"
+                  >
+                    Retry mobile money ({MAX_PAYMENT_RETRIES - (pendingPayment.retriesUsed ?? 0)} left)
+                  </button>
+                )}
+                {(!pendingPayment || status.paymentState === "failed" || walletConfirmedUnpaid) && (
+                  <button
+                    type="button"
+                    onClick={switchToPayOnDelivery}
+                    className="min-h-11 text-sm underline"
+                  >
+                    Pay on delivery instead
+                  </button>
+                )}
                 <a className="min-h-11 text-sm underline" href={`tel:${site.phoneTel}`}>
                   Call {site.phoneDisplay}
                 </a>
@@ -1028,14 +1230,51 @@ export function OrderSection() {
             </div>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || Boolean(pendingPayment?.transactionId)}
               className="bg-cocoa text-cream hover:bg-cocoa-deep inline-flex min-h-12 w-full items-center justify-center px-6 text-base font-semibold disabled:opacity-60"
             >
               {submitLabel()}
             </button>
+            {pendingPayment?.transactionId && status.kind === "payment-failed" && (
+              <p className="text-muted-foreground text-sm">
+                Check your payment status or choose an option above before placing this order again.
+              </p>
+            )}
           </div>
         </form>
       </div>
+      <Dialog open={paymentProgressOpen} onOpenChange={setPaymentProgressOpen}>
+        <DialogContent showCloseButton={false} className="gap-5 p-6 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">
+              {status.kind === "verifying" ? "Checking payment" : "Payment in progress"}
+            </DialogTitle>
+            <DialogDescription>
+              Keep this page open while we contact your mobile money provider. Approve the payment prompt on your phone. Never share your mobile money PIN.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-muted flex items-start gap-3 rounded-lg p-4">
+            <LoaderCircle className="text-primary mt-0.5 size-5 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+            <p role="status" aria-live="polite" className="text-sm leading-relaxed">
+              {status.kind === "awaiting"
+                ? status.message
+                : status.kind === "redirecting"
+                  ? "Opening the secure payment page…"
+                  : status.kind === "verifying"
+                    ? "Checking with the payment provider. This can take a few moments…"
+                    : "Starting your mobile money payment…"}
+            </p>
+          </div>
+          {(status.kind === "awaiting" || status.kind === "verifying") && (
+            <p className="text-muted-foreground text-xs break-all">Payment reference: {status.kind === "awaiting" ? status.reference : pendingPayment?.transactionId}</p>
+          )}
+          <DialogFooter className="-mx-6 -mb-6 px-6 py-4">
+            <Button variant="outline" onClick={() => setPaymentProgressOpen(false)}>
+              Continue in background
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

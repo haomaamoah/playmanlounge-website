@@ -609,11 +609,11 @@ export function CheckoutView() {
       {paymentMessage && <p role="status" className="mt-4">{paymentMessage}</p>}
       {error && <p role="alert" className="text-destructive mt-4">{error}</p>}
       <div className="mt-6 flex flex-wrap gap-3">
-        {pendingPayment && paymentReference && !paymentExpired && !paymentBlocked && (
+        {pendingPayment && paymentReference && !paymentBlocked && (
           <button type="button" disabled={busy || switchingToDelivery}
             onClick={() => void checkPayment(pendingPayment, paymentReference)}
             className="border-border inline-flex min-h-11 items-center border px-4 font-semibold disabled:opacity-60">
-            {busy ? "Checking payment…" : "Check payment status"}
+            {busy ? "Checking payment…" : "Check Payment Status"}
           </button>
         )}
         {pendingPayment && paymentExpired && retriesUsed < MAX_PAYMENT_RETRIES && !paymentBlocked && (
