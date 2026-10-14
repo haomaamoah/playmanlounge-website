@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import type { AdminOrder, ItemResponse, OrderStatus } from "@/lib/admin/contracts";
-import { formatGhs } from "@/lib/content";
-import { Badge, PageHeading, ResourceState, adminRequest, dateLabel, orderLabels, paymentLabels, useAdminResource } from "./admin-ui";
+import { Badge, CustomerFulfilment, OrderTicket, PageHeading, ResourceState, adminRequest, dateLabel, orderLabels, useAdminResource } from "./admin-ui";
 
 export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -28,18 +27,8 @@ export function OrderDetail() {
     {order && <>
       <PageHeading title={order.id} description={`Placed ${dateLabel(order.createdAt)} · Accra time`} />
       <div className="admin-detail-grid">
-        <section className="admin-report"><h2>Order ticket</h2>
-          <ul className="admin-line-items">{order.lines.map((line, index) => <li key={`${line.itemId}-${index}`}><span>{line.qty} × {line.name}</span><strong>{formatGhs(line.qty * line.unitPrice)}</strong></li>)}</ul>
-          <div className="admin-ticket-total"><span>Total</span><strong>{formatGhs(order.total)}</strong></div>
-          <dl className="admin-details"><div><dt>Payment</dt><dd><Badge value={order.paymentStatus}>{paymentLabels[order.paymentStatus]}</Badge></dd></div><div><dt>Transaction reference</dt><dd>{order.transactionId || "Not yet recorded"}</dd></div></dl>
-          <p className="admin-footnote">Kitchen status changes do not mark an order as paid.</p>
-        </section>
-        <section className="admin-report"><h2>Customer & fulfilment</h2><dl className="admin-details">
-          <div><dt>Customer</dt><dd>{order.customerName}</dd></div><div><dt>Phone</dt><dd><a href={`tel:${order.customerPhone}`}>{order.customerPhone}</a></dd></div>
-          <div><dt>Email</dt><dd>{order.customerEmail ? <a href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a> : "Not provided"}</dd></div>
-          <div><dt>Fulfilment</dt><dd>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</dd></div><div><dt>Preferred time</dt><dd>{order.preferredTime || "As soon as possible"}</dd></div>
-          <div><dt>Customer notes</dt><dd className="admin-preserve">{order.notes || "No notes provided."}</dd></div>
-        </dl></section>
+        <OrderTicket order={order} footnote="Kitchen status changes do not mark an order as paid." />
+        <CustomerFulfilment order={order} />
       </div>
       <section className="admin-report admin-status-editor"><h2>Kitchen status</h2><Badge value={order.status}>{orderLabels[order.status]}</Badge>
         <form onSubmit={(event) => { event.preventDefault(); const status = new FormData(event.currentTarget).get("status") as OrderStatus; if (status === "cancelled") setConfirmCancel(true); else void update(status); }}>

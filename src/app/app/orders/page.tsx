@@ -1,3 +1,4 @@
+import "@/app/admin/admin.css";
 import { CustomerOrders } from "@/components/customer/customer-orders";
 
 export default function CustomerOrdersPage() {

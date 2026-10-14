@@ -60,15 +60,34 @@ export function dateLabel(value: string) {
   return new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(value));
 }
 
-export function OrderTable({ items }: { items: AdminOrder[] }) {
+export function OrderTable({ items, hrefBase = "/admin/orders", showCustomer = true }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean }) {
+  const orderHeading = showCustomer ? "Order / customer" : "Order";
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
-    <thead><tr><th>Order / customer</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
+    <thead><tr><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
     <tbody>{items.map((order) => <tr key={order.id}>
-      <td><span className="admin-cell-label">Order / customer</span><Link className="admin-order-link" href={`/admin/orders/${encodeURIComponent(order.id)}`}>{order.id}</Link><small>{order.customerName}</small></td>
+      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${hrefBase}/${encodeURIComponent(order.id)}`}>{order.id}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><Badge value={order.paymentStatus}>{paymentLabels[order.paymentStatus]}</Badge></td>
       <td><span className="admin-cell-label">Kitchen status</span><Badge value={order.status}>{orderLabels[order.status]}</Badge></td>
       <td className="admin-number"><span className="admin-cell-label">Total</span>{formatGhs(order.total)}</td>
     </tr>)}</tbody>
   </table></div>;
+}
+
+export function OrderTicket({ order, footnote }: { order: AdminOrder; footnote?: string }) {
+  return <section className="admin-report"><h2>Order ticket</h2>
+    <ul className="admin-line-items">{order.lines.map((line, index) => <li key={`${line.itemId}-${index}`}><span>{line.qty} × {line.name}</span><strong>{formatGhs(line.qty * line.unitPrice)}</strong></li>)}</ul>
+    <div className="admin-ticket-total"><span>Total</span><strong>{formatGhs(order.total)}</strong></div>
+    <dl className="admin-details"><div><dt>Payment</dt><dd><Badge value={order.paymentStatus}>{paymentLabels[order.paymentStatus]}</Badge></dd></div><div><dt>Transaction reference</dt><dd>{order.transactionId || "Not yet recorded"}</dd></div></dl>
+    {footnote && <p className="admin-footnote">{footnote}</p>}
+  </section>;
+}
+
+export function CustomerFulfilment({ order }: { order: AdminOrder }) {
+  return <section className="admin-report"><h2>Customer & fulfilment</h2><dl className="admin-details">
+    <div><dt>Customer</dt><dd>{order.customerName}</dd></div><div><dt>Phone</dt><dd><a href={`tel:${order.customerPhone}`}>{order.customerPhone}</a></dd></div>
+    <div><dt>Email</dt><dd>{order.customerEmail ? <a href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a> : "Not provided"}</dd></div>
+    <div><dt>Fulfilment</dt><dd>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</dd></div><div><dt>Preferred time</dt><dd>{order.preferredTime || "As soon as possible"}</dd></div>
+    <div><dt>Customer notes</dt><dd className="admin-preserve">{order.notes || "No notes provided."}</dd></div>
+  </dl></section>;
 }
