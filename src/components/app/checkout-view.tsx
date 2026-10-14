@@ -2,7 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { formatGhs, pesewas, site, type MenuItem } from "@/lib/content";
 import { DELIVERY_AREAS } from "@/lib/mocks/seed";
 import { useMockStore } from "@/lib/mocks/store";
@@ -53,6 +56,7 @@ export function CheckoutView() {
   const [success, setSuccess] = useState("");
   const [placedTotal, setPlacedTotal] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [paymentProgressOpen, setPaymentProgressOpen] = useState(false);
   const submission = useRef<{ body: string; key: string } | null>(null);
   const [paymentKind, setPaymentKind] = useState<"delivery" | "momo">("delivery");
   const [switchingToDelivery, setSwitchingToDelivery] = useState(false);
@@ -283,6 +287,7 @@ export function CheckoutView() {
       ...pendingPayment,
       retriesUsed: (pendingPayment.retriesUsed ?? 0) + 1,
     });
+    setPaymentProgressOpen(true);
     try {
       const started = await startPayment({
         ...retryOrder.customer,
@@ -341,6 +346,7 @@ export function CheckoutView() {
       setError(reason instanceof Error ? reason.message : "The retry could not be started.");
     } finally {
       setBusy(false);
+      setPaymentProgressOpen(false);
     }
   }
 
@@ -438,6 +444,7 @@ export function CheckoutView() {
       const attemptOrder = startPaymentAttempt(order);
       let activeOrder: PendingOrder | undefined;
       setBusy(true);
+      setPaymentProgressOpen(true);
       setPaymentMessage("Starting mobile money payment…");
       try {
         const started = await startPayment({
@@ -494,6 +501,7 @@ export function CheckoutView() {
             : "The payment could not be started. Choose pay on delivery or try again.");
       } finally {
         setBusy(false);
+        setPaymentProgressOpen(false);
       }
       return;
     }
@@ -659,7 +667,6 @@ export function CheckoutView() {
         <span>Total</span><span>{formatGhs(bagTotal)}</span>
       </p>
 
-      {!profile && !error && <p role="status" className="mt-6">Loading your account details…</p>}
       <form onSubmit={onSubmit} className="mt-8 space-y-5">
         <label className="block">
           <span className="text-sm font-medium">Your name</span>
@@ -759,12 +766,6 @@ export function CheckoutView() {
             </div>
           )}
         </fieldset>
-        {paymentMessage && (
-          <p role="status" aria-live="polite" className="text-sm leading-relaxed">
-            {paymentMessage}
-          </p>
-        )}
-        {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
         <button type="submit" disabled={busy || !profile || !catalog || Boolean(pendingPayment)}
           className="bg-palm text-cream hover:bg-palm/90 inline-flex min-h-12 w-full items-center justify-center px-5 font-semibold disabled:opacity-60 sm:w-auto">
           {busy
@@ -775,11 +776,40 @@ export function CheckoutView() {
               ? `Pay ${formatGhs(bagTotal)} now`
               : `Place order · ${formatGhs(bagTotal)}`}
         </button>
+        {!profile && !error && <p role="status" className="text-muted-foreground text-sm">Loading your account details…</p>}
+        {(paymentMessage || error) && (
+          <div className="border-border bg-cream space-y-2 rounded-lg border p-4" aria-live="polite">
+            {paymentMessage && <p role="status" className="text-sm leading-relaxed">{paymentMessage}</p>}
+            {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
+          </div>
+        )}
         <p className="text-muted-foreground text-sm">
           Questions? Call{" "}
           <a className="underline" href={`tel:${site.followUpPhoneTel}`}>{site.followUpPhoneDisplay}</a>.
         </p>
       </form>
+      <Dialog open={paymentProgressOpen} onOpenChange={setPaymentProgressOpen}>
+        <DialogContent showCloseButton={false} className="gap-5 p-6 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">Payment in progress</DialogTitle>
+            <DialogDescription>
+              Keep this page open while we contact your mobile money provider. Approve the payment prompt on your phone. Never share your mobile money PIN.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-cream flex items-start gap-3 rounded-lg p-4">
+            <LoaderCircle className="text-palm mt-0.5 size-5 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+            <p role="status" aria-live="polite" className="text-sm leading-relaxed">
+              {paymentMessage || "Starting mobile money payment…"}
+            </p>
+          </div>
+          {paymentReference && <p className="text-muted-foreground text-xs break-all">Payment reference: {paymentReference}</p>}
+          <DialogFooter className="-mx-6 -mb-6 px-6 py-4">
+            <Button variant="outline" onClick={() => setPaymentProgressOpen(false)}>
+              Continue in background
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
