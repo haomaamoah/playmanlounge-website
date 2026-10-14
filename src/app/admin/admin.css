@@ -76,6 +76,10 @@
 .admin-table tbody tr:hover td { background: #f7edda; }
 .admin-table small { display: block; color: #6b4a28; font-size: 12px; margin-top: 5px; }
 .admin-order-link { font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; overflow-wrap: anywhere; }
+.admin-payment-check { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; justify-self: start; }
+.admin-payment-check .admin-badge { text-decoration: underline; text-underline-offset: 3px; }
+.admin-payment-check:hover:not(:disabled) .admin-badge { background: var(--rice-cream); border-color: var(--admin-control-border); }
+.admin-table small.admin-payment-error { color: #9b1c0a; }
 .admin-number { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .admin-table .admin-number { text-align: right; }
 .admin-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; border: 1px solid #c9b693; background: #f6e9ce; color: #624413; border-radius: 4px; padding: 4px 8px; white-space: nowrap; }

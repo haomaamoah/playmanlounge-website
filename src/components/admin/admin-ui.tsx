@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import type { AdminOrder } from "@/lib/admin/contracts";
+import type { AdminOrder, ItemResponse } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
 
 export async function adminRequest<T = { ok: true }>(url: string, init: RequestInit = {}): Promise<T> {
@@ -60,14 +60,39 @@ export function dateLabel(value: string) {
   return new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Accra" }).format(new Date(value));
 }
 
-export function OrderTable({ items, hrefBase = "/admin/orders", showCustomer = true }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean }) {
+export function PaymentCell({ order, canCheck }: { order: AdminOrder; canCheck: boolean }) {
+  const [status, setStatus] = useState(order.paymentStatus);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  if (!canCheck || status !== "pending" || !order.transactionId) return <>
+    <Badge value={status}>{paymentLabels[status]}</Badge>
+    {message && <small role="status" className={failed ? "admin-payment-error" : undefined}>{message}</small>}
+  </>;
+  async function check() {
+    setBusy(true); setMessage(""); setFailed(false);
+    try {
+      const data = await adminRequest<ItemResponse<AdminOrder> & { message: string }>(`/api/admin/orders/${encodeURIComponent(order.id)}/payment`, { method: "POST", body: "{}" });
+      setStatus(data.item.paymentStatus); setMessage(data.item.paymentStatus === "pending" ? data.message : "");
+    } catch (err) { setFailed(true); setMessage((err as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <>
+    <button type="button" className="admin-payment-check" disabled={busy} onClick={() => void check()} aria-label={`Check PaySwitch payment status for ${order.id}`}>
+      <Badge value={status}>{busy ? "Checking…" : paymentLabels[status]}</Badge>
+    </button>
+    {message && <small role="status" className={failed ? "admin-payment-error" : undefined}>{message}</small>}
+  </>;
+}
+
+export function OrderTable({ items, hrefBase = "/admin/orders", showCustomer = true, checkPayments = true }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean }) {
   const orderHeading = showCustomer ? "Order / customer" : "Order";
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
     <thead><tr><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
     <tbody>{items.map((order) => <tr key={order.id}>
       <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${hrefBase}/${encodeURIComponent(order.id)}`}>{order.id}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
-      <td><span className="admin-cell-label">Payment</span><Badge value={order.paymentStatus}>{paymentLabels[order.paymentStatus]}</Badge></td>
+      <td><span className="admin-cell-label">Payment</span><PaymentCell key={order.paymentStatus} order={order} canCheck={checkPayments} /></td>
       <td><span className="admin-cell-label">Kitchen status</span><Badge value={order.status}>{orderLabels[order.status]}</Badge></td>
       <td className="admin-number"><span className="admin-cell-label">Total</span>{formatGhs(order.total)}</td>
     </tr>)}</tbody>
