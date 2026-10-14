@@ -51,6 +51,10 @@ export async function supersedePayment(oldTransactionId: string, newTransactionI
   const {data,error} = await db().rpc("supersede_payment_attempt",{p_old:oldTransactionId,p_new:newTransactionId});
   return orderDTO(checked(data,error));
 }
+export async function retryPaymentAttempt(oldTransactionId: string, newTransactionId: string) {
+  const {data,error} = await db().rpc("retry_payment_attempt",{p_old:oldTransactionId,p_new:newTransactionId});
+  return orderDTO(checked(data,error));
+}
 export function notificationStore(orderId: string): DeliveryStore {
   return {
     async claim(keys) {

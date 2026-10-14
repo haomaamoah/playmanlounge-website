@@ -1,7 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MenuItem } from "./content.ts";
-import { readPendingOrder, rememberPendingOrder, restoreOrder, type PendingOrder } from "./pending-order.ts";
+import { MAX_PAYMENT_RETRIES, PAYMENT_TIMEOUT_MS, readPendingOrder, rememberPendingOrder, restoreOrder, startPaymentAttempt, type PendingOrder } from "./pending-order.ts";
+
+test("mobile money gives two minutes per attempt and allows only two retries", () => {
+  assert.equal(PAYMENT_TIMEOUT_MS, 120_000);
+  assert.equal(MAX_PAYMENT_RETRIES, 2);
+});
+
+test("each retry starts a fresh timer without resetting its retry count", () => {
+  const retry = startPaymentAttempt({ ...pending, retriesUsed: 1 }, 5000);
+  assert.equal(retry.attemptStartedAt, 5000);
+  assert.equal(retry.retriesUsed, 1);
+  assert.equal(retry.lastPaymentState, "pending");
+});
 
 const item: MenuItem = {
   id: "admin-created-dish",
@@ -60,10 +72,13 @@ test("portal payment details survive reload even when the start outcome has no r
   });
   assert.equal(rememberPendingOrder({
     ...pending, customerPortal: true, startUnconfirmed: true, transactionId: "", savedAt: 0,
+    attemptStartedAt: 1_760_000_000_000, retriesUsed: 1,
   }), true);
   const restored = readPendingOrder();
   assert.equal(restored?.customerPortal, true);
   assert.equal(restored?.startUnconfirmed, true);
+  assert.equal(restored?.attemptStartedAt, 1_760_000_000_000);
+  assert.equal(restored?.retriesUsed, 1);
   assert.equal(restored?.customer.email, pending.customer.email);
   assert.ok(restored && restored.savedAt > 0);
 });

@@ -4,8 +4,10 @@ import { siteUrl } from "@/lib/mail/config";
 import { hydrateOrder, parseOrderRequest } from "@/lib/mail/order";
 import { isMomoNetwork, normaliseSubscriberNumber } from "@/lib/payments/networks";
 import { getCatalog } from "@/lib/db/catalog";
-import { persistOrder, supersedePayment, updatePayment } from "@/lib/db/orders";
+import { db } from "@/lib/db/server";
+import { persistOrder, retryPaymentAttempt, supersedePayment, updatePayment } from "@/lib/db/orders";
 import { nextAfterCharge } from "@/lib/payments/fallback";
+import { MAX_PAYMENT_RETRIES } from "@/lib/payments/policy";
 import type { HydratedOrder } from "@/lib/mail/types";
 import { checkOrigin, jsonBody, rateLimit } from "@/lib/admin/server";
 import { ApiFailure } from "@/lib/admin/validation";
@@ -62,6 +64,7 @@ async function startCheckout(
     supersedes?: string;
     customerPortal?: boolean;
     order: HydratedOrder;
+    retry?: boolean;
   }
 ) {
   const redirectUrl = publicReturnUrl(args.customerPortal);
@@ -75,7 +78,10 @@ async function startCheckout(
     });
   }
 
-  if (args.supersedes) await supersedePayment(args.supersedes,args.transactionId);
+  if (args.supersedes) {
+    if (args.retry) await retryPaymentAttempt(args.supersedes, args.transactionId);
+    else await supersedePayment(args.supersedes,args.transactionId);
+  }
   else await persistOrder(args.order,args.transactionId);
   const started = await initiateCheckout(config, {
     transactionId: args.transactionId,
@@ -158,10 +164,37 @@ async function start(request: Request) {
   const order = hydrated.order;
   const body = raw as Record<string, unknown>;
   const customerPortal = body.customerPortal === true;
+  const retryTransactionId = typeof body.retryTransactionId === "string" ? body.retryTransactionId : "";
   if (customerPortal) {
     const { profile } = await requireCustomer();
     if (profile.email.toLowerCase() !== order.email.toLowerCase()) {
       return fail(403, { error: "Sign in with the account placing this order." });
+    }
+  }
+  if (retryTransactionId) {
+    if (!customerPortal || !/^\d{12}$/.test(retryTransactionId)) {
+      return fail(400, { error: "This payment cannot be retried from this session." });
+    }
+    const { data: previous, error: previousError } = await db()
+      .from("orders").select("*").eq("transaction_id", retryTransactionId).maybeSingle();
+    if (previousError) throw previousError;
+    if (!previous || previous.customer_email.toLowerCase() !== order.email.toLowerCase() ||
+        !["pending", "failed"].includes(String(previous.payment_status))) {
+      return fail(409, { error: "This payment can no longer be retried." });
+    }
+    if (Number(previous.payment_retries ?? 0) >= MAX_PAYMENT_RETRIES) {
+      return fail(409, { error: "You’ve used both mobile money retries. Choose Pay on delivery or contact the kitchen." });
+    }
+    const lines = Array.isArray(previous.lines) ? previous.lines as { itemId: string; qty: number }[] : [];
+    const matches = lines.length === order.lines.length &&
+      lines.every((line) => order.lines.some((entry) => entry.item.id === line.itemId && entry.qty === line.qty));
+    if (!matches || Number(previous.total) !== order.total || previous.customer_phone !== order.phone ||
+        previous.fulfilment !== order.fulfilment || previous.preferred_time !== order.preferredTime ||
+        previous.notes !== order.notes) {
+      return fail(409, { error: "The order details changed. This payment cannot be retried." });
+    }
+    if (String(previous.transaction_id) !== retryTransactionId) {
+      return fail(409, { error: "A newer payment attempt is already active for this order." });
     }
   }
 
@@ -202,13 +235,16 @@ async function start(request: Request) {
       email: order.email,
       order,
       customerPortal,
+      supersedes: retryTransactionId || undefined,
+      retry: Boolean(retryTransactionId),
     });
   }
   const voucherCode = (typeof body.voucherCode === "string" ? body.voucherCode : "")
     .replace(/[^0-9a-zA-Z]/g, "")
     .slice(0, 20);
 
-  await persistOrder(order,transactionId);
+  if (retryTransactionId) await retryPaymentAttempt(retryTransactionId, transactionId);
+  else await persistOrder(order,transactionId);
   let outcome: { result: PaymentResult } | { error: unknown };
   try {
     outcome = { result: await chargeMomo(config, {

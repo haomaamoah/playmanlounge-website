@@ -18,15 +18,26 @@ const input: StartPaymentInput = {
 };
 
 test("customer payment start sends the account, basket, wallet and portal return flag", async (t) => {
+  let requestCount = 0;
   t.mock.method(globalThis, "fetch", async (url: string, options: RequestInit) => {
     assert.equal(url, "/api/payments/start");
     assert.equal(options.method, "POST");
-    assert.deepEqual(JSON.parse(String(options.body)), input);
-    return Response.json({ mode: "checkout", total: 35, transactionId: "123456789012", checkoutUrl: "https://checkout.theteller.net/test" });
+    const body = JSON.parse(String(options.body));
+    if (requestCount++ === 0) {
+      assert.deepEqual(body, input);
+      return Response.json({ mode: "checkout", total: 35, transactionId: "123456789012", checkoutUrl: "https://checkout.theteller.net/test" });
+    }
+    assert.deepEqual(body, { ...input, retryTransactionId: "123456789012" });
+    return Response.json({
+      mode: "prompt", total: 35, transactionId: "987654321098", state: "pending",
+      code: "111", message: "Approve the prompt.", retryable: true, gatewayIssue: false,
+    });
   });
   const result = await startPayment(input);
   assert.equal(result.mode, "checkout");
   assert.equal(result.transactionId, "123456789012");
+  const retried = await startPayment({ ...input, retryTransactionId: "123456789012" });
+  assert.equal(retried.transactionId, "987654321098");
 });
 
 test("an ambiguous start error preserves its transaction reference for status checks", async (t) => {

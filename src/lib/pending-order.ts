@@ -7,12 +7,16 @@
 import { pesewas, type MenuItem } from "@/lib/content";
 import type { Fulfilment, OrderPayload, PaymentInfo } from "@/lib/email";
 import type { MomoNetwork } from "@/lib/payments/networks";
+export { PAYMENT_TIMEOUT_MS, MAX_PAYMENT_RETRIES } from "@/lib/payments/policy";
 
 export type PendingOrder = {
   customerPortal?: boolean;
   startUnconfirmed?: boolean;
   transactionId: string;
   savedAt: number;
+  attemptStartedAt?: number;
+  retriesUsed?: number;
+  lastPaymentState?: "pending" | "failed";
   total: number;
   network?: MomoNetwork;
   momoNumber?: string;
@@ -26,6 +30,10 @@ export type PendingOrder = {
   };
   lines: { id: string; qty: number }[];
 };
+
+export function startPaymentAttempt(order: PendingOrder, startedAt = Date.now()): PendingOrder {
+  return { ...order, attemptStartedAt: startedAt, lastPaymentState: "pending" };
+}
 
 const KEY = "playman.pendingOrder";
 const MAX_AGE_MS = 2 * 60 * 60 * 1000;

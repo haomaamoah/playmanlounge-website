@@ -6,9 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { formatGhs, pesewas, site, type MenuItem } from "@/lib/content";
 import { DELIVERY_AREAS } from "@/lib/mocks/seed";
 import { useMockStore } from "@/lib/mocks/store";
-import { clearPendingOrder, readPendingOrder, rememberPendingOrder, type PendingOrder } from "@/lib/pending-order";
+import { clearPendingOrder, MAX_PAYMENT_RETRIES, PAYMENT_TIMEOUT_MS, readPendingOrder, rememberPendingOrder, startPaymentAttempt, type PendingOrder } from "@/lib/pending-order";
 import { guessNetwork, isValidMomoNumber, momoNetworks, type MomoNetwork } from "@/lib/payments/networks";
-import { loadPaymentConfig, PaymentError, readCheckoutReturn, startPayment, stripCheckoutParams, waitForPayment } from "@/lib/payments/client";
+import { fetchPaymentStatus, loadPaymentConfig, PaymentError, readCheckoutReturn, startPayment, stripCheckoutParams, waitForPayment, type PaymentUpdate } from "@/lib/payments/client";
 
 type CustomerProfile = { name: string; email: string; phone: string };
 
@@ -20,6 +20,13 @@ type OrderResponse = {
   error?: string;
   payment?: { method?: string; state?: string };
 };
+
+function retryGuidance(retriesUsed: number) {
+  const remaining = Math.max(0, MAX_PAYMENT_RETRIES - retriesUsed);
+  return remaining === 0
+    ? "You’ve used both mobile money retries. Switch to Pay on delivery or contact the kitchen."
+    : `You may retry mobile money ${remaining} more ${remaining === 1 ? "time" : "times"}.`;
+}
 
 export function CheckoutView() {
   const { bag, clearBag, ready } = useMockStore();
@@ -38,6 +45,8 @@ export function CheckoutView() {
   const [paymentMessage, setPaymentMessage] = useState("");
   const [pendingPayment, setPendingPayment] = useState<PendingOrder | null>(null);
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentTimeLeft, setPaymentTimeLeft] = useState(PAYMENT_TIMEOUT_MS);
+  const [walletConfirmedUnpaid, setWalletConfirmedUnpaid] = useState(false);
   const [paymentBlocked, setPaymentBlocked] = useState(false);
   const [restoringPayment, setRestoringPayment] = useState(true);
   const [error, setError] = useState("");
@@ -46,6 +55,7 @@ export function CheckoutView() {
   const [busy, setBusy] = useState(false);
   const submission = useRef<{ body: string; key: string } | null>(null);
   const [paymentKind, setPaymentKind] = useState<"delivery" | "momo">("delivery");
+  const [switchingToDelivery, setSwitchingToDelivery] = useState(false);
 
   useEffect(() => {
     void loadPaymentConfig().then(setCanPayOnline);
@@ -143,42 +153,63 @@ export function CheckoutView() {
   }
 
   async function checkPayment(order: PendingOrder, reference: string) {
-    setPendingPayment(order);
+    const startedAt = order.attemptStartedAt ?? Date.now();
+    const attempt = { ...order, attemptStartedAt: startedAt, lastPaymentState: "pending" as const };
+    rememberPendingOrder(attempt);
+    setPendingPayment(attempt);
     setPaymentReference(reference);
+    setWalletConfirmedUnpaid(false);
     setBusy(true);
     setError("");
-    setPaymentMessage("Checking your mobile money payment…");
+    setPaymentTimeLeft(Math.max(0, startedAt + PAYMENT_TIMEOUT_MS - Date.now()));
+    setPaymentMessage("Waiting for your mobile money prompt. Approve it on your phone.");
     const controller = new AbortController();
     pollRef.current?.abort();
     pollRef.current = controller;
     try {
-      const settled = await waitForPayment(reference, {
-        signal: controller.signal,
-        intervalMs: 4000,
-        timeoutMs: 45_000,
-        onUpdate: (update) => setPaymentMessage(update.message),
-      });
+      const remainingMs = Math.max(0, startedAt + PAYMENT_TIMEOUT_MS - Date.now());
+      let settled: PaymentUpdate;
+      if (remainingMs > 0) {
+        settled = await waitForPayment(reference, {
+          signal: controller.signal,
+          intervalMs: 4000,
+          timeoutMs: remainingMs,
+          onUpdate: (update) => setPaymentMessage(update.message),
+        });
+      } else {
+        try {
+          settled = await fetchPaymentStatus(reference);
+        } catch {
+          settled = {
+            transactionId: reference, state: "pending", code: "111",
+            message: "The approval timer ended. Check your wallet before retrying.",
+            retryable: true, gatewayIssue: false,
+          };
+        }
+      }
       if (controller.signal.aborted) return;
       if (settled.state === "paid" && !settled.gatewayIssue) {
         await finishPaidOrder(order, reference);
         return;
       }
       if (settled.state === "failed" && !settled.gatewayIssue) {
-        clearPendingOrder();
-        setPendingPayment(null);
-        setPaymentReference("");
-        setPaymentMessage("");
-        setError(`${settled.message} Reference: ${reference}`);
+        const failed = { ...attempt, lastPaymentState: "failed" as const };
+        rememberPendingOrder(failed);
+        setPendingPayment(failed);
+        setPaymentMessage(`${settled.message} ${retryGuidance(attempt.retriesUsed ?? 0)}`);
         return;
       }
       setPendingPayment(order);
       setPaymentReference(reference);
-      setPaymentMessage(`${settled.message} Do not start another payment while this one is unconfirmed.`);
+      const stillPending = { ...attempt, lastPaymentState: "pending" as const };
+      rememberPendingOrder(stillPending);
+      setPendingPayment(stillPending);
+      setPaymentMessage(`${settled.message} You can retry after the timer expires, or switch to Pay on delivery.`);
     } catch (reason) {
       if (!controller.signal.aborted) {
-        setPendingPayment(order);
+        setPendingPayment(attempt);
         setPaymentReference(reference);
-        setPaymentMessage("We could not confirm the payment. Check your mobile wallet or contact the kitchen with your reference before trying again.");
+        setPaymentMessage("We could not confirm the payment yet. Keep the prompt open and check your phone.");
         setError(reason instanceof Error ? reason.message : "Your payment status could not be confirmed.");
       }
     } finally {
@@ -234,6 +265,115 @@ export function CheckoutView() {
 
   useEffect(() => () => pollRef.current?.abort(), []);
 
+  useEffect(() => {
+    if (!pendingPayment?.attemptStartedAt) return;
+    const update = () => setPaymentTimeLeft(Math.max(0, pendingPayment.attemptStartedAt! + PAYMENT_TIMEOUT_MS - Date.now()));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [pendingPayment?.attemptStartedAt]);
+
+  async function retryPayment() {
+    if (!pendingPayment || !paymentReference || busy || switchingToDelivery ||
+        (pendingPayment.retriesUsed ?? 0) >= MAX_PAYMENT_RETRIES) return;
+    setBusy(true);
+    setError("");
+    setPaymentMessage("Starting a new mobile money prompt…");
+    const retryOrder = startPaymentAttempt({
+      ...pendingPayment,
+      retriesUsed: (pendingPayment.retriesUsed ?? 0) + 1,
+    });
+    try {
+      const started = await startPayment({
+        ...retryOrder.customer,
+        lines: retryOrder.lines,
+        expectedTotal: retryOrder.total,
+        acceptedTerms: true,
+        network: pendingPayment.network,
+        momoNumber: pendingPayment.momoNumber,
+        customerPortal: true,
+        retryTransactionId: paymentReference,
+      });
+      const nextAttempt: PendingOrder = {
+        ...retryOrder,
+        transactionId: started.transactionId,
+        total: started.total,
+      };
+      if (!rememberPendingOrder(nextAttempt)) {
+        setPaymentBlocked(true);
+        throw new Error("This browser could not save the retry details. Contact the kitchen before trying to pay again.");
+      }
+      setPendingPayment(nextAttempt);
+      setPaymentReference(started.transactionId);
+      if (started.mode === "checkout") {
+        window.location.assign(started.checkoutUrl);
+        return;
+      }
+      if (started.state === "failed" && !started.gatewayIssue) {
+        const failed = { ...nextAttempt, lastPaymentState: "failed" as const };
+        rememberPendingOrder(failed);
+        setPendingPayment(failed);
+        setPaymentMessage(`${started.message} ${retryGuidance(nextAttempt.retriesUsed ?? 0)}`);
+        return;
+      }
+      if (started.state === "paid" && !started.gatewayIssue) {
+        await finishPaidOrder(nextAttempt, started.transactionId);
+        return;
+      }
+      await checkPayment(nextAttempt, started.transactionId);
+    } catch (reason) {
+      let blocked = false;
+      if (reason instanceof PaymentError && reason.transactionId) {
+        const uncertain = {
+          ...retryOrder,
+          transactionId: reason.transactionId,
+          lastPaymentState: "pending" as const,
+        };
+        rememberPendingOrder(uncertain);
+        setPendingPayment(uncertain);
+        setPaymentReference(reason.transactionId);
+      } else if (reason instanceof PaymentError && !reason.retryable) {
+        setPaymentBlocked(true);
+        blocked = true;
+        setPaymentMessage("We could not confirm whether the retry started. Do not pay again; contact the kitchen with your current reference.");
+      }
+      if (!blocked) setPaymentMessage("We couldn't confirm whether the new prompt started. Check your phone before taking another action.");
+      setError(reason instanceof Error ? reason.message : "The retry could not be started.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function switchToDelivery() {
+    if (!pendingPayment || !paymentReference || busy || switchingToDelivery) return;
+    setSwitchingToDelivery(true);
+    setError("");
+    setPaymentMessage("Switching your order to Pay on delivery…");
+    try {
+      const response = await fetch("/api/payments/switch-to-delivery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId: paymentReference }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "We could not switch this order to Pay on delivery.");
+      clearPendingOrder();
+      setPendingPayment(null);
+      setPaymentReference("");
+      setPaymentKind("delivery");
+      setPlacedTotal(pendingPayment.total);
+      clearBag();
+      setSuccess(data.receiptSent
+        ? `Order ${data.orderRef} is confirmed. Pay on delivery.`
+        : `Order ${data.orderRef} is saved. ${data.receiptError ?? "The receipt could not be sent."} Pay on delivery.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "We could not switch this order to Pay on delivery.");
+      setPaymentMessage("");
+    } finally {
+      setSwitchingToDelivery(false);
+    }
+  }
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || restoringPayment || paymentBlocked || !catalog) return;
@@ -279,6 +419,9 @@ export function CheckoutView() {
         customerPortal: true,
         transactionId: "",
         savedAt: 0,
+        attemptStartedAt: 0,
+        retriesUsed: 0,
+        lastPaymentState: "pending",
         total: bagTotal,
         network,
         momoNumber,
@@ -292,6 +435,7 @@ export function CheckoutView() {
         },
         lines: lines.map(({ id, qty }) => ({ id, qty })),
       };
+      const attemptOrder = startPaymentAttempt(order);
       let activeOrder: PendingOrder | undefined;
       setBusy(true);
       setPaymentMessage("Starting mobile money payment…");
@@ -305,16 +449,18 @@ export function CheckoutView() {
           momoNumber,
           customerPortal: true,
         });
-        const startedOrder = { ...order, transactionId: started.transactionId, total: started.total };
-        activeOrder = startedOrder;
+        const timedStartedOrder = { ...attemptOrder, transactionId: started.transactionId, total: started.total };
+        activeOrder = timedStartedOrder;
+        setPendingPayment(timedStartedOrder);
+        setPaymentReference(started.transactionId);
+        const stored = rememberPendingOrder(timedStartedOrder);
         if (started.mode === "prompt" && started.state === "failed" && !started.gatewayIssue) {
-          setError(started.message);
-          setPaymentMessage("");
+          const failed = { ...timedStartedOrder, lastPaymentState: "failed" as const };
+          rememberPendingOrder(failed);
+          setPendingPayment(failed);
+          setPaymentMessage(`${started.message} ${retryGuidance(timedStartedOrder.retriesUsed ?? 0)}`);
           return;
         }
-        setPendingPayment(startedOrder);
-        setPaymentReference(started.transactionId);
-        const stored = rememberPendingOrder(startedOrder);
         if (started.mode === "checkout") {
           if (!stored) {
             throw new Error("This browser could not save the payment details. Contact the kitchen with your reference before continuing.");
@@ -324,19 +470,19 @@ export function CheckoutView() {
           return;
         }
         if (started.state === "paid" && !started.gatewayIssue) {
-          await finishPaidOrder(startedOrder, started.transactionId);
+          await finishPaidOrder(timedStartedOrder, started.transactionId);
           return;
         }
-        await checkPayment(startedOrder, started.transactionId);
+        await checkPayment(timedStartedOrder, started.transactionId);
       } catch (reason) {
         if (reason instanceof PaymentError && reason.transactionId) {
-          const uncertainOrder = { ...order, transactionId: reason.transactionId };
+          const uncertainOrder = { ...attemptOrder, transactionId: reason.transactionId };
           rememberPendingOrder(uncertainOrder);
           setPendingPayment(uncertainOrder);
           setPaymentReference(reason.transactionId);
         } else if (!(reason instanceof PaymentError) || !reason.retryable) {
           if (!activeOrder) {
-            rememberPendingOrder({ ...order, startUnconfirmed: true });
+            rememberPendingOrder({ ...attemptOrder, startUnconfirmed: true });
             setPaymentBlocked(true);
           }
         }
@@ -423,16 +569,60 @@ export function CheckoutView() {
   }
 
   if (pendingPayment || paymentBlocked) {
+    const paymentExpired = paymentTimeLeft <= 0 || pendingPayment?.lastPaymentState === "failed";
+    const retriesUsed = pendingPayment?.retriesUsed ?? 0;
+    const paymentIsUnconfirmed = pendingPayment?.lastPaymentState !== "failed";
+    const paymentFailed = pendingPayment?.lastPaymentState === "failed";
+    const secondsLeft = Math.ceil(paymentTimeLeft / 1000);
+    const timeLabel = `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}`;
     return <section>
       <h1 className="font-display text-4xl">Your payment</h1>
       {paymentReference && <p className="mt-4">Reference: {paymentReference}</p>}
+      {pendingPayment && (
+        <div className="bg-cream mt-5 border border-border p-4">
+          {paymentFailed
+            ? <p role="status" className="font-display text-2xl">Payment attempt failed</p>
+            : <p role="timer" aria-live="off" aria-label={`${secondsLeft} seconds remaining to approve payment`}
+                className="font-display text-2xl">
+                {paymentExpired ? "Approval time ended" : `Time to approve: ${timeLabel}`}
+              </p>}
+          <p className="text-muted-foreground mt-2 text-sm">
+            Approve the mobile money prompt on your phone. You can retry up to {MAX_PAYMENT_RETRIES} times ({retriesUsed} used).
+          </p>
+          {paymentExpired && paymentIsUnconfirmed && (
+            <label className="mt-3 flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={walletConfirmedUnpaid}
+                onChange={(event) => setWalletConfirmedUnpaid(event.target.checked)} />
+              <span>I checked my mobile wallet and this payment was not taken.</span>
+            </label>
+          )}
+        </div>
+      )}
       {paymentMessage && <p role="status" className="mt-4">{paymentMessage}</p>}
       {error && <p role="alert" className="text-destructive mt-4">{error}</p>}
-      {pendingPayment && paymentReference && <button type="button" disabled={busy}
-        onClick={() => void checkPayment(pendingPayment, paymentReference)}
-        className="border-border mt-6 inline-flex min-h-11 items-center border px-4 font-semibold disabled:opacity-60">
-        {busy ? "Checking payment…" : "Check payment status"}
-      </button>}
+      <div className="mt-6 flex flex-wrap gap-3">
+        {pendingPayment && paymentReference && !paymentExpired && !paymentBlocked && (
+          <button type="button" disabled={busy || switchingToDelivery}
+            onClick={() => void checkPayment(pendingPayment, paymentReference)}
+            className="border-border inline-flex min-h-11 items-center border px-4 font-semibold disabled:opacity-60">
+            {busy ? "Checking payment…" : "Check payment status"}
+          </button>
+        )}
+        {pendingPayment && paymentExpired && retriesUsed < MAX_PAYMENT_RETRIES && !paymentBlocked && (
+          <button type="button" disabled={busy || switchingToDelivery || (paymentIsUnconfirmed && !walletConfirmedUnpaid)}
+            onClick={() => void retryPayment()}
+            className="bg-cocoa text-cream inline-flex min-h-11 items-center px-4 font-semibold disabled:opacity-60">
+            {busy ? "Starting retry…" : `Retry mobile money (${MAX_PAYMENT_RETRIES - retriesUsed} left)`}
+          </button>
+        )}
+        {pendingPayment && paymentExpired && !paymentBlocked && (
+          <button type="button" disabled={busy || switchingToDelivery}
+            onClick={() => void switchToDelivery()}
+            className="border-border inline-flex min-h-11 items-center border px-4 font-semibold disabled:opacity-60">
+            {switchingToDelivery ? "Switching…" : "Switch to Pay on delivery"}
+          </button>
+        )}
+      </div>
       <p className="mt-4 text-sm">Need help? Call <a className="underline" href={`tel:${site.followUpPhoneTel}`}>{site.followUpPhoneDisplay}</a>.</p>
     </section>;
   }

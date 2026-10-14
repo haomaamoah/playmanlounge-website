@@ -86,6 +86,7 @@ export type StartPaymentInput = {
   momoNumber?: string;
   voucherCode?: string;
   customerPortal?: boolean;
+  retryTransactionId?: string;
 };
 
 export async function startPayment(input: StartPaymentInput): Promise<StartedPayment> {

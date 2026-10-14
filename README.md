@@ -107,7 +107,7 @@ Use `prompt` for the in-page flow. If wallet details are missing, prompt mode re
 
 Hosted checkout only works from a public HTTPS address, because PaySwitch has to be able to reach the return URL — `/initiate` answers `code 999` for a `SITE_URL` on `127.0.0.1`. The route checks for that first and tells the customer to pay on delivery instead.
 
-Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side before sending receipts or marking it paid. Customer-portal orders remain available to recheck if the payment is unsettled, and the portal will not start another charge while that payment is unresolved. The site never claims a payment PaySwitch has not confirmed.
+Before hosted checkout the order is parked in `sessionStorage`; on return the page verifies the payment server-side before sending receipts or marking it paid. Customer-portal mobile-money attempts show a two-minute approval timer. Once it expires, the customer can retry at most twice or atomically switch the same order to pay on delivery. Retry limits are enforced against persisted orders, not only browser state, and a superseded attempt that later settles as paid still marks the order paid. The site never claims a payment PaySwitch has not confirmed.
 
 ### Merchant account status (October 2026)
 
@@ -185,14 +185,14 @@ The cocoa bar has **Terms and Conditions** and **Return Policy** buttons, then *
 
 ## Supabase backend setup
 
-Use a user-approved Supabase project; these scripts never create a project. The versioned migrations are `supabase/migrations/202610090001_backend.sql`, `202610090002_email_thumbnails.sql`, `202610090003_delivery_and_attempts.sql` (receipt delivery ledger, superseded payment attempts), `202610130001_customer_portal.sql` (website customer portal), `202610120001_mobile_customers.sql` (mobile order/support links), and `202610130002_mobile_customer_phone.sql` (normalized phone lookup). Apply each **once**, in that order, through that project's SQL editor, or use the idempotent CLI wrapper (requires `psql`):
+Use a user-approved Supabase project; these scripts never create a project. The versioned migrations are `supabase/migrations/202610090001_backend.sql`, `202610090002_email_thumbnails.sql`, `202610090003_delivery_and_attempts.sql` (receipt delivery ledger, superseded payment attempts), `202610130001_customer_portal.sql` (website customer portal), `202610120001_mobile_customers.sql` (mobile order/support links), `202610130002_mobile_customer_phone.sql` (normalized phone lookup), and `202610140001_switch_payment_to_delivery.sql` (mobile-money retries and switching an existing order to pay on delivery). Apply each **once**, in that order, through that project's SQL editor, or use the idempotent CLI wrapper (requires `psql`):
 
 ```bash
 # Supply the database connection privately; do not paste it into chat or commit it.
 APPLY_DB_MIGRATIONS=1 npm run db:migrate
 ```
 
-The wrapper reads `SUPABASE_DB_URL` from the environment, tracks the migration version and runs it transactionally, including the customer portal migration. If you use the SQL editor, wrap each file in a transaction that also inserts its version into `app_migrations.versions`, and do not rerun a raw migration. It explicitly grants service-role table/function/sequence access for projects with automatic API exposure disabled; enables RLS on every app table; grants authenticated users only their own admin profile; and provides no public app writes. The public `menu-images` bucket serves object URLs without an anonymous list policy; uploads/deletes are server-only.
+The wrapper reads `SUPABASE_DB_URL` from the environment, tracks the migration version and runs it transactionally. Apply migrations before deploying code that depends on them. If you use the SQL editor, wrap each file in a transaction that also inserts its version into `app_migrations.versions`, and do not rerun a raw migration. It explicitly grants service-role table/function/sequence access for projects with automatic API exposure disabled; enables RLS on every app table; grants authenticated users only their own admin profile; and provides no public app writes. The public `menu-images` bucket serves object URLs without an anonymous list policy; uploads/deletes are server-only.
 
 Copy `env.example` into `.env.local` without overwriting existing payment/email keys. Set server-only `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (legacy `SUPABASE_ANON_KEY` accepted), and `SUPABASE_SECRET_KEY` (legacy `SUPABASE_SERVICE_ROLE_KEY` accepted) privately in local/hosting configuration. No Supabase key needs a `NEXT_PUBLIC_` prefix: the UI calls server APIs. Production requires `SITE_URL` set to the exact deployed HTTPS origin. Loopback development uses the request's exact origin, so an existing deployed payment-return `SITE_URL` does not block local admin forms. Restart the dev server after adding environment variables.
 
