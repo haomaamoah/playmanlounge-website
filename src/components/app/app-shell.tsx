@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, LogOut, Menu, MessagesSquare, Settings, ShoppingBag, UtensilsCrossed, X } from "lucide-react";
 import { useState } from "react";
-import { site } from "@/lib/content";
+import { site, type MenuGroup } from "@/lib/content";
+import { CatalogProvider } from "./catalog-context";
 import { useMockStore } from "@/lib/mocks/store";
 
-export function AppShell({ children, customerName }: { children: React.ReactNode; customerName: string }) {
+export function AppShell({ children, customerName, menuGroups }: { children: React.ReactNode; customerName: string; menuGroups: MenuGroup[] | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const { bagCount } = useMockStore();
@@ -115,7 +116,7 @@ export function AppShell({ children, customerName }: { children: React.ReactNode
               )}
             </Link>
           </div>
-          {children}
+          <CatalogProvider groups={menuGroups}>{children}</CatalogProvider>
         </main>
       </div>
       {mobileMenuOpen && (

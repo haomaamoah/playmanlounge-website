@@ -1,6 +1,8 @@
 import { AppShell } from "@/components/app/app-shell";
 import { authClient } from "@/lib/admin/server";
 import { db } from "@/lib/db/server";
+import { loadMenuGroups } from "@/lib/db/catalog";
+import type { MenuGroup } from "@/lib/content";
 import { redirect } from "next/navigation";
 
 export default async function CustomerAppLayout({
@@ -20,5 +22,11 @@ export default async function CustomerAppLayout({
     .maybeSingle();
   if (profileError) throw new Error("The customer profile could not be verified.");
   if (!profile) redirect("/customer/login?next=%2Fapp");
-  return <AppShell customerName={profile.name}>{children}</AppShell>;
+  let menuGroups: MenuGroup[] | null = null;
+  try {
+    menuGroups = await loadMenuGroups();
+  } catch {
+    console.error("The customer portal menu could not be loaded from the database.");
+  }
+  return <AppShell customerName={profile.name} menuGroups={menuGroups}>{children}</AppShell>;
 }

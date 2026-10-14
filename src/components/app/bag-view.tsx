@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus } from "lucide-react";
-import { formatGhs, menu } from "@/lib/content";
+import { formatGhs } from "@/lib/content";
 import { useMockStore } from "@/lib/mocks/store";
 
 export function BagView() {
@@ -33,7 +33,6 @@ export function BagView() {
       <ul className="mt-6 divide-y divide-border border-y border-border">
         {bag.map((line) => {
           const item = resolvedMenu.find((entry) => entry.id === line.itemId);
-          const photo = menu.find((entry) => entry.id === line.itemId);
           if (!item) return null;
           return (
             <li key={line.itemId} className="flex gap-3 py-4">
@@ -41,8 +40,8 @@ export function BagView() {
                 <Image
                   src={item.image}
                   alt=""
-                  width={photo?.width ?? 1100}
-                  height={photo?.height ?? 733}
+                  width={item.width || 1100}
+                  height={item.height || 733}
                   className="size-full object-cover"
                 />
               </div>

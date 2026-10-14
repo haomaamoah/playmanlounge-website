@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import { Minus, Plus } from "lucide-react";
-import { formatGhs, menuGroups } from "@/lib/content";
+import { formatGhs } from "@/lib/content";
+import { useCatalog } from "./catalog-context";
 import { useMockStore } from "@/lib/mocks/store";
 import { dealKind } from "@/lib/promotions";
 import { CustomerDealsCarousel } from "./customer-deals-carousel";
 
 export function BrowseView() {
   const { bag, addToBag, setBagQty, menuOverrides, resolvedMenu } = useMockStore();
+  const { groups: menuGroups, unavailable } = useCatalog();
   const customerMenuGroups = menuGroups.filter((group) => !dealKind(group.id));
 
   return (
@@ -18,6 +20,11 @@ export function BrowseView() {
       <p className="text-muted-foreground mt-3 max-w-md text-base leading-relaxed">
         Combos come with a Coke.
       </p>
+      {unavailable && (
+        <p role="alert" className="mt-8 border border-border p-4 text-sm">
+          The menu could not be loaded right now. Please refresh in a moment.
+        </p>
+      )}
       <div className="mt-8 space-y-10">
         <CustomerDealsCarousel groups={menuGroups} />
         {customerMenuGroups.map((group) => (

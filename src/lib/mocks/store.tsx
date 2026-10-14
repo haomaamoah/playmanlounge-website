@@ -47,9 +47,9 @@ function writeStorage(state: MockState) {
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function linesFromBag(bag: BagLine[]): OrderLine[] {
+function linesFromBag(bag: BagLine[], items: MenuItem[]): OrderLine[] {
   return bag.flatMap((entry) => {
-    const item = menu.find((candidate) => candidate.id === entry.itemId);
+    const item = items.find((candidate) => candidate.id === entry.itemId);
     if (!item || entry.qty <= 0) return [];
     return [
       {
@@ -74,6 +74,8 @@ type MockStoreValue = {
   bagCount: number;
   bagTotal: number;
   resolvedMenu: MenuItem[];
+  /** Replaces the bundled fallback menu with the live catalog and drops bag lines no longer sold. */
+  syncCatalog: (items: MenuItem[]) => void;
   login: (pin: string) => boolean;
   logout: () => void;
   addToBag: (itemId: string) => void;
@@ -96,6 +98,8 @@ const MockStoreContext = createContext<MockStoreValue | null>(null);
 export function MockStoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<MockState>(cloneSeed);
   const [ready, setReady] = useState(false);
+  const [catalog, setCatalog] = useState<MenuItem[] | null>(null);
+  const items = catalog ?? menu;
 
   useEffect(() => {
     const stored = readStorage();
@@ -130,8 +134,16 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
     update((prev) => ({ ...prev, staffAuthed: false }));
   }, [update]);
 
+  const syncCatalog = useCallback((live: MenuItem[]) => {
+    setCatalog(live);
+    const ids = new Set(live.map((item) => item.id));
+    update((prev) => prev.bag.every((line) => ids.has(line.itemId))
+      ? prev
+      : { ...prev, bag: prev.bag.filter((line) => ids.has(line.itemId)) });
+  }, [update]);
+
   const addToBag = useCallback((itemId: string) => {
-    const item = menu.find((entry) => entry.id === itemId);
+    const item = items.find((entry) => entry.id === itemId);
     if (!item) return;
     update((prev) => {
       const soldOut = prev.menuOverrides[itemId]?.soldOut;
@@ -144,7 +156,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
         : [...prev.bag, { itemId, qty: 1 }];
       return { ...prev, bag };
     });
-  }, [update]);
+  }, [items, update]);
 
   const setBagQty = useCallback((itemId: string, qty: number) => {
     update((prev) => {
@@ -178,7 +190,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
       const box: { order: Order | null } = { order: null };
       flushSync(() => {
         update((prev) => {
-        const orderLines = linesFromBag(prev.bag).map((entry) => {
+        const orderLines = linesFromBag(prev.bag, items).map((entry) => {
           const override = prev.menuOverrides[entry.itemId];
           return {
             ...entry,
@@ -231,7 +243,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
       });
       return box.order;
     },
-    [update]
+    [items, update]
   );
 
   const setOrderStatus = useCallback((orderId: string, status: OrderStatus) => {
@@ -268,7 +280,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
   const bagTotal =
     pesewas(
       state.bag.reduce((sum, line) => {
-        const item = menu.find((entry) => entry.id === line.itemId);
+        const item = items.find((entry) => entry.id === line.itemId);
         const price = state.menuOverrides[line.itemId]?.price ?? item?.price ?? 0;
         return sum + line.qty * price;
       }, 0)
@@ -276,7 +288,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
 
   const resolvedMenu = useMemo(
     () =>
-      menu.map((item) => {
+      items.map((item) => {
         const override = state.menuOverrides[item.id];
         if (!override) return item;
         return {
@@ -285,7 +297,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
           price: override.price ?? item.price,
         };
       }),
-    [state.menuOverrides]
+    [items, state.menuOverrides]
   );
 
   const value = useMemo<MockStoreValue>(
@@ -300,6 +312,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
       bagCount,
       bagTotal,
       resolvedMenu,
+      syncCatalog,
       login,
       logout,
       addToBag,
@@ -317,6 +330,7 @@ export function MockStoreProvider({ children }: { children: ReactNode }) {
       bagCount,
       bagTotal,
       resolvedMenu,
+      syncCatalog,
       login,
       logout,
       addToBag,
