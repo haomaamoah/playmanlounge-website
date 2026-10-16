@@ -14,6 +14,7 @@ const links = [
   { path: "/orders", label: "Orders", icon: ClipboardList },
   { path: "/menu", label: "Menu", icon: UtensilsCrossed },
   { path: "/customers", label: "Customers", icon: UsersRound },
+  { path: "/administrators", label: "Administrators", icon: ShieldCheck, managerOnly: true },
   { path: "/support", label: "Support", icon: MessagesSquare },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
@@ -70,8 +71,9 @@ export function AdminShell({ children, basePath = "/admin", managerPortal = fals
     {error ? <><p role="alert">{error}</p><button className="admin-button" onClick={() => setAttempt(attempt + 1)}>Try again</button><Link href={`${basePath}/login`}>Back to sign in</Link></> : <p>Checking your secure session…</p>}
   </div>;
   const portalBase = admin.role === "manager" ? "/man" : "/admin";
-  const navLinks = [...links.map((link) => ({ ...link, href: `${portalBase}${link.path}` })),
-    ...(admin.role === "manager" ? [{ href: `${portalBase}/administrators`, label: "Administrators", icon: ShieldCheck }] : [])];
+  const navLinks = links
+    .filter((link) => !("managerOnly" in link) || admin.role === "manager")
+    .map(({ path, ...link }) => ({ ...link, href: `${portalBase}${path}` }));
 
   return <div className="admin-root admin-workspace">
     <a className="admin-skip" href="#main">Skip to workspace</a>
