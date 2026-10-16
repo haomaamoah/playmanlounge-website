@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createContext, useContext } from "react";
 import Link from "next/link";
-import type { AdminOrder, ItemResponse } from "@/lib/admin/contracts";
+import { availableOrderStatuses, type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
 
 const AdminBasePathContext = createContext("/admin");
@@ -96,7 +96,51 @@ export function PaymentCell({ order, canCheck }: { order: AdminOrder; canCheck: 
   </>;
 }
 
-export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments = true }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean }) {
+function OrderStatusCell({ order, editable, onUpdated }: { order: AdminOrder; editable: boolean; onUpdated?: () => void }) {
+  const [status, setStatus] = useState<OrderStatus>(order.status);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const options = availableOrderStatuses(order.status, order.paymentStatus);
+  async function update(next: OrderStatus) {
+    if (next === order.status) return;
+    if (next === "cancelled" && !window.confirm("Cancel this order? This changes kitchen fulfilment only and does not issue a refund.")) {
+      setStatus(order.status);
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const data = await adminRequest<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(order.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: next }),
+      });
+      setStatus(data.item.status);
+      setMessage(`Kitchen status changed to ${orderLabels[data.item.status].toLowerCase()}.`);
+      onUpdated?.();
+    } catch (err) {
+      setStatus(order.status);
+      setMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!editable) return <Badge value={status}>{orderLabels[status]}</Badge>;
+  return <>
+    <select
+      className="admin-order-status-select"
+      aria-label={`Kitchen status for order ${order.id}`}
+      value={status}
+      disabled={busy || options.length === 1}
+      onChange={(event) => void update(event.target.value as OrderStatus)}
+    >
+      {options.map((value) => <option value={value} key={value}>{orderLabels[value]}</option>)}
+    </select>
+    {busy && <small role="status">Saving kitchen status…</small>}
+    {message && <small role={message.startsWith("Kitchen status changed") ? "status" : "alert"}>{message}</small>}
+  </>;
+}
+
+export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments = true, canUpdateStatus = true, onOrderUpdated }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean; canUpdateStatus?: boolean; onOrderUpdated?: () => void }) {
   const basePath = useAdminBasePath();
   const orderHrefBase = hrefBase ?? `${basePath}/orders`;
   const orderHeading = showCustomer ? "Order / customer" : "Order";
@@ -106,7 +150,7 @@ export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments
       <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${orderHrefBase}/${encodeURIComponent(order.id)}`}>{`${order.id.slice(0, 8)}......`}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><PaymentCell key={order.paymentStatus} order={order} canCheck={checkPayments} /></td>
-      <td><span className="admin-cell-label">Kitchen status</span><Badge value={order.status}>{orderLabels[order.status]}</Badge></td>
+      <td><span className="admin-cell-label">Kitchen status</span><OrderStatusCell key={`${order.id}-${order.status}-${order.paymentStatus}`} order={order} editable={canUpdateStatus} onUpdated={onOrderUpdated} /></td>
       <td className="admin-number"><span className="admin-cell-label">Total</span>{formatGhs(order.total)}</td>
     </tr>)}</tbody>
   </table></div>;

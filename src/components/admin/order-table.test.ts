@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { AdminOrder } from "../../lib/admin/contracts";
+import { availableOrderStatuses, type AdminOrder } from "../../lib/admin/contracts";
 import { OrderTable } from "./admin-ui";
 
 const base: AdminOrder = {
@@ -23,4 +23,21 @@ test("settled, pay-on-delivery and customer-portal payments are not clickable", 
     assert.doesNotMatch(renderToStaticMarkup(createElement(OrderTable, { items: [order] })), /<button/);
   }
   assert.doesNotMatch(renderToStaticMarkup(createElement(OrderTable, { items: [base], checkPayments: false })), /<button/);
+});
+
+test("kitchen status options follow the legal transition sequence and payment gate", () => {
+  assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending", "cooking", "cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "pending"), ["pending", "cancelled"]);
+  assert.deepEqual(availableOrderStatuses("cooking", "failed"), ["cooking", "cancelled"]);
+  assert.deepEqual(availableOrderStatuses("ready", "cod"), ["ready", "out", "completed", "cancelled"]);
+  assert.deepEqual(availableOrderStatuses("completed", "paid"), ["completed"]);
+  assert.deepEqual(availableOrderStatuses("cancelled", "paid"), ["cancelled"]);
+});
+
+test("admin order table renders an inline kitchen status selector", () => {
+  const paidOrder = { ...base, paymentStatus: "paid" as const };
+  const html = renderToStaticMarkup(createElement(OrderTable, { items: [paidOrder] }));
+  assert.match(html, /aria-label="Kitchen status for order PML-2001"/);
+  assert.match(html, /<option value="cooking">Cooking<\/option>/);
+  assert.doesNotMatch(html, /<option value="ready">Ready<\/option>/);
 });

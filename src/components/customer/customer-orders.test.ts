@@ -21,6 +21,7 @@ test("customer orders table shows Order and Payment without customer names", () 
   assert.doesNotMatch(html, /Ama Mensah/);
   assert.match(html, /href="\/app\/orders\/PML-1001">PML-1001\.\.\.\.\.\.<\/a>/);
   assert.match(html, /Paid/);
+  assert.doesNotMatch(html, /admin-order-status-select/);
 });
 
 test("customer order detail shows only the ticket and fulfilment sections", () => {

@@ -1,4 +1,4 @@
-import type { MenuInput, OrderStatus, SupportInput } from "./contracts";
+import type { MenuInput, SupportInput } from "./contracts";
 
 export class ApiFailure extends Error {
   status: number;
@@ -37,14 +37,7 @@ export function supportInput(raw: unknown): SupportInput {
   return { customerName: text(b.customerName,2,100), customerEmail: email(b.customerEmail),
     phone: text(b.phone ?? "",0,30), subject: text(b.subject,3,160), message: text(b.message,10,4000) };
 }
-export const orderStatuses: OrderStatus[] = ["pending","cooking","ready","out","completed","cancelled"];
-const transitions: Record<OrderStatus, OrderStatus[]> = {
-  pending: ["cooking","cancelled"], cooking: ["ready","cancelled"], ready: ["out","completed","cancelled"],
-  out: ["completed","cancelled"], completed: [], cancelled: [],
-};
-export function canTransition(from: OrderStatus, to: OrderStatus) {
-  return from === to || transitions[from].includes(to);
-}
+export { availableOrderStatuses, canTransition, orderStatuses } from "./contracts";
 export function menuInput(raw: unknown, partial = false): Partial<MenuInput> {
   const keys = ["id","name","description","price","category","image","width","height","groupId","groupTitle","groupBlurb","sortOrder","isActive"];
   const b = object(raw, partial ? keys.filter(k => k !== "id") : keys);

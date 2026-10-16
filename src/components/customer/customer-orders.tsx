@@ -28,7 +28,7 @@ export function CustomerOrdersView({ orders }: { orders: AdminOrder[] }) {
     <h2 className="font-display text-2xl">No orders yet</h2>
     <p className="text-muted-foreground mt-2">Choose a combo or a favourite from the menu to get started.</p>
   </div>;
-  return <div className="mt-8"><OrderTable items={orders} hrefBase="/app/orders" showCustomer={false} checkPayments={false} /></div>;
+  return <div className="mt-8"><OrderTable items={orders} hrefBase="/app/orders" showCustomer={false} checkPayments={false} canUpdateStatus={false} /></div>;
 }
 
 export function CustomerOrders() {

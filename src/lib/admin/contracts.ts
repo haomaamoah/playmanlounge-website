@@ -15,6 +15,33 @@ export type AdminMenuItem = MenuItem & {
 export type MenuInput = Omit<AdminMenuItem, "createdAt" | "updatedAt">;
 export type OrderStatus = "pending" | "cooking" | "ready" | "out" | "completed" | "cancelled";
 export type PaymentStatus = "pending" | "paid" | "cod" | "failed";
+export const orderStatuses: OrderStatus[] = ["pending", "cooking", "ready", "out", "completed", "cancelled"];
+const orderTransitions: Record<OrderStatus, OrderStatus[]> = {
+  pending: ["cooking", "cancelled"],
+  cooking: ["ready", "cancelled"],
+  ready: ["out", "completed", "cancelled"],
+  out: ["completed", "cancelled"],
+  completed: [],
+  cancelled: [],
+};
+export function canTransition(from: OrderStatus, to: OrderStatus) {
+  return from === to || orderTransitions[from].includes(to);
+}
+export function availableOrderStatuses(
+  status: OrderStatus,
+  paymentStatus: PaymentStatus,
+): OrderStatus[] {
+  return [
+    status,
+    ...orderTransitions[status].filter(
+      (next) =>
+        next === "cancelled" ||
+        next === "pending" ||
+        paymentStatus === "paid" ||
+        paymentStatus === "cod",
+    ),
+  ];
+}
 export type AdminOrder = {
   id: string; createdAt: string; updatedAt: string;
   customerName: string; customerEmail: string; customerPhone: string;

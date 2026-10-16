@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accountBlockInput, administratorCreateInput, canTransition, menuInput, object, password, supportInput } from "./validation.ts";
+import { accountBlockInput, administratorCreateInput, availableOrderStatuses, canTransition, menuInput, object, password, supportInput } from "./validation.ts";
 
 test("unknown fields, malformed objects and invalid support are rejected", () => {
   assert.throws(() => object({role:"admin"},["email"]));
@@ -23,6 +23,13 @@ test("order transitions cannot resurrect terminal states", () => {
   assert.ok(!canTransition("pending","completed"));
   assert.ok(!canTransition("cancelled","cooking"));
   assert.ok(!canTransition("completed","pending"));
+});
+test("available kitchen statuses respect transition order and payment confirmation", () => {
+  assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending","cooking","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "pending"), ["pending","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("cooking", "failed"), ["cooking","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("ready", "cod"), ["ready","out","completed","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("completed", "paid"), ["completed"]);
 });
 test("password verification preserves significant whitespace", () => {
   assert.equal(password(" long pass phrase ",12)," long pass phrase ");
