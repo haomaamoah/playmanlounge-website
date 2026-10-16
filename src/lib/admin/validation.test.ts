@@ -19,14 +19,15 @@ test("menu fields validate cents, types and immutable id", () => {
 });
 test("order transitions cannot resurrect terminal states", () => {
   assert.ok(canTransition("pending","cooking"));
+  assert.ok(canTransition("pending","ready"));
   assert.ok(canTransition("ready","completed"));
   assert.ok(!canTransition("pending","completed"));
   assert.ok(!canTransition("cancelled","cooking"));
   assert.ok(!canTransition("completed","pending"));
 });
 test("available kitchen statuses respect transition order and payment confirmation", () => {
-  assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending","cooking","cancelled"]);
-  assert.deepEqual(availableOrderStatuses("pending", "cod"), ["pending","cooking","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending","cooking","ready","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "cod"), ["pending","cooking","ready","cancelled"]);
   assert.deepEqual(availableOrderStatuses("pending", "pending"), ["pending","cancelled"]);
   assert.deepEqual(availableOrderStatuses("cooking", "cod"), ["cooking","ready","cancelled"]);
   assert.deepEqual(availableOrderStatuses("cooking", "failed"), ["cooking","cancelled"]);

@@ -17,7 +17,7 @@ export type OrderStatus = "pending" | "cooking" | "ready" | "out" | "completed" 
 export type PaymentStatus = "pending" | "paid" | "cod" | "failed";
 export const orderStatuses: OrderStatus[] = ["pending", "cooking", "ready", "out", "completed", "cancelled"];
 const orderTransitions: Record<OrderStatus, OrderStatus[]> = {
-  pending: ["cooking", "cancelled"],
+  pending: ["cooking", "ready", "cancelled"],
   cooking: ["ready", "cancelled"],
   ready: ["out", "completed", "cancelled"],
   out: ["completed", "cancelled"],

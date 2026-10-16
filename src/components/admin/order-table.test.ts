@@ -26,7 +26,8 @@ test("settled, pay-on-delivery and customer-portal payments are not clickable", 
 });
 
 test("kitchen status options follow the legal transition sequence and payment gate", () => {
-  assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending", "cooking", "cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending", "cooking", "ready", "cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "cod"), ["pending", "cooking", "ready", "cancelled"]);
   assert.deepEqual(availableOrderStatuses("pending", "pending"), ["pending", "cancelled"]);
   assert.deepEqual(availableOrderStatuses("cooking", "failed"), ["cooking", "cancelled"]);
   assert.deepEqual(availableOrderStatuses("ready", "cod"), ["ready", "out", "completed", "cancelled"]);
@@ -40,7 +41,7 @@ test("admin order table renders an inline kitchen status selector", () => {
   assert.match(html, /class="admin-order-status-select admin-badge-pending"/);
   assert.match(html, /aria-label="Kitchen status for order PML-2001"/);
   assert.match(html, /<option value="cooking">Cooking<\/option>/);
-  assert.doesNotMatch(html, /<option value="ready">Ready<\/option>/);
+  assert.match(html, /<option value="ready">Ready<\/option>/);
 });
 
 test("kitchen status selector uses the matching payment badge palette", () => {
