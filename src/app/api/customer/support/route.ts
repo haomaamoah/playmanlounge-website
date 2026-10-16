@@ -5,6 +5,7 @@ import { object, supportInput } from "@/lib/admin/validation";
 import { requireCustomer } from "@/lib/customer/server";
 import { supportDTO } from "@/lib/db/orders";
 import { db } from "@/lib/db/server";
+import { scheduleNotificationDispatch } from "@/lib/notifications/schedule";
 
 export const GET = endpoint(async (request) => {
   const { user } = await requireCustomer();
@@ -30,5 +31,7 @@ export const POST = endpoint(async (request) => {
     customer_id: user.id, customer_name: input.customerName, customer_email: input.customerEmail,
     phone: input.phone, subject: input.subject, message: input.message,
   }).select("id").single();
-  return { ok: true, id: checked(data, error).id };
+  const item = checked(data, error);
+  scheduleNotificationDispatch();
+  return { ok: true, id: item.id };
 });

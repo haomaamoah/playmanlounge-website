@@ -7,6 +7,7 @@ import { getCatalog } from "@/lib/db/catalog";
 import { notificationStore, submitPersistedOrder } from "@/lib/db/orders";
 import { checkOrigin, jsonBody, rateLimit } from "@/lib/admin/server";
 import { ApiFailure } from "@/lib/admin/validation";
+import { scheduleNotificationDispatch } from "@/lib/notifications/schedule";
 
 export const runtime = "nodejs";
 
@@ -61,6 +62,7 @@ async function submit(request: Request) {
   const requestKey = request.headers.get("idempotency-key") ?? undefined;
   if (requestKey && !/^[a-zA-Z0-9-]{16,100}$/.test(requestKey)) throw new ApiFailure(400,"Invalid idempotency key.");
   const saved = await submitPersistedOrder(hydrated.order,payment,requestKey);
+  scheduleNotificationDispatch();
   const sent = await sendOrderReceipts(hydrated.order,{orderId:saved.id,store:notificationStore(saved.id)});
   if (!sent.ok) {
     const status = sent.reason === "no-provider" ? 503 : 502;

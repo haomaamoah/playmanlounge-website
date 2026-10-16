@@ -3,6 +3,7 @@ import { ApiFailure, canTransition, object, orderStatuses } from "@/lib/admin/va
 import type { OrderStatus } from "@/lib/admin/contracts";
 import { orderDTO } from "@/lib/db/orders";
 import { db } from "@/lib/db/server";
+import { scheduleNotificationDispatch } from "@/lib/notifications/schedule";
 type Context = {params:Promise<{id:string}>};
 export async function GET(request: Request, context: Context) {
   return endpoint(async () => {
@@ -23,6 +24,8 @@ export async function PATCH(request: Request, context: Context) {
     if (status !== "cancelled" && status !== "pending" && !["paid","cod"].includes(row.payment_status)) throw new ApiFailure(409,"Payment must be confirmed before preparing.");
     await audit(admin.id,"order_status",id);
     const {data,error} = await db().from("orders").update({status}).eq("id",id).eq("status",row.status).select("*").single();
-    return {ok:true,item:orderDTO(checked(data,error))};
+    const item = orderDTO(checked(data,error));
+    scheduleNotificationDispatch();
+    return {ok:true,item};
   })(request);
 }
