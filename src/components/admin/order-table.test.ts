@@ -52,8 +52,8 @@ test("kitchen status selector uses the matching payment badge palette", () => {
       ],
     }),
   );
-  assert.match(html, /class="admin-order-status-select admin-badge-completed"/);
-  assert.match(html, /class="admin-order-status-select admin-badge-cancelled"/);
+  assert.match(html, /class="admin-order-status-select admin-badge-completed is-terminal"/);
+  assert.match(html, /class="admin-order-status-select admin-badge-cancelled is-terminal"/);
 });
 
 test("terminal kitchen statuses show a lock beside the disabled selector", () => {

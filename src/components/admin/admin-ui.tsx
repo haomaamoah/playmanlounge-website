@@ -116,7 +116,6 @@ function OrderStatusCell({ order, editable, onUpdated }: { order: AdminOrder; ed
         body: JSON.stringify({ status: next }),
       });
       setStatus(data.item.status);
-      setMessage(`Kitchen status changed to ${orderLabels[data.item.status].toLowerCase()}.`);
       onUpdated?.();
     } catch (err) {
       setStatus(order.status);
@@ -133,7 +132,7 @@ function OrderStatusCell({ order, editable, onUpdated }: { order: AdminOrder; ed
       title={locked ? `${orderLabels[status]} orders cannot be changed` : undefined}
     >
       <select
-        className={`admin-order-status-select admin-badge-${status}`}
+        className={`admin-order-status-select admin-badge-${status}${locked ? " is-terminal" : ""}`}
         aria-label={`Kitchen status for order ${order.id}`}
         value={status}
         disabled={busy || options.length === 1}
@@ -144,7 +143,7 @@ function OrderStatusCell({ order, editable, onUpdated }: { order: AdminOrder; ed
       {locked && <LockKeyhole className="admin-order-status-lock" aria-hidden="true" />}
     </span>
     {busy && <small role="status">Saving kitchen status…</small>}
-    {message && <small role={message.startsWith("Kitchen status changed") ? "status" : "alert"}>{message}</small>}
+    {message && <small role="alert">{message}</small>}
   </>;
 }
 
