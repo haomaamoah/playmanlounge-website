@@ -67,7 +67,14 @@ async function fallbackEmail(event: Event) {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new Error("The order for this alert no longer exists.");
-    const payment = data.payment_status === "pending" ? "Payment is still pending." : "Payment is confirmed.";
+    const payment =
+      data.payment_status === "pending"
+        ? "Payment is still pending."
+        : data.payment_status === "paid"
+          ? "Payment is confirmed."
+          : data.payment_status === "cod"
+            ? "Order received; payment is due on delivery."
+            : "Payment failed; review the order before preparing.";
     await sendNotificationEmail(
       staffOrderEmails(),
       `New order · ${data.order_ref}`,

@@ -21,12 +21,17 @@ export function notificationCopy({
 }: NotificationCopyInput): { title: string; body: string; data: Record<string, string> } {
   if (eventType === "order.created") {
     const orderRef = typeof payload.orderRef === "string" ? payload.orderRef : "";
-    const awaitingPayment = payload.paymentStatus === "pending";
+    const paymentStatus = payload.paymentStatus;
     return {
       title: `New order · ${orderRef}`,
-      body: awaitingPayment
-        ? "Payment pending · open the dashboard to review."
-        : "Payment confirmed · open the dashboard to prepare.",
+      body:
+        paymentStatus === "pending"
+          ? "Payment pending · open the dashboard to review."
+          : paymentStatus === "paid"
+            ? "Payment confirmed · open the dashboard to prepare."
+            : paymentStatus === "cod"
+              ? "Order received · pay on delivery · open the dashboard to prepare."
+              : "Payment failed · open the dashboard to review.",
       data: { type: eventType, orderId: entityId, orderRef },
     };
   }

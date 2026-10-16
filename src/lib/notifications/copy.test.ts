@@ -17,6 +17,22 @@ test("staff order alerts carry a stable order route payload", () => {
   );
 });
 
+test("new-order alerts distinguish COD orders from confirmed payments", () => {
+  const common = { eventType: "order.created" as const, entityId: "order-id" };
+  assert.equal(
+    notificationCopy({ ...common, payload: { orderRef: "PL-123", paymentStatus: "cod" } }).body,
+    "Order received · pay on delivery · open the dashboard to prepare.",
+  );
+  assert.equal(
+    notificationCopy({ ...common, payload: { orderRef: "PL-123", paymentStatus: "paid" } }).body,
+    "Payment confirmed · open the dashboard to prepare.",
+  );
+  assert.equal(
+    notificationCopy({ ...common, payload: { orderRef: "PL-123", paymentStatus: "failed" } }).body,
+    "Payment failed · open the dashboard to review.",
+  );
+});
+
 test("support alerts do not expose unbounded subject content", () => {
   const copy = notificationCopy({
     eventType: "support.created",
