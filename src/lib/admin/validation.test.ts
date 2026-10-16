@@ -26,7 +26,9 @@ test("order transitions cannot resurrect terminal states", () => {
 });
 test("available kitchen statuses respect transition order and payment confirmation", () => {
   assert.deepEqual(availableOrderStatuses("pending", "paid"), ["pending","cooking","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("pending", "cod"), ["pending","cooking","cancelled"]);
   assert.deepEqual(availableOrderStatuses("pending", "pending"), ["pending","cancelled"]);
+  assert.deepEqual(availableOrderStatuses("cooking", "cod"), ["cooking","ready","cancelled"]);
   assert.deepEqual(availableOrderStatuses("cooking", "failed"), ["cooking","cancelled"]);
   assert.deepEqual(availableOrderStatuses("ready", "cod"), ["ready","out","completed","cancelled"]);
   assert.deepEqual(availableOrderStatuses("completed", "paid"), ["completed"]);
