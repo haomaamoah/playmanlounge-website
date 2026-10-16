@@ -85,10 +85,17 @@
 .admin-payment-check:hover:not(:disabled) .admin-badge { background: var(--rice-cream); border-color: var(--admin-control-border); }
 .admin-table small.admin-payment-error { color: #9b1c0a; }
 .admin-order-status-control { display: inline-flex; position: relative; width: fit-content; max-width: 100%; min-width: 0; }
-.admin-root .admin-order-status-select { display: block; width: auto; min-width: 0; min-height: 44px; max-width: 100%; padding: 8px 32px 8px 12px; border: 1px solid #c9b693; border-radius: 4px; font-size: 13px; font-weight: 600; line-height: 1.3; text-align: left; white-space: nowrap; cursor: pointer; transition: border-color 160ms ease-out, filter 160ms ease-out; }
+.admin-root .admin-order-status-select { display: block; width: auto; min-width: 0; min-height: 44px; max-width: 100%; padding: 8px 32px 8px 12px; border: 1px solid #c9b693; border-radius: 4px; background-color: #f6e9ce; color: #624413; font-size: 13px; font-weight: 600; line-height: 1.3; text-align: left; white-space: nowrap; cursor: pointer; transition: border-color 160ms ease-out, filter 160ms ease-out; }
+.admin-root .admin-order-status-select.admin-badge-paid,
+.admin-root .admin-order-status-select.admin-badge-completed { background-color: #e9f1e5; color: #235137; border-color: #b7cbb0; }
+.admin-root .admin-order-status-select.admin-badge-failed,
+.admin-root .admin-order-status-select.admin-badge-cancelled { background-color: #fbe9df; color: #9b1c0a; border-color: #e4b7a5; }
+.admin-root .admin-order-status-select.admin-badge-cod,
+.admin-root .admin-order-status-select.admin-badge-cooking,
+.admin-root .admin-order-status-select.admin-badge-out { background-color: #f8e6cf; color: #77370e; }
 .admin-root .admin-order-status-select.is-terminal { padding-right: 58px; }
 .admin-root .admin-order-status-select:hover:not(:disabled) { border-color: var(--admin-control-border); filter: brightness(.97); }
-.admin-root .admin-order-status-select:disabled { cursor: not-allowed; opacity: .8; }
+.admin-root .admin-order-status-select:disabled { cursor: not-allowed; opacity: 1; }
 .admin-order-status-lock { position: absolute; top: 50%; right: 32px; width: 15px; height: 15px; color: currentColor; opacity: .8; pointer-events: none; transform: translateY(-50%); }
 .admin-table small[role="alert"] { color: #9b1c0a; }
 .admin-table small[role="status"] { color: #235137; }
