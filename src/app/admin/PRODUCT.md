@@ -4,7 +4,13 @@ This documents the shipped admin surface, not a development plan.
 
 ## Product and routes
 
-The kitchen desk is for authorised Play Man Lounge staff to manage customer orders, the published menu and support requests. `/admin` shows database-backed all-time analytics. Navigation includes Home, Orders, Menu, Support and Settings. `/admin/orders/[id]` remains an order detail deep link; `/admin/payments` redirects to Orders.
+The kitchen desk is for authorised Play Man Lounge staff to manage customer orders, the published menu and support requests. `/admin` shows database-backed all-time analytics. Navigation includes Home, Orders, Menu, Customers, Support and Settings. `/admin/orders/[id]` remains an order detail deep link; `/admin/payments` redirects to Orders.
+
+Managers sign in at `/man/login` and use their own `/man` portal URLs, including `/man/administrators`. They have the same operational workspace and also see Administrators. They can create, edit the sign-in email for, block/unblock and delete admin accounts, and block/unblock customer accounts. Blocking is stored on the account profile, prevents future sign-ins, denies existing sessions at protected endpoints and applies a Supabase Auth ban to revoke active sessions. A manager cannot manage manager accounts or their own account. The manager dashboard includes an administrator-account count.
+
+To provision the initial manager, first create the user through Supabase Auth, then copy and run [`supabase/manager-setup.sql`](../../../supabase/manager-setup.sql) in the Supabase SQL Editor. It applies the account-role and block-status schema and allowlists the existing Auth user as a manager. Do not run it until `admin_profiles` and `customer_profiles` have been created by the project's existing migrations:
+
+Never put the manager password in a migration, source file or SQL statement.
 
 Orders have independent payment (`pending`, `paid`, `cod`, `failed`) and fulfilment statuses. Kitchen updates never assert payment. Menu removal deactivates an item while preserving historical order details. Settings verifies the current password before changing it.
 
@@ -16,7 +22,7 @@ Orders have independent payment (`pending`, `paid`, `cod`, `failed`) and fulfilm
 
 **STORY:** Staff sign in securely, scan current records, then fulfil an order, publish a menu edit or resolve a customer request.
 
-**FIRST VIEWPORT:** Desktop login pairs brand context on the left with a cream sign-in form on the right. The authenticated shell uses a fixed-width sidebar and spacious work area. Mobile stacks login and uses five accessible bottom navigation destinations.
+**FIRST VIEWPORT:** Desktop login pairs brand context on the left with a cream sign-in form on the right. The authenticated shell uses a fixed-width sidebar and spacious work area. Mobile stacks login and uses accessible bottom navigation destinations, with a manager-only Administrators item.
 
 **FORM:** Established-world Operate extension explicitly constrained by the brief; no replacement-world seed or approved comp. Native labeled forms, payment filters and responsive horizontally scrollable tables retain familiar task affordances.
 

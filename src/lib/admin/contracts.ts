@@ -1,7 +1,8 @@
 import type { MenuGroup, MenuItem } from "../content";
 
 export type ApiError = { ok: false; error: string };
-export type AdminProfile = { id: string; email: string; role: "admin" };
+export type AdminProfile = { id: string; email: string; role: "admin" | "manager" };
+export type ManagedAdmin = { id: string; email: string; created_at: string; is_blocked: boolean };
 export type AdminMenuItem = MenuItem & {
   groupId: string;
   groupTitle: string;
@@ -33,6 +34,7 @@ export type Dashboard = {
   totalOrders: number; paidOrders: number; pendingOrders: number; failedPayments: number;
   codOrders: number; revenue: number; openSupport: number; closedSupport: number; menuItems: number;
   customerCount: number | null;
+  adminCount: number | null;
   recentOrders: AdminOrder[];
 };
 export type MenuResponse = { ok: true; items: MenuItem[]; groups: MenuGroup[] };

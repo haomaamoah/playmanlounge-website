@@ -10,7 +10,7 @@ import type { SessionResponse } from "@/lib/admin/contracts";
 import { site } from "@/lib/content";
 import { adminRequest } from "./admin-ui";
 
-export function LoginView() {
+export function LoginView({ managerPortal = false }: { managerPortal?: boolean }) {
   const router = useRouter();
   const search = useSearchParams();
   const [error, setError] = useState("");
@@ -20,9 +20,15 @@ export function LoginView() {
     setBusy(true); setError("");
     const form = new FormData(event.currentTarget);
     try {
-      await adminRequest<SessionResponse>("/api/admin/login", { method: "POST", body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
+      const data = await adminRequest<SessionResponse>("/api/admin/login", { method: "POST", body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
+      if (managerPortal && data.admin.role !== "manager") {
+        await adminRequest("/api/admin/logout", { method: "POST", body: JSON.stringify({}) });
+        throw new Error("Manager access is required for this sign-in page.");
+      }
       const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(next && (next === "/admin" || next.startsWith("/admin/")) && !next.startsWith("/admin/login") ? next : "/admin");
+      const portalBase = data.admin.role === "manager" ? "/man" : "/admin";
+      const validNext = next && next.startsWith(`${portalBase}/`) && !next.startsWith(`${portalBase}/login`);
+      router.replace(validNext ? next : portalBase);
       router.refresh();
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
@@ -36,8 +42,8 @@ export function LoginView() {
     </section>
     <section className="admin-login-form">
       <LockKeyhole size={28} aria-hidden="true" />
-      <h2 className="font-display">Staff sign in</h2>
-      <p>Use your authorised admin account to open the kitchen desk.</p>
+      <h2 className="font-display">{managerPortal ? "Manager sign in" : "Staff sign in"}</h2>
+      <p>Use your authorised {managerPortal ? "manager" : "admin"} account to open the kitchen desk.</p>
       {search.get("password") === "changed" && <p className="admin-success" role="status">Password changed. Sign in with your new password.</p>}
       <form onSubmit={submit} className="admin-form">
         <label>Email address<input name="email" type="email" autoComplete="username" required autoFocus disabled={busy} /></label>

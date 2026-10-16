@@ -3,9 +3,10 @@
 import Link from "next/link";
 import type { Dashboard } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
-import { EmptyState, OrderTable, PageHeading, ResourceState, useAdminResource } from "./admin-ui";
+import { EmptyState, OrderTable, PageHeading, ResourceState, useAdminBasePath, useAdminResource } from "./admin-ui";
 
 export function HomeDashboard() {
+  const basePath = useAdminBasePath();
   const { data, loading, error, reload } = useAdminResource<{ ok: true; dashboard: Dashboard }>("/api/admin/dashboard");
   const dashboard = data?.dashboard;
   return <>
@@ -13,23 +14,24 @@ export function HomeDashboard() {
     <ResourceState loading={loading} error={error} retry={reload} />
     {dashboard && <>
       <section className="admin-report" aria-labelledby="orders-overview">
-        <div className="admin-section-heading"><h2 id="orders-overview">Orders & payments</h2><Link href="/admin/orders">View all orders</Link></div>
-        <dl className="admin-stats">
+        <div className="admin-section-heading"><h2 id="orders-overview">Orders & payments</h2><Link href={`${basePath}/orders`}>View all orders</Link></div>
+        <dl className={`admin-stats${dashboard.adminCount !== null ? " admin-stats-manager" : ""}`}>
           <div><dt>Orders created</dt><dd>{dashboard.totalOrders}</dd></div>
           <div className="admin-stat-paid"><dt>Paid</dt><dd>{dashboard.paidOrders}</dd></div>
           <div className="admin-stat-pending"><dt>Pending payment</dt><dd>{dashboard.pendingOrders}</dd></div>
           <div className="admin-stat-cod"><dt>Pay on delivery</dt><dd>{dashboard.codOrders}</dd></div>
           <div className="admin-stat-failed"><dt>Failed payments</dt><dd>{dashboard.failedPayments}</dd></div>
+          {dashboard.adminCount !== null && <div className="admin-stat-admins"><dt>Administrators</dt><dd>{dashboard.adminCount}</dd></div>}
         </dl>
         <div className="admin-revenue"><span>Paid revenue</span><strong>{formatGhs(dashboard.revenue)}</strong><small>Excludes pending, failed and pay-on-delivery orders.</small></div>
       </section>
       <div className="admin-home-secondary">
-        <section className="admin-summary"><h2>Customer care</h2><p><strong>{dashboard.openSupport}</strong> open requests <span>· {dashboard.closedSupport} closed</span></p><Link href="/admin/support">Open support desk</Link></section>
+        <section className="admin-summary"><h2>Customer care</h2><p><strong>{dashboard.openSupport}</strong> open requests <span>· {dashboard.closedSupport} closed</span></p><Link href={`${basePath}/support`}>Open support desk</Link></section>
         <section className="admin-summary"><h2>Customers</h2><p><strong>{dashboard.customerCount ?? "—"}</strong> registered customers</p>
           {dashboard.customerCount === null ? <p>Customer records are not set up yet.</p> : null}
-          <Link href="/admin/customers">View customers</Link>
+          <Link href={`${basePath}/customers`}>View customers</Link>
         </section>
-        <section className="admin-summary"><h2>On the menu</h2><p><strong>{dashboard.menuItems}</strong> menu items</p><Link href="/admin/menu">Manage the menu</Link></section>
+        <section className="admin-summary"><h2>On the menu</h2><p><strong>{dashboard.menuItems}</strong> menu items</p><Link href={`${basePath}/menu`}>Manage the menu</Link></section>
       </div>
       <section className="admin-report"><div className="admin-section-heading"><h2>Recent orders</h2><span>Latest activity</span></div>
         {dashboard.recentOrders.length ? <OrderTable items={dashboard.recentOrders} /> : <EmptyState title="Your first order will appear here">New customer orders will populate this live activity list.</EmptyState>}

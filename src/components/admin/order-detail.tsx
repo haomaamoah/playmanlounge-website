@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import type { AdminOrder, ItemResponse, OrderStatus } from "@/lib/admin/contracts";
-import { Badge, CustomerFulfilment, OrderTicket, PageHeading, ResourceState, adminRequest, dateLabel, orderLabels, useAdminResource } from "./admin-ui";
+import { Badge, CustomerFulfilment, OrderTicket, PageHeading, ResourceState, adminRequest, dateLabel, orderLabels, useAdminBasePath, useAdminResource } from "./admin-ui";
 
 export function OrderDetail() {
+  const basePath = useAdminBasePath();
   const { id } = useParams<{ id: string }>();
   const { data, loading, error, reload } = useAdminResource<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(id)}`);
   const [busy, setBusy] = useState(false);
@@ -22,7 +23,7 @@ export function OrderDetail() {
     finally { setBusy(false); }
   }
   const order = data?.item;
-  return <><Link className="admin-back" href="/admin/orders">Back to orders</Link>
+  return <><Link className="admin-back" href={`${basePath}/orders`}>Back to orders</Link>
     <ResourceState loading={loading} error={error} retry={reload} />
     {order && <>
       <PageHeading title={order.id} description={`Placed ${dateLabel(order.createdAt)} · Accra time`} />

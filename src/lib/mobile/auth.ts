@@ -22,6 +22,12 @@ function throwIfAuthUnavailable(error: { status?: number; code?: string; message
   throwIfAuthDown(error);
 }
 
+async function findProfileByEmail(email: string): Promise<Row | null> {
+  const { data, error } = await db().from("customer_profiles").select("*").eq("email", email.toLowerCase()).maybeSingle();
+  if (error) throw failed("read customer profile for sign-in");
+  return data;
+}
+
 /** Audit is mandatory before a sensitive change, but never allowed to turn a finished action into an error. */
 async function auditQuietly(actor: string | null, action: string, resource?: string) {
   try {
@@ -52,6 +58,7 @@ export async function requireCustomer(request: Request): Promise<Customer> {
   if (!user?.email) throw unauthorized();
   const profile = await findProfile(user.id);
   if (!profile) throw unauthorized();
+  if (profile.is_blocked === true) throw unauthorized("This account is blocked.");
   return { id: user.id, email: user.email.toLowerCase(), profile, jwt };
 }
 
@@ -151,10 +158,16 @@ export async function login(request: Request) {
     email = identifier.toLowerCase();
     await limit(request, "mobile-login", LIMITS.loginPerEmail, email);
   }
+  const existing = await findProfileByEmail(email);
+  if (existing?.is_blocked === true) throw wrongCredentials(401, "Email or password is incorrect.");
   const signedIn = await signIn(email, derivePassword(email, password, key));
   // Unknown e-mail and wrong password are indistinguishable on purpose.
   if (!signedIn) throw wrongCredentials(401, "Email or password is incorrect.");
   const profile = await profileFor(signedIn.user);
+  if (profile.is_blocked === true) {
+    await db().auth.admin.signOut(signedIn.session.access_token, "global");
+    throw wrongCredentials(401, "Email or password is incorrect.");
+  }
   return ok({ session: mobileSession(signedIn.session), customer: mobileCustomer(profile) });
 }
 
@@ -167,7 +180,7 @@ export async function refresh(request: Request) {
   }
   if (!data.session || !data.user) throw unauthorized();
   const profile = await findProfile(data.user.id);
-  if (!profile) throw unauthorized();
+  if (!profile || profile.is_blocked === true) throw unauthorized();
   return ok({ session: mobileSession(data.session), customer: mobileCustomer(profile) });
 }
 

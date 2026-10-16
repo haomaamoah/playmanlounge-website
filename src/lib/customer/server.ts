@@ -9,6 +9,7 @@ export type CustomerProfile = {
   email: string;
   phone: string;
   created_at: string;
+  is_blocked: boolean;
 };
 
 export async function requireCustomer() {
@@ -19,10 +20,11 @@ export async function requireCustomer() {
   }
   const { data, error: profileError } = await db()
     .from("customer_profiles")
-    .select("id,name,email,phone,created_at")
+    .select("id,name,email,phone,created_at,is_blocked")
     .eq("id", user.id)
     .single();
   if (profileError || !data) throw new ApiFailure(403, "Customer access is unavailable.");
+  if (data.is_blocked) throw new ApiFailure(401, "This customer account is blocked. Sign in again.");
   return { auth, user, profile: data as CustomerProfile };
 }
 
@@ -30,7 +32,7 @@ export async function findCustomer(identifier: string) {
   const isEmail = identifier.includes("@");
   let query = db()
     .from("customer_profiles")
-    .select("id,email");
+    .select("id,email,is_blocked");
   if (isEmail) {
     query = query.eq("email", identifier.toLowerCase());
   } else {
@@ -39,17 +41,18 @@ export async function findCustomer(identifier: string) {
   const { data, error } = await query.maybeSingle();
   if (error) throw new ApiFailure(503, "Customer sign-in is unavailable right now.");
   if (!data) throw new ApiFailure(401, "Invalid email/phone or password.");
+  if (data.is_blocked) throw new ApiFailure(401, "Invalid email/phone or password.");
   return data;
 }
 
 export async function hasCustomerProfile(id: string) {
   const { data, error } = await db()
     .from("customer_profiles")
-    .select("id")
+    .select("id,is_blocked")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new ApiFailure(503, "Customer sign-in is unavailable right now.");
-  return Boolean(data);
+  return Boolean(data && !data.is_blocked);
 }
 
 export function phoneVariants(phone: string) {

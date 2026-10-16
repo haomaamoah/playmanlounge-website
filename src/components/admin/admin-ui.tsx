@@ -1,9 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
 import Link from "next/link";
 import type { AdminOrder, ItemResponse } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
+
+const AdminBasePathContext = createContext("/admin");
+
+export function AdminBasePathProvider({ basePath, children }: { basePath: string; children: React.ReactNode }) {
+  return <AdminBasePathContext.Provider value={basePath}>{children}</AdminBasePathContext.Provider>;
+}
+
+export function useAdminBasePath() {
+  return useContext(AdminBasePathContext);
+}
 
 export async function adminRequest<T = { ok: true }>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
@@ -85,12 +96,14 @@ export function PaymentCell({ order, canCheck }: { order: AdminOrder; canCheck: 
   </>;
 }
 
-export function OrderTable({ items, hrefBase = "/admin/orders", showCustomer = true, checkPayments = true }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean }) {
+export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments = true }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean }) {
+  const basePath = useAdminBasePath();
+  const orderHrefBase = hrefBase ?? `${basePath}/orders`;
   const orderHeading = showCustomer ? "Order / customer" : "Order";
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
     <thead><tr><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
     <tbody>{items.map((order) => <tr key={order.id}>
-      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${hrefBase}/${encodeURIComponent(order.id)}`}>{`${order.id.slice(0, 8)}......`}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
+      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${orderHrefBase}/${encodeURIComponent(order.id)}`}>{`${order.id.slice(0, 8)}......`}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><PaymentCell key={order.paymentStatus} order={order} canCheck={checkPayments} /></td>
       <td><span className="admin-cell-label">Kitchen status</span><Badge value={order.status}>{orderLabels[order.status]}</Badge></td>

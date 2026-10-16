@@ -19,6 +19,7 @@
 .admin-sidebar nav a { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 11px 14px; border-radius: 4px; }
 .admin-sidebar nav a:hover { background: #563014; }
 .admin-sidebar nav a[aria-current] { background: var(--rice-cream); color: var(--cocoa); font-weight: 700; }
+.admin-sidebar-manager .admin-account { margin-top: auto; }
 .admin-account { margin-top: auto; padding: 24px 8px 0; border-top: 1px solid #795438; }
 .admin-account > span { display: block; overflow-wrap: anywhere; font-size: 12px; margin-bottom: 10px; }
 .admin-account button { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 8px 0; }
@@ -40,6 +41,7 @@
 .admin-section-heading a, .admin-summary a { text-decoration: underline; font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
 .admin-section-heading > span { color: #6b4a28; font-size: 13px; }
 .admin-stats { display: grid; grid-template-columns: repeat(5, 1fr); border-block: 1px solid var(--border); }
+.admin-stats-manager { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .admin-stats > div { padding: 22px 16px; border-right: 1px solid var(--border); }
 .admin-stats > div:first-child { padding-left: 0; }
 .admin-stats > div:last-child { border-right: none; }
@@ -48,6 +50,8 @@
 .admin-stat-paid dd { color: #235137; }
 .admin-stat-pending dd, .admin-stat-cod dd { color: #805300; }
 .admin-stat-failed dd { color: #9b1c0a; }
+.admin-account-status { display: inline-flex; align-items: center; padding: 4px 8px; border: 1px solid #68826d; border-radius: 4px; color: #235137; background: #eef4ea; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-account-status.is-blocked { border-color: #b77a69; color: #8b2718; background: #fae8df; }
 .admin-revenue { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 20px; margin-top: 20px; }
 .admin-revenue strong { font-size: 24px; font-variant-numeric: tabular-nums; }
 .admin-revenue small { font-size: 12px; color: #6b4a28; margin-left: auto; }
@@ -146,6 +150,12 @@
 .admin-settings { max-width: 650px; }
 .admin-settings > p { margin-top: 12px; max-width: 65ch; color: #6b4a28; }
 .admin-settings .admin-button { justify-self: start; }
+.admin-admin-create { margin-top: 18px; }
+.admin-admin-create fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0; border: 0; }
+.admin-admin-create label { display: grid; gap: 7px; font-size: 13px; font-weight: 600; }
+.admin-account-email-form { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.admin-account-email-form label { flex: 1 1 190px; }
+.admin-account-email-form .admin-button { min-height: 40px; padding: 8px 12px; }
 .admin-gate { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; padding: 28px; text-align: center; }
 .admin-login { background: var(--cocoa); color: var(--rice-cream); display: grid; align-items: center; }
 .admin-login-layout { display: grid; grid-template-columns: 1fr 1fr; max-width: 1120px; margin: 0 auto; width: 100%; padding: 72px 40px; gap: 100px; align-items: center; }
@@ -166,6 +176,7 @@
   .admin-brand strong { font-size: 18px; }
   .admin-main { padding: 32px 24px 60px; }
   .admin-stats { grid-template-columns: repeat(3, 1fr); }
+  .admin-stats-manager { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .admin-home-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-stats > div { padding: 16px; border-bottom: 1px solid var(--border); }
   .admin-stats > div:first-child { padding-left: 16px; }
@@ -182,8 +193,10 @@
   .admin-account { padding: 0; border: 0; margin: 0; }
   .admin-account > span { display: none; }
   .admin-account button { font-size: 13px; padding: 8px; }
-  .admin-sidebar nav { position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; background: var(--cocoa); padding: 7px 5px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #795438; }
+  .admin-sidebar nav { position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; background: var(--cocoa); padding: 7px 5px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #795438; }
+  .admin-sidebar-manager nav { grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .admin-sidebar nav a { min-height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 2px; font-size: 11px; }
+  .admin-sidebar nav a span { text-align: center; overflow-wrap: anywhere; }
   .admin-main { padding: 28px 20px 32px; }
   .admin-root h1 { font-size: 30px; }
   .admin-heading { align-items: flex-start; flex-wrap: wrap; margin-bottom: 24px; gap: 16px; }
@@ -194,6 +207,8 @@
   .admin-stats > div:nth-child(3) { border-right: 1px solid var(--border); }
   .admin-stats > div:nth-child(even) { border-right: 0; }
   .admin-stats > div:nth-child(4) { border-bottom: 1px solid var(--border); }
+  .admin-stats-manager > div:nth-child(n+4) { border-bottom: 1px solid var(--border); }
+  .admin-stats-manager > div:nth-child(n+5) { border-bottom: 0; }
   .admin-revenue { flex-direction: column; gap: 6px; }
   .admin-revenue small { margin-left: 0; }
   .admin-home-secondary { grid-template-columns: 1fr; gap: 20px; }
@@ -213,6 +228,7 @@
   .admin-table-scroll:has(.admin-order-link) .admin-table .admin-cell-label { display: block; color: #6b4a28; font-size: 12px; }
   .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-number { text-align: left; }
   .admin-form-grid { grid-template-columns: 1fr; }
+  .admin-admin-create fieldset { grid-template-columns: 1fr; }
   .admin-form-wide { grid-column: auto; }
   .admin-support-footer { align-items: flex-start; flex-direction: column; }
   .admin-support-heading { gap: 12px; }

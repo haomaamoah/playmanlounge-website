@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canTransition, menuInput, object, password, supportInput } from "./validation.ts";
+import { accountBlockInput, administratorCreateInput, canTransition, menuInput, object, password, supportInput } from "./validation.ts";
 
 test("unknown fields, malformed objects and invalid support are rejected", () => {
   assert.throws(() => object({role:"admin"},["email"]));
@@ -27,4 +27,15 @@ test("order transitions cannot resurrect terminal states", () => {
 test("password verification preserves significant whitespace", () => {
   assert.equal(password(" long pass phrase ",12)," long pass phrase ");
   assert.throws(() => password("short",12));
+});
+test("manager account inputs validate initial credentials and block state", () => {
+  assert.deepEqual(administratorCreateInput({ email: "NEW@example.com", password: "long temporary password" }), {
+    email: "new@example.com", password: "long temporary password",
+  });
+  assert.throws(() => administratorCreateInput({ email: "bad", password: "long temporary password" }));
+  assert.throws(() => administratorCreateInput({ email: "new@example.com", password: "short" }));
+  assert.throws(() => administratorCreateInput({ email: "new@example.com", password: "long temporary password", role: "manager" }));
+  assert.equal(accountBlockInput({ isBlocked: true }), true);
+  assert.equal(accountBlockInput({ isBlocked: false }), false);
+  assert.throws(() => accountBlockInput({ isBlocked: "true" }));
 });

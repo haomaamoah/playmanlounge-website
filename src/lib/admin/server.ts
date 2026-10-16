@@ -23,9 +23,19 @@ export async function requireAdmin(): Promise<AdminProfile> {
   const auth = await authClient();
   const { data: { user }, error } = await auth.auth.getUser();
   if (error || !user) throw new ApiFailure(401,"Sign in to continue.");
-  const { data, error: profileError } = await db().from("admin_profiles").select("id,email,role").eq("id",user.id).single();
-  if (profileError || !data || data.role !== "admin") throw new ApiFailure(403,"Administrator access required.");
-  return data as AdminProfile;
+  const { data, error: profileError } = await db().from("admin_profiles").select("id,email,role,is_blocked").eq("id",user.id).single();
+  if (profileError || !data || (data.role !== "admin" && data.role !== "manager")) throw new ApiFailure(403,"Administrator access required.");
+  if (data.is_blocked) throw new ApiFailure(401,"This account is blocked. Sign in again.");
+  return { id: data.id, email: data.email, role: data.role };
+}
+export async function requireManager(): Promise<AdminProfile> {
+  const admin = await requireAdmin();
+  if (admin.role !== "manager") throw new ApiFailure(403,"Manager access required.");
+  return admin;
+}
+export async function setAuthBlocked(userId: string, blocked: boolean) {
+  const { error } = await db().auth.admin.updateUserById(userId,{ban_duration:blocked ? "876000h" : "none"});
+  if (error) throw new ApiFailure(503,"Could not update the account's authentication status.");
 }
 export function checkOrigin(request: Request) {
   const url = new URL(request.url);

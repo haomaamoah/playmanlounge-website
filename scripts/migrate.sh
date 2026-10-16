@@ -46,5 +46,10 @@ select not exists(select 1 from app_migrations.versions where version='202610140
 \i supabase/migrations/202610140001_switch_payment_to_delivery.sql
 insert into app_migrations.versions(version) values('202610140001');
 \endif
+select not exists(select 1 from app_migrations.versions where version='202610160001') as apply8 \gset
+\if :apply8
+\i supabase/migrations/202610160001_manager_accounts.sql
+insert into app_migrations.versions(version) values('202610160001');
+\endif
 commit;
 SQL

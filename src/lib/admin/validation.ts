@@ -23,6 +23,15 @@ export function password(value: unknown, min = 1) {
   if (typeof value !== "string" || value.length < min || value.length > 128) throw new ApiFailure(400,"Invalid password length.");
   return value;
 }
+export function administratorCreateInput(raw: unknown) {
+  const body = object(raw, ["email","password"]);
+  return { email: email(body.email), password: password(body.password,12) };
+}
+export function accountBlockInput(raw: unknown) {
+  const body = object(raw, ["isBlocked"]);
+  if (typeof body.isBlocked !== "boolean") throw new ApiFailure(400,"Choose whether the account should be blocked.");
+  return body.isBlocked;
+}
 export function supportInput(raw: unknown): SupportInput {
   const b = object(raw, ["customerName","customerEmail","phone","subject","message"]);
   return { customerName: text(b.customerName,2,100), customerEmail: email(b.customerEmail),
