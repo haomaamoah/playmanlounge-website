@@ -37,7 +37,39 @@ test("kitchen status options follow the legal transition sequence and payment ga
 test("admin order table renders an inline kitchen status selector", () => {
   const paidOrder = { ...base, paymentStatus: "paid" as const };
   const html = renderToStaticMarkup(createElement(OrderTable, { items: [paidOrder] }));
+  assert.match(html, /class="admin-order-status-select admin-badge-pending"/);
   assert.match(html, /aria-label="Kitchen status for order PML-2001"/);
   assert.match(html, /<option value="cooking">Cooking<\/option>/);
   assert.doesNotMatch(html, /<option value="ready">Ready<\/option>/);
+});
+
+test("kitchen status selector uses the matching payment badge palette", () => {
+  const html = renderToStaticMarkup(
+    createElement(OrderTable, {
+      items: [
+        { ...base, status: "completed", paymentStatus: "paid" },
+        { ...base, id: "PML-2002", status: "cancelled", paymentStatus: "failed" },
+      ],
+    }),
+  );
+  assert.match(html, /class="admin-order-status-select admin-badge-completed"/);
+  assert.match(html, /class="admin-order-status-select admin-badge-cancelled"/);
+});
+
+test("terminal kitchen statuses show a lock beside the disabled selector", () => {
+  const terminalHtml = renderToStaticMarkup(
+    createElement(OrderTable, {
+      items: [
+        { ...base, status: "completed", paymentStatus: "paid" },
+        { ...base, id: "PML-2002", status: "cancelled", paymentStatus: "failed" },
+      ],
+    }),
+  );
+  assert.equal((terminalHtml.match(/<svg[^>]*admin-order-status-lock/g) ?? []).length, 2);
+  assert.equal((terminalHtml.match(/disabled=""/g) ?? []).length, 2);
+
+  const activeHtml = renderToStaticMarkup(
+    createElement(OrderTable, { items: [{ ...base, paymentStatus: "paid" }] }),
+  );
+  assert.doesNotMatch(activeHtml, /admin-order-status-lock/);
 });

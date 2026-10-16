@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createContext, useContext } from "react";
 import Link from "next/link";
+import { LockKeyhole } from "lucide-react";
 import { availableOrderStatuses, type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
 
@@ -125,16 +126,23 @@ function OrderStatusCell({ order, editable, onUpdated }: { order: AdminOrder; ed
     }
   }
   if (!editable) return <Badge value={status}>{orderLabels[status]}</Badge>;
+  const locked = status === "completed" || status === "cancelled";
   return <>
-    <select
-      className="admin-order-status-select"
-      aria-label={`Kitchen status for order ${order.id}`}
-      value={status}
-      disabled={busy || options.length === 1}
-      onChange={(event) => void update(event.target.value as OrderStatus)}
+    <span
+      className="admin-order-status-control"
+      title={locked ? `${orderLabels[status]} orders cannot be changed` : undefined}
     >
-      {options.map((value) => <option value={value} key={value}>{orderLabels[value]}</option>)}
-    </select>
+      <select
+        className={`admin-order-status-select admin-badge-${status}`}
+        aria-label={`Kitchen status for order ${order.id}`}
+        value={status}
+        disabled={busy || options.length === 1}
+        onChange={(event) => void update(event.target.value as OrderStatus)}
+      >
+        {options.map((value) => <option value={value} key={value}>{orderLabels[value]}</option>)}
+      </select>
+      {locked && <LockKeyhole className="admin-order-status-lock" aria-hidden="true" />}
+    </span>
     {busy && <small role="status">Saving kitchen status…</small>}
     {message && <small role={message.startsWith("Kitchen status changed") ? "status" : "alert"}>{message}</small>}
   </>;
