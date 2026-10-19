@@ -10,6 +10,10 @@ Agent Skills live in `.cursor/skills/<name>/SKILL.md` and are committed, so they
 
 `ui-ux-pro-max` and `brand` were authored for Claude under `.claude/skills/`; they were copied into `.cursor/skills/` because Cursor discovers skills there. Test fixtures were dropped; the searchable data under `ui-ux-pro-max/data/` was kept.
 
+Portable `bugbot-review` and `security-review` skills live in the shared
+`.agents/skills/` directory so both Cursor and VS Code/Copilot can discover
+them. See their [usage and provenance](../../.agents/skills/README.md).
+
 ## Using them
 
 Cursor loads these automatically. To call one explicitly in chat, type `/` and pick the skill name.
