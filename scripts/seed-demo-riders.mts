@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -11,20 +10,12 @@ if (!url || !localHosts.has(new URL(url).hostname)) {
   throw new Error("Demo riders may only be seeded into a local Supabase instance.");
 }
 if (!key) throw new Error("Set the local Supabase service-role key before seeding demo riders.");
-const pepper = process.env.RIDER_AUTH_PEPPER;
-if (!pepper || pepper.length < 32) throw new Error("Set a local RIDER_AUTH_PEPPER (at least 32 characters).");
-const authPepper = pepper;
-
-const password = process.env.RIDER_DEMO_PASSWORD ?? "rider";
+const password = process.env.RIDER_DEMO_PASSWORD ?? "rider123";
 const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 const fixtures = [
   { email: "rider.spintex@example.test", name: "Spintex Test Rider", phone: "+233000000001", bike_model: "Demo motorcycle", bike_color: "Orange", license_plate: "TEST-001", latitude: 5.6277, longitude: -0.0692 },
   { email: "rider.madina@example.test", name: "Madina Test Rider", phone: "+233000000002", bike_model: "Demo motorcycle", bike_color: "Blue", license_plate: "TEST-002", latitude: 5.6810, longitude: -0.1680 },
 ];
-
-function authPassword(email: string) {
-  return createHmac("sha256", authPepper).update(`rider:v1:${email}\0${password}`).digest("hex");
-}
 
 for (const fixture of fixtures) {
   const { data: current, error: findError } = await client.from("rider_profiles")
@@ -33,7 +24,7 @@ for (const fixture of fixtures) {
   let id = current?.id as string | undefined;
   if (id) {
     const { error } = await client.auth.admin.updateUserById(id, {
-      password: authPassword(fixture.email), email_confirm: true, ban_duration: "none",
+      password, email_confirm: true, ban_duration: "none",
     });
     if (error) throw new Error(`Could not reset local demo rider ${fixture.email}: ${error.message}`);
     const { error: profileError } = await client.from("rider_profiles").update({
@@ -43,7 +34,7 @@ for (const fixture of fixtures) {
     if (profileError) throw new Error(`Could not update local demo rider ${fixture.email}: ${profileError.message}`);
   } else {
     const { data, error } = await client.auth.admin.createUser({
-      email: fixture.email, password: authPassword(fixture.email), email_confirm: true,
+      email: fixture.email, password, email_confirm: true,
     });
     if (error || !data.user) throw new Error(`Could not create local demo rider ${fixture.email}: ${error?.message ?? "No auth user returned."}`);
     id = data.user.id;

@@ -1,5 +1,4 @@
 import "server-only";
-import { createHmac } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
 import { authClient } from "../admin/server";
 import { ApiFailure } from "../admin/validation";
@@ -18,14 +17,6 @@ export type RiderProfile = {
   created_at: string;
   updated_at: string;
 };
-
-export function riderAuthPassword(email: string, password: string) {
-  const pepper = process.env.RIDER_AUTH_PEPPER;
-  if (!pepper || pepper.length < 32) throw new ApiFailure(503, "Rider authentication is not configured.");
-  return createHmac("sha256", pepper)
-    .update(`rider:v1:${email.trim().toLowerCase()}\0${password}`)
-    .digest("hex");
-}
 
 export async function findRider(id: string): Promise<RiderProfile | null> {
   const { data, error } = await db().from("rider_profiles")
@@ -68,7 +59,7 @@ export async function signInRider(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const { data, error } = await publicClient().auth.signInWithPassword({
     email: normalizedEmail,
-    password: riderAuthPassword(normalizedEmail, password),
+    password,
   });
   if (error || !data.user || !data.session) throw new ApiFailure(401, "Email or password is incorrect.");
   try {
@@ -85,7 +76,7 @@ export async function signInRiderWeb(email: string, password: string) {
   const auth = await authClient();
   const { data, error } = await auth.auth.signInWithPassword({
     email: normalizedEmail,
-    password: riderAuthPassword(normalizedEmail, password),
+    password,
   });
   if (error || !data.user) throw new ApiFailure(401, "Email or password is incorrect.");
   try {

@@ -1,7 +1,7 @@
 import { audit, checkOrigin, endpoint, jsonBody, rateLimit, requireManager } from "@/lib/admin/server";
 import { ApiFailure, email, object, password, text } from "@/lib/admin/validation";
 import { db } from "@/lib/db/server";
-import { publicRider, riderAuthPassword } from "@/lib/riders/server";
+import { publicRider } from "@/lib/riders/server";
 import { searchQuery, textSearchFilter } from "@/lib/admin/search";
 
 export const GET = endpoint(async (request) => {
@@ -53,7 +53,7 @@ export const POST = endpoint(async (request) => {
   const client = db();
   const { data, error } = await client.auth.admin.createUser({
     email: address,
-    password: riderAuthPassword(address, initialPassword),
+    password: initialPassword,
     email_confirm: true,
   });
   if (error) {
