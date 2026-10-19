@@ -90,9 +90,11 @@ export async function limitedBody(request: Request, max: number) {
   } finally { reader.releaseLock(); }
   return Buffer.concat(chunks);
 }
-export function endpoint(handler: (request: Request) => Promise<unknown>) {
-  return async (request: Request) => {
-    try { return NextResponse.json(await handler(request),{headers:{"Cache-Control":"no-store"}}); }
+export function endpoint(handler: (request: Request) => Promise<unknown>): (request: Request) => Promise<NextResponse>;
+export function endpoint<Context>(handler: (request: Request, context: Context) => Promise<unknown>): (request: Request, context: Context) => Promise<NextResponse>;
+export function endpoint<Context>(handler: (request: Request, context?: Context) => Promise<unknown>) {
+  return async (request: Request, context?: Context) => {
+    try { return NextResponse.json(await handler(request, context as Context),{headers:{"Cache-Control":"no-store"}}); }
     catch (error) {
       return NextResponse.json({ok:false,error:error instanceof ApiFailure ? error.message : "Service unavailable. Try again later."},
         {status:error instanceof ApiFailure ? error.status : 503,headers:{"Cache-Control":"no-store"}});

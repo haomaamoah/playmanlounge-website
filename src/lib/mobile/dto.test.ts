@@ -54,12 +54,40 @@ test("an order carries the reference and only the fields the app shows", () => {
     total: 50,
     customerName: "Kofi",
     customerPhone: "0200000000",
+    rider: null,
+    riderDeliveryStatus: null,
+    riderLocation: null,
     lines: [{ itemId: "chairman", name: "Chairman", qty: 2, unitPrice: 25, image: "https://example.com/c.webp" }],
     createdAt: "2026-10-12T10:45:52.686314Z",
     updatedAt: "2026-10-12T10:46:00Z",
   });
   const text = JSON.stringify(dto);
   for (const secret of ["kofi@example.com", "mobile:abc", "request_key", "transaction", "customer_id", "is_demo", "source"]) assert.ok(!text.includes(secret), secret);
+});
+
+test("an assigned rider is limited to contact and vehicle details plus a valid location", () => {
+  const dto = mobileOrder({
+    ...row,
+    rider: {
+      id: "rider-1", name: "Ama", phone: "0201234567", bikeModel: "Honda",
+      bikeColor: "Red", licensePlate: "GR-1234-25", password: "never",
+    },
+    rider_delivery_status: "picked_up",
+    rider_location: { latitude: 5.61, longitude: -0.19, updatedAt: "2026-10-12T10:45:00Z" },
+  });
+  assert.deepEqual(dto.rider, {
+    id: "rider-1", name: "Ama", phone: "0201234567", bikeModel: "Honda",
+    bikeColor: "Red", licensePlate: "GR-1234-25",
+  });
+  assert.equal(dto.riderDeliveryStatus, "picked_up");
+  assert.deepEqual(dto.riderLocation, {
+    latitude: 5.61, longitude: -0.19, updatedAt: "2026-10-12T10:45:00Z",
+  });
+  assert.equal(mobileOrder({ ...row, rider: [] }).rider, null);
+  assert.equal(mobileOrder({
+    ...row,
+    rider_location: { latitude: Number.NaN, longitude: -0.19, updatedAt: "now" },
+  }).riderLocation, null);
 });
 
 test("a malformed lines column never breaks the DTO", () => {

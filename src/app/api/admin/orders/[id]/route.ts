@@ -13,11 +13,33 @@ export async function GET(request: Request, context: Context) {
     const row = checked(data,error);
     assertKitchenOrderAccess(row,admin);
     let kitchen = null;
+    let rider = null;
+    let riderLocation = null;
     if (row.kitchen_id) {
       const result = await db().from("kitchens").select("name,latitude,longitude").eq("id",row.kitchen_id).maybeSingle();
       kitchen = checked(result.data,result.error);
     }
-    return {ok:true,item:{...orderDTO(row),kitchen}};
+    if (row.rider_id) {
+      const [profile, location] = await Promise.all([
+        db().from("rider_profiles").select("id,name,phone,bike_model,bike_color,license_plate").eq("id",row.rider_id).maybeSingle(),
+        db().from("rider_locations").select("latitude,longitude,updated_at").eq("rider_id",row.rider_id).maybeSingle(),
+      ]);
+      rider = checked(profile.data,profile.error);
+      if (location.error) throw new ApiFailure(503,"Could not load the rider's latest location.");
+      if (location.data) {
+        riderLocation = {
+          latitude:Number(location.data.latitude),
+          longitude:Number(location.data.longitude),
+          updatedAt:String(location.data.updated_at),
+        };
+      }
+      rider = {
+        id:String(rider.id),name:String(rider.name),phone:String(rider.phone),
+        bikeModel:String(rider.bike_model ?? ""),bikeColor:String(rider.bike_color ?? ""),
+        licensePlate:String(rider.license_plate ?? ""),
+      };
+    }
+    return {ok:true,item:{...orderDTO(row),kitchen,rider,riderLocation}};
   })(request);
 }
 export async function PATCH(request: Request, context: Context) {

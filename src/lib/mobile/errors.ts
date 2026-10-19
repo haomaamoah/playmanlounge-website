@@ -11,6 +11,10 @@ export type MobileErrorCode =
   | "rate_limited"
   | "payment_unavailable"
   | "payment_conflict"
+  | "rider_unavailable"
+  | "missing_delivery_location"
+  | "rider_location_unavailable"
+  | "route_unavailable"
   | "unavailable";
 
 export type FieldErrors = Record<string, string>;

@@ -16,12 +16,14 @@ import { limit } from "./limits";
 import { chargeOrder, checkPayment, newTransactionId, paymentView, requireMobileMoney, supersedePayment, updatePayment, type MobilePaymentView } from "./payments";
 import { Reply, ok } from "./reply";
 import { db, failed, userClient } from "./supabase";
+import { computeDrivingRoute } from "../maps/google-routes";
+import { hasActiveRiderTracking } from "../riders/privacy";
 import { UUID_PATTERN, parseIdempotencyKey, parseMobileOrder, parseOrdersQuery, parsePaymentRetry, type MobileOrderInput, type MobilePayment } from "./validation";
 
 type Row = Record<string, unknown>;
 
 // Exactly the columns the customer role may read (see the migration's column grants).
-const ORDER_COLUMNS = "id,order_ref,status,payment_status,fulfilment,preferred_time,notes,total,customer_name,customer_phone,lines,delivery_address,delivery_latitude,delivery_longitude,created_at,updated_at";
+const ORDER_COLUMNS = "id,order_ref,status,payment_status,fulfilment,preferred_time,notes,total,customer_name,customer_phone,lines,delivery_address,delivery_latitude,delivery_longitude,rider_id,rider_delivery_status,created_at,updated_at";
 // The app waits for this response (20 s receive timeout) and serverless functions are billed and limited by it.
 const RECEIPT_TIMEOUT_MS = 5000;
 
@@ -262,7 +264,8 @@ export async function listOrders(request: Request, customer: Customer) {
   if (before) query = query.lt("created_at", before);
   const { data, error } = await query;
   if (error) throw failed("list orders", error);
-  const orders = data.slice(0, pageSize).map((row) => mobileOrder(row));
+  const page = await customerOrdersRiders(data.slice(0, pageSize));
+  const orders = page.map((row) => mobileOrder(row));
   return ok({ orders, nextBefore: data.length > pageSize ? orders[orders.length - 1].createdAt : null });
 }
 
@@ -272,5 +275,87 @@ export async function getOrder(customer: Customer, id: string) {
   const { data, error } = await userClient(customer.jwt).from("orders").select(ORDER_COLUMNS).eq("id", id).eq("customer_id", customer.id).maybeSingle();
   if (error) throw failed("read order", error);
   if (!data) throw notFound("We could not find that order.");
-  return ok({ order: mobileOrder(data) });
+  const [row] = await customerOrdersRiders([data]);
+  return ok({ order: mobileOrder(row) });
+}
+
+async function customerOrdersRiders(rows: Row[]): Promise<Row[]> {
+  const riderIds = [...new Set(rows.flatMap((row) =>
+    typeof row.rider_id === "string" ? [row.rider_id] : [],
+  ))];
+  const activeRiderIds = [...new Set(rows.flatMap((row) =>
+    typeof row.rider_id === "string" &&
+      hasActiveRiderTracking(row.rider_delivery_status)
+      ? [row.rider_id]
+      : [],
+  ))];
+  if (riderIds.length === 0) {
+    return rows.map((row) => ({ ...row, rider: null, rider_location: null }));
+  }
+  const [profiles, locations] = await Promise.all([
+    db().from("rider_profiles").select("id,name,phone,bike_model,bike_color,license_plate").in("id", riderIds),
+    activeRiderIds.length
+      ? db().from("rider_locations").select("rider_id,latitude,longitude,updated_at").in("rider_id", activeRiderIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (profiles.error) throw failed("read assigned riders", profiles.error);
+  if (locations.error) throw failed("read assigned rider locations", locations.error);
+  const profilesById = new Map((profiles.data ?? []).map((profile) => [String(profile.id), profile]));
+  const locationsById = new Map((locations.data ?? []).map((location) => [String(location.rider_id), location]));
+  return rows.map((row) => {
+    const riderId = typeof row.rider_id === "string" ? row.rider_id : null;
+    const profile = riderId ? profilesById.get(riderId) : null;
+    const isActiveDelivery = hasActiveRiderTracking(row.rider_delivery_status);
+    const location = riderId && isActiveDelivery ? locationsById.get(riderId) : null;
+    return {
+      ...row,
+      rider: profile ? {
+        id: String(profile.id),
+        name: String(profile.name),
+        phone: String(profile.phone),
+        bikeModel: String(profile.bike_model ?? ""),
+        bikeColor: String(profile.bike_color ?? ""),
+        licensePlate: String(profile.license_plate ?? ""),
+      } : null,
+      rider_location: location ? {
+        latitude: Number(location.latitude),
+        longitude: Number(location.longitude),
+        updatedAt: isoLocationTime(location.updated_at),
+      } : null,
+    };
+  });
+}
+
+function isoLocationTime(value: unknown) {
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) throw failed("parse assigned rider location timestamp");
+  return date.toISOString();
+}
+
+export async function customerRiderRoute(customer: Customer, id: string) {
+  if (!UUID_PATTERN.test(id)) throw notFound("We could not find that order.");
+  const { data, error } = await userClient(customer.jwt).from("orders")
+    .select("id,rider_id,rider_delivery_status,fulfilment,delivery_latitude,delivery_longitude")
+    .eq("id", id).eq("customer_id", customer.id).maybeSingle();
+  if (error) throw failed("read customer rider route", error);
+  if (!data) throw notFound("We could not find that order.");
+  if (data.fulfilment !== "delivery" || !data.rider_id ||
+      !hasActiveRiderTracking(data.rider_delivery_status)) {
+    throw new MobileFailure(409, "This order does not have an active rider to track.", { code: "rider_unavailable" });
+  }
+  if (typeof data.delivery_latitude !== "number" || typeof data.delivery_longitude !== "number") {
+    throw new MobileFailure(409, "Delivery GPS coordinates are missing.", { code: "missing_delivery_location" });
+  }
+  const { data: location, error: locationError } = await db().from("rider_locations")
+    .select("latitude,longitude").eq("rider_id", data.rider_id).maybeSingle();
+  if (locationError) throw failed("read customer-visible rider location", locationError);
+  if (!location) throw new MobileFailure(409, "The rider location is not available yet.", { code: "rider_location_unavailable" });
+  const apiKey = process.env.GOOGLE_ROUTES_API_KEY;
+  if (!apiKey) throw new MobileFailure(503, "Google Routes is not configured.", { code: "route_unavailable" });
+  const route = await computeDrivingRoute(apiKey, {
+    latitude: Number(location.latitude), longitude: Number(location.longitude),
+  }, {
+    latitude: data.delivery_latitude, longitude: data.delivery_longitude,
+  });
+  return ok({ route });
 }

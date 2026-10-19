@@ -18,6 +18,9 @@ export function orderDTO(r: Record<string, unknown>): AdminOrder {
     kitchenId:String(r.kitchen_id),deliveryAddress:String(r.delivery_address ?? ""),
     deliveryLatitude:typeof r.delivery_latitude === "number" ? r.delivery_latitude : null,
     deliveryLongitude:typeof r.delivery_longitude === "number" ? r.delivery_longitude : null,
+    riderId:typeof r.rider_id === "string" ? r.rider_id : null,
+    riderDeliveryStatus:r.rider_delivery_status === "assigned" || r.rider_delivery_status === "picked_up" || r.rider_delivery_status === "delivered"
+      ? r.rider_delivery_status : null,
     lines:r.lines as AdminOrder["lines"]};
 }
 export function supportDTO(r: Record<string, unknown>): SupportRequest {

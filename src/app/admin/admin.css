@@ -269,3 +269,19 @@
   .admin-login-form h2 { font-size: 27px; }
 }
 @media (prefers-reduced-motion: reduce) { .admin-root * { transition: none !important; scroll-behavior: auto !important; } }
+.admin-rider-card { margin-bottom: 12px; }
+.admin-rider-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.admin-rider-heading h2 { overflow-wrap: anywhere; }
+.admin-rider-heading p { color: #6b4a28; font-size: 13px; overflow-wrap: anywhere; }
+.admin-rider-heading > div { min-width: 0; flex: 1; }
+.admin-rider-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--cocoa); background: var(--rice-cream); flex-shrink: 0; }
+.admin-rider-card .admin-details { margin-bottom: 18px; }
+.admin-badge-available, .admin-badge-on_delivery { color: #235137; border-color: #68826d; background: #eef4ea; }
+.admin-badge-offline { color: #6b4a28; border-color: #9d865f; background: #f7edda; }
+.admin-badge-blocked { color: #8b2718; border-color: #b77a69; background: #fae8df; }
+.admin-rider-list { display: grid; gap: 2px; }
+@media (max-width: 640px) {
+  .admin-rider-heading { align-items: flex-start; flex-wrap: wrap; }
+  .admin-rider-heading > .admin-badge { margin-left: 56px; }
+  .admin-rider-card .admin-actions > button { flex: 1 1 140px; }
+}

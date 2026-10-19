@@ -61,6 +61,10 @@ export type AdminOrder = {
   deliveryAddress: string;
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
+  riderId?: string | null;
+  riderDeliveryStatus?: "assigned" | "picked_up" | "delivered" | null;
+  rider?: { id: string; name: string; phone: string; bikeModel: string; bikeColor: string; licensePlate: string } | null;
+  riderLocation?: { latitude: number; longitude: number; updatedAt: string } | null;
   lines: { itemId: string; name: string; qty: number; unitPrice: number; image: string }[];
 };
 export type SupportInput = {

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCustomerResource } from "./customer-orders";
 import type { AdminOrder } from "@/lib/admin/contracts";
 import { CustomerFulfilment, OrderTicket, dateLabel } from "@/components/admin/admin-ui";
+import { RiderDetails } from "@/components/admin/rider-details";
 
 export function CustomerOrderDetailView({ order }: { order: AdminOrder }) {
   return <>
@@ -14,6 +15,11 @@ export function CustomerOrderDetailView({ order }: { order: AdminOrder }) {
       <OrderTicket order={order} />
       <CustomerFulfilment order={order} />
     </div>
+    <RiderDetails
+      order={order}
+      locationUrl={`/api/customer/orders/${encodeURIComponent(order.id)}`}
+      isCustomerView
+    />
   </>;
 }
 

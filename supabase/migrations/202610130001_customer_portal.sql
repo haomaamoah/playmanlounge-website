@@ -1,4 +1,4 @@
-create table public.customer_profiles (
+create table if not exists public.customer_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   email text not null unique,
@@ -53,6 +53,7 @@ alter table public.customer_profiles enable row level security;
 revoke all on public.customer_profiles from public, anon, authenticated;
 grant all on public.customer_profiles to service_role;
 grant select (id, name, email, phone, created_at, updated_at) on public.customer_profiles to authenticated;
+drop policy if exists "Own customer profile" on public.customer_profiles;
 create policy "Own customer profile" on public.customer_profiles
   for select to authenticated using ((select auth.uid()) = id);
 revoke all on function public.sync_customer_profile() from public, anon, authenticated;

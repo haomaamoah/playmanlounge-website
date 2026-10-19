@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { availableOrderStatuses, type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
 import { Badge, CustomerFulfilment, OrderTicket, PageHeading, ResourceState, adminRequest, dateLabel, orderLabels, useAdminBasePath, useAdminResource } from "./admin-ui";
+import { RiderDetails } from "./rider-details";
 
 export function OrderDetail() {
   const basePath = useAdminBasePath();
@@ -31,6 +32,7 @@ export function OrderDetail() {
         <OrderTicket order={order} footnote="Kitchen status changes do not mark an order as paid." />
         <CustomerFulfilment order={order} />
       </div>
+      <RiderDetails order={order} locationUrl={`/api/admin/orders/${encodeURIComponent(order.id)}`} />
       <section className="admin-report admin-status-editor"><h2>Kitchen status</h2><Badge value={order.status}>{orderLabels[order.status]}</Badge>
         <form onSubmit={(event) => { event.preventDefault(); const status = new FormData(event.currentTarget).get("status") as OrderStatus; if (status === "cancelled") setConfirmCancel(true); else void update(status); }}>
           <label>Update fulfilment<select name="status" key={`${order.status}-${order.paymentStatus}`} defaultValue={order.status} disabled={busy}>{availableOrderStatuses(order.status, order.paymentStatus).map((value) => <option value={value} key={value}>{orderLabels[value]}</option>)}</select></label>

@@ -19,6 +19,16 @@ export type MobileOrder = {
   total: number;
   customerName: string;
   customerPhone: string;
+  rider: {
+    id: string;
+    name: string;
+    phone: string;
+    bikeModel: string;
+    bikeColor: string;
+    licensePlate: string;
+  } | null;
+  riderDeliveryStatus: string | null;
+  riderLocation: { latitude: number; longitude: number; updatedAt: string } | null;
   lines: MobileOrderLine[];
   createdAt: string;
   updatedAt: string;
@@ -26,6 +36,12 @@ export type MobileOrder = {
 export type MobileTicket = { id: string; subject: string; message: string; status: string; phone: string; createdAt: string; updatedAt: string };
 
 type Row = Record<string, unknown>;
+
+function objectRow(value: unknown): Row | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Row
+    : null;
+}
 
 /**
  * PostgREST returns `2026-10-12T09:53:26.12345+00:00`; the contract says UTC ISO-8601. Fractional digits are kept
@@ -60,6 +76,8 @@ export function mobileSession(session: { access_token: string; refresh_token: st
 
 export function mobileOrder(row: Row): MobileOrder {
   const lines = Array.isArray(row.lines) ? (row.lines as Row[]) : [];
+  const rider = objectRow(row.rider);
+  const riderLocation = objectRow(row.rider_location);
   return {
     id: String(row.id),
     ref: String(row.order_ref ?? ""),
@@ -74,6 +92,26 @@ export function mobileOrder(row: Row): MobileOrder {
     total: Number(row.total),
     customerName: String(row.customer_name ?? ""),
     customerPhone: String(row.customer_phone ?? ""),
+    rider: rider && typeof rider.id === "string" && typeof rider.name === "string" && typeof rider.phone === "string"
+      ? {
+          id: rider.id,
+          name: rider.name,
+          phone: rider.phone,
+          bikeModel: typeof rider.bikeModel === "string" ? rider.bikeModel : "",
+          bikeColor: typeof rider.bikeColor === "string" ? rider.bikeColor : "",
+          licensePlate: typeof rider.licensePlate === "string" ? rider.licensePlate : "",
+        }
+      : null,
+    riderDeliveryStatus: typeof row.rider_delivery_status === "string" ? row.rider_delivery_status : null,
+    riderLocation: riderLocation && typeof riderLocation.latitude === "number" &&
+      Number.isFinite(riderLocation.latitude) && typeof riderLocation.longitude === "number" &&
+      Number.isFinite(riderLocation.longitude) && typeof riderLocation.updatedAt === "string"
+      ? {
+          latitude: riderLocation.latitude,
+          longitude: riderLocation.longitude,
+          updatedAt: riderLocation.updatedAt,
+        }
+      : null,
     lines: lines.map((line) => ({
       itemId: String(line.itemId ?? ""),
       name: String(line.name ?? ""),

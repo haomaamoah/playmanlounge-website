@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "db:bootstrap": "tsx --env-file=.env.local scripts/bootstrap.mts",
+    "db:seed-demo-riders": "tsx scripts/seed-demo-riders.mts",
     "db:cleanup-demo": "tsx --env-file=.env.local scripts/cleanup-demo.mts",
     "db:admin": "tsx --env-file=.env.local scripts/bootstrap-admin.mts",
     "deals:assets": "tsx scripts/generate-deal-art.mts",

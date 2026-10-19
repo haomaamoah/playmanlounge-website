@@ -23,6 +23,7 @@ async function loadMaps() {
   }
   return mapsPromise;
 }
+export { loadMaps as loadGoogleMaps };
 
 function getBrowserLocation(): Promise<google.maps.LatLngLiteral> {
   return new Promise((resolve, reject) => {
