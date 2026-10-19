@@ -6,8 +6,8 @@ import { LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { GoogleLocationPicker } from "@/components/google-location-picker";
 import { formatGhs, pesewas, site, type MenuItem } from "@/lib/content";
-import { DELIVERY_AREAS } from "@/lib/mocks/seed";
 import { useMockStore } from "@/lib/mocks/store";
 import { clearPendingOrder, MAX_PAYMENT_RETRIES, PAYMENT_TIMEOUT_MS, readPendingOrder, rememberPendingOrder, startPaymentAttempt, type PendingOrder } from "@/lib/pending-order";
 import { guessNetwork, isValidMomoNumber, momoNetworks, type MomoNetwork } from "@/lib/payments/networks";
@@ -38,7 +38,9 @@ export function CheckoutView() {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [area, setArea] = useState<string>(DELIVERY_AREAS[0]);
+  const [deliveryLocation, setDeliveryLocation] = useState<{address: string; latitude: number | null; longitude: number | null}>({
+    address: "", latitude: null, longitude: null,
+  });
   const [preferredTime, setPreferredTime] = useState("13:00");
   const [notes, setNotes] = useState("");
   const [payMethod, setPayMethod] = useState<"delivery" | "momo">("delivery");
@@ -402,7 +404,11 @@ export function CheckoutView() {
       return;
     }
 
-    const orderNotes = [`Delivery area: ${area}`, notes.trim()].filter(Boolean).join("\n");
+    if (!deliveryLocation.address || deliveryLocation.latitude === null || deliveryLocation.longitude === null) {
+      setError("Choose a delivery address from Google Maps or place the pin on the map.");
+      return;
+    }
+    const orderNotes = notes.trim();
     if (orderNotes.length > 800) {
       setError("Shorten your notes to fit the order details.");
       return;
@@ -438,7 +444,9 @@ export function CheckoutView() {
           fulfilment: "delivery",
           preferredTime,
           notes: orderNotes,
-          deliveryAddress: area,
+          deliveryAddress: deliveryLocation.address,
+          deliveryLatitude: deliveryLocation.latitude,
+          deliveryLongitude: deliveryLocation.longitude,
         },
         lines: lines.map(({ id, qty }) => ({ id, qty })),
       };
@@ -514,7 +522,9 @@ export function CheckoutView() {
       fulfilment: "delivery",
       preferredTime,
       notes: orderNotes,
-      deliveryAddress: area,
+      deliveryAddress: deliveryLocation.address,
+      deliveryLatitude: deliveryLocation.latitude,
+      deliveryLongitude: deliveryLocation.longitude,
       lines: lines.map(({ id, qty }) => ({ id, qty })),
       payment: { method: "delivery" },
       acceptedTerms: true,
@@ -685,13 +695,13 @@ export function CheckoutView() {
           <input value={phone} onChange={(event) => setPhone(event.target.value)} required maxLength={16}
             className="border-border mt-2 min-h-12 w-full border bg-transparent px-3 text-base" autoComplete="tel" inputMode="tel" />
         </label>
-        <label className="block">
-          <span className="text-sm font-medium">Delivery area</span>
-          <select value={area} onChange={(event) => setArea(event.target.value)}
-            className="border-border mt-2 min-h-12 w-full border bg-surface px-3 text-base">
-            {DELIVERY_AREAS.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
-          </select>
-        </label>
+        <GoogleLocationPicker
+          label="Delivery address"
+          required
+          value={deliveryLocation}
+          onChange={setDeliveryLocation}
+          error={error.includes("delivery address") || error.includes("delivery location") ? error : ""}
+        />
         <label className="block">
           <span className="text-sm font-medium">Preferred time</span>
           <input type="time" min="12:00" max="23:00" required value={preferredTime}

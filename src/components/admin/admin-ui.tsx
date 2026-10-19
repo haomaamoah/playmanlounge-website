@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { createContext, useContext } from "react";
 import Link from "next/link";
-import { LockKeyhole } from "lucide-react";
+import { LockKeyhole, MapPin } from "lucide-react";
 import { availableOrderStatuses, type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
+import { GoogleDirectionsMap } from "@/components/google-location-picker";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const AdminBasePathContext = createContext("/admin");
 
@@ -173,10 +175,40 @@ export function OrderTicket({ order, footnote }: { order: AdminOrder; footnote?:
 }
 
 export function CustomerFulfilment({ order }: { order: AdminOrder }) {
-  return <section className="admin-report"><h2>Customer & fulfilment</h2><dl className="admin-details">
+  const [mapOpen, setMapOpen] = useState(false);
+  const routeAvailable = order.fulfilment === "delivery" &&
+    order.deliveryLatitude !== null && order.deliveryLongitude !== null &&
+    order.kitchen?.latitude != null && order.kitchen.longitude != null;
+  return <>
+    <section className="admin-report"><h2>Customer & fulfilment</h2><dl className="admin-details">
     <div><dt>Customer</dt><dd>{order.customerName}</dd></div><div><dt>Phone</dt><dd><a href={`tel:${order.customerPhone}`}>{order.customerPhone}</a></dd></div>
     <div><dt>Email</dt><dd>{order.customerEmail ? <a href={`mailto:${order.customerEmail}`}>{order.customerEmail}</a> : "Not provided"}</dd></div>
     <div><dt>Fulfilment</dt><dd>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</dd></div><div><dt>Preferred time</dt><dd>{order.preferredTime || "As soon as possible"}</dd></div>
+    {order.fulfilment === "delivery" && <div><dt>Delivery address</dt><dd>{order.deliveryAddress || "Not provided"}</dd></div>}
     <div><dt>Customer notes</dt><dd className="admin-preserve">{order.notes || "No notes provided."}</dd></div>
-  </dl></section>;
+    </dl>
+    {order.fulfilment === "delivery" && <button
+      type="button"
+      className="admin-button admin-button-secondary admin-route-action"
+      disabled={!routeAvailable}
+      onClick={() => setMapOpen(true)}
+      title={routeAvailable ? `Show route from ${order.kitchen?.name ?? "kitchen"} to delivery address` : "Map unavailable because kitchen or delivery GPS coordinates are missing"}
+    >
+      <MapPin size={17} aria-hidden="true" />
+      {routeAvailable ? "View delivery route" : "Map unavailable · location coordinates missing"}
+    </button>}
+    </section>
+    {routeAvailable && <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+      <DialogContent className="google-map-dialog sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Delivery route</DialogTitle>
+          <DialogDescription>{order.kitchen?.name} to {order.deliveryAddress}</DialogDescription>
+        </DialogHeader>
+        <GoogleDirectionsMap
+          origin={{ lat: order.kitchen!.latitude!, lng: order.kitchen!.longitude! }}
+          destination={{ lat: order.deliveryLatitude!, lng: order.deliveryLongitude! }}
+        />
+      </DialogContent>
+    </Dialog>}
+  </>;
 }

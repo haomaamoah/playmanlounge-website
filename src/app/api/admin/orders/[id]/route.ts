@@ -12,7 +12,12 @@ export async function GET(request: Request, context: Context) {
     if (!data && !error) throw new ApiFailure(404,"Order not found.");
     const row = checked(data,error);
     assertKitchenOrderAccess(row,admin);
-    return {ok:true,item:orderDTO(row)};
+    let kitchen = null;
+    if (row.kitchen_id) {
+      const result = await db().from("kitchens").select("name,latitude,longitude").eq("id",row.kitchen_id).maybeSingle();
+      kitchen = checked(result.data,result.error);
+    }
+    return {ok:true,item:{...orderDTO(row),kitchen}};
   })(request);
 }
 export async function PATCH(request: Request, context: Context) {

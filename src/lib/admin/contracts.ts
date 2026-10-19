@@ -57,6 +57,7 @@ export type AdminOrder = {
   status: OrderStatus; paymentStatus: PaymentStatus; total: number;
   transactionId: string | null;
   kitchenId: string;
+  kitchen?: { name: string; latitude: number | null; longitude: number | null } | null;
   deliveryAddress: string;
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
