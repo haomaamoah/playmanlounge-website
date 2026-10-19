@@ -19,5 +19,11 @@ Restrict the key to the production and development website referrers and only th
 
 - Checkout requires a Places result, current location, or confirmed map pin; it persists the formatted address with latitude and longitude for nearest-kitchen routing.
 - Kitchen create/edit uses the same search and map picker and persists the address and pin.
-- The order detail route action is disabled when the kitchen or delivery coordinates are absent. When available, it requests a driving route through Routes API and draws the route in green.
+- The order detail route action is disabled when the kitchen or delivery coordinates are absent. When available, it requests a driving route through Routes API with a red kitchen pin, blue route line, and green delivery pin.
 - Location maps offer roadmap, satellite, and terrain types.
+
+The manager and admin mobile apps request driving-route polylines through the authenticated
+`/api/admin/orders/{id}/directions` endpoint. Configure a separate, server-only
+`GOOGLE_ROUTES_API_KEY` on the hosting environment, restricted to Routes API. Do not place this
+credential in a mobile build or browser bundle. The endpoint checks the signed-in administrator's
+kitchen access, requires both coordinate pairs, and rate limits route requests.
