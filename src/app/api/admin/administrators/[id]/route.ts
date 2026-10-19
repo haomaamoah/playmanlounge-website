@@ -1,5 +1,5 @@
 import { audit, checkOrigin, endpoint, jsonBody, requireManager, setAuthBlocked } from "@/lib/admin/server";
-import { ApiFailure, email, object } from "@/lib/admin/validation";
+import { ApiFailure, email, object, uuid } from "@/lib/admin/validation";
 import { db } from "@/lib/db/server";
 
 type Context = { params: Promise<{ id: string }> };
@@ -7,7 +7,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 
 async function findAdmin(id: string) {
   if (!uuidPattern.test(id)) throw new ApiFailure(404, "Administrator not found.");
-  const { data, error } = await db().from("admin_profiles").select("id,email,created_at,is_blocked,role")
+  const { data, error } = await db().from("admin_profiles").select("id,email,created_at,is_blocked,role,kitchen_id")
     .eq("id", id).eq("role", "admin").maybeSingle();
   if (error) throw new ApiFailure(503, "Could not load the administrator account.");
   if (!data) throw new ApiFailure(404, "Administrator not found.");
@@ -20,10 +20,23 @@ export async function PATCH(request: Request, context: Context) {
     const manager = await requireManager();
     const { id } = await context.params;
     if (id === manager.id) throw new ApiFailure(403, "You cannot manage your own account.");
-    const body = object(await jsonBody(req), ["email", "isBlocked"]);
+    const body = object(await jsonBody(req), ["email", "isBlocked", "kitchenId"]);
     if (Object.keys(body).length !== 1) throw new ApiFailure(400, "Change one account setting at a time.");
     const client = db();
     const current = await findAdmin(id);
+
+    if ("kitchenId" in body) {
+      const kitchenId = uuid(body.kitchenId);
+      const {data:kitchen,error:kitchenError} = await client.from("kitchens").select("id")
+        .eq("id",kitchenId).eq("is_active",true).maybeSingle();
+      if (kitchenError) throw new ApiFailure(503,"Could not load the selected kitchen.");
+      if (!kitchen) throw new ApiFailure(400,"Choose an active kitchen.");
+      await audit(manager.id,"admin_kitchen_assign",id);
+      const {data,error} = await client.from("admin_profiles").update({kitchen_id:kitchenId}).eq("id",id)
+        .select("id,email,created_at,is_blocked,kitchen_id").single();
+      if (error || !data) throw new ApiFailure(503,"Could not assign the administrator to that kitchen.");
+      return {ok:true,item:data};
+    }
 
     if ("email" in body) {
       const address = email(body.email);
@@ -35,7 +48,7 @@ export async function PATCH(request: Request, context: Context) {
       const { error: authError } = await client.auth.admin.updateUserById(id, { email: address, email_confirm: true });
       if (authError) throw new ApiFailure(503, "Could not update the administrator's sign-in email.");
       const { data, error } = await client.from("admin_profiles").update({ email: address })
-        .eq("id", id).select("id,email,created_at,is_blocked").single();
+        .eq("id", id).select("id,email,created_at,is_blocked,kitchen_id").single();
       if (error || !data) {
         const { error: rollbackError } = await client.auth.admin.updateUserById(id, {
           email: current.email,
@@ -60,7 +73,7 @@ export async function PATCH(request: Request, context: Context) {
       const { error } = await client.from("admin_profiles").update({ is_blocked: false }).eq("id", id);
       if (error) throw new ApiFailure(503, "Could not save the administrator's unblocked status.");
     }
-    return { ok: true, item: { id, email: current.email, created_at: current.created_at, is_blocked: blocked } };
+    return { ok: true, item: { id, email: current.email, created_at: current.created_at, is_blocked: blocked, kitchen_id:current.kitchen_id } };
   })(request);
 }
 

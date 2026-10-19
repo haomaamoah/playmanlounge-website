@@ -36,6 +36,9 @@ export function parseOrderRequest(raw: unknown): {
   const phone = typeof body.phone === "string" ? body.phone : "";
   const email = typeof body.email === "string" ? body.email : "";
   const notes = typeof body.notes === "string" ? body.notes : "";
+  const deliveryAddress = typeof body.deliveryAddress === "string" ? body.deliveryAddress.trim() : "";
+  const deliveryLatitude = body.deliveryLatitude;
+  const deliveryLongitude = body.deliveryLongitude;
   const preferredTime =
     typeof body.preferredTime === "string" ? body.preferredTime : "";
   const fulfilment = body.fulfilment;
@@ -59,10 +62,16 @@ export function parseOrderRequest(raw: unknown): {
     fulfilment: isFulfilment(fulfilment) ? fulfilment : "pickup",
     preferredTime,
     notes,
+    deliveryAddress,
+    ...(typeof deliveryLatitude === "number" ? { deliveryLatitude } : {}),
+    ...(typeof deliveryLongitude === "number" ? { deliveryLongitude } : {}),
     lines,
   };
 
   const errors = validateOrderInput(data);
+  if (("deliveryLatitude" in body && typeof deliveryLatitude !== "number") ||
+      ("deliveryLongitude" in body && typeof deliveryLongitude !== "number"))
+    errors.fulfilment = "Choose a valid delivery location.";
   if (Object.keys(errors).length) return { errors };
   return { data };
 }
@@ -91,6 +100,14 @@ export function validateOrderInput(order: OrderRequest): OrderFieldErrors {
       errors.preferredTime = "Choose a time between 12:00 and 23:00.";
   }
   if (order.notes.length > 800) errors.notes = "Keep notes under 800 characters.";
+  if (order.fulfilment === "delivery" && order.deliveryAddress && order.deliveryAddress.length > 300)
+    errors.fulfilment = "Keep the delivery address under 300 characters.";
+  if ((order.deliveryLatitude === undefined) !== (order.deliveryLongitude === undefined) ||
+      (order.deliveryLatitude !== undefined && (!Number.isFinite(order.deliveryLatitude) || order.deliveryLatitude < -90 || order.deliveryLatitude > 90)) ||
+      (order.deliveryLongitude !== undefined && (!Number.isFinite(order.deliveryLongitude) || order.deliveryLongitude < -180 || order.deliveryLongitude > 180)))
+    errors.fulfilment = "Choose a valid delivery location.";
+  if (order.fulfilment === "pickup" && (order.deliveryAddress || order.deliveryLatitude !== undefined || order.deliveryLongitude !== undefined))
+    errors.fulfilment = "Delivery location details are only for delivery orders.";
   if (order.lines.length === 0) errors.cart = "Add at least one menu item.";
   if (order.lines.length > 30) errors.cart = "Too many items in one order.";
   return errors;
@@ -150,6 +167,9 @@ export function hydrateOrder(
       fulfilment: order.fulfilment,
       preferredTime: order.preferredTime,
       notes: order.notes.trim(),
+      deliveryAddress: order.fulfilment === "delivery" ? (order.deliveryAddress?.trim() || "") : "",
+      deliveryLatitude: order.fulfilment === "delivery" ? order.deliveryLatitude ?? null : null,
+      deliveryLongitude: order.fulfilment === "delivery" ? order.deliveryLongitude ?? null : null,
       lines,
       total,
       payment,

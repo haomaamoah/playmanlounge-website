@@ -24,8 +24,38 @@ export function password(value: unknown, min = 1) {
   return value;
 }
 export function administratorCreateInput(raw: unknown) {
-  const body = object(raw, ["email","password"]);
-  return { email: email(body.email), password: password(body.password,12) };
+  const body = object(raw, ["email","password","kitchenId"]);
+  return { email: email(body.email), password: password(body.password,12), kitchenId: uuid(body.kitchenId) };
+}
+export function uuid(value: unknown) {
+  const result = text(value,36,36);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result))
+    throw new ApiFailure(400,"Choose a valid kitchen.");
+  return result;
+}
+export function kitchenInput(raw: unknown, partial = false) {
+  const keys = ["name","address","latitude","longitude","is_active"];
+  const body = object(raw,keys);
+  if (!partial && keys.slice(0,4).some(key => !(key in body))) throw new ApiFailure(400,"Enter the kitchen name, address and GPS coordinates.");
+  if (!Object.keys(body).length) throw new ApiFailure(400,"No kitchen changes supplied.");
+  const result: Record<string,unknown> = {};
+  if ("name" in body) result.name = text(body.name,2,100);
+  if ("address" in body) result.address = text(body.address,3,300);
+  for (const key of ["latitude","longitude"] as const) {
+    if (!(key in body)) continue;
+    const value = body[key];
+    const min = key === "latitude" ? -90 : -180;
+    const max = key === "latitude" ? 90 : 180;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max)
+      throw new ApiFailure(400,"Enter valid GPS coordinates.");
+    result[key] = value;
+  }
+  if (("latitude" in result) !== ("longitude" in result)) throw new ApiFailure(400,"Enter both GPS coordinates.");
+  if ("is_active" in body) {
+    if (typeof body.is_active !== "boolean") throw new ApiFailure(400,"Choose whether this kitchen is active.");
+    result.is_active = body.is_active;
+  }
+  return result;
 }
 export function accountBlockInput(raw: unknown) {
   const body = object(raw, ["isBlocked"]);

@@ -1,8 +1,16 @@
 import type { MenuGroup, MenuItem } from "../content";
 
 export type ApiError = { ok: false; error: string };
-export type AdminProfile = { id: string; email: string; role: "admin" | "manager" };
-export type ManagedAdmin = { id: string; email: string; created_at: string; is_blocked: boolean };
+export type AdminProfile = { id: string; email: string; role: "admin" | "manager"; kitchenId: string | null };
+export type ManagedAdmin = { id: string; email: string; created_at: string; is_blocked: boolean; kitchen_id: string };
+export type Kitchen = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  is_active: boolean;
+};
 export type AdminMenuItem = MenuItem & {
   groupId: string;
   groupTitle: string;
@@ -48,6 +56,10 @@ export type AdminOrder = {
   fulfilment: "delivery" | "pickup"; preferredTime: string; notes: string;
   status: OrderStatus; paymentStatus: PaymentStatus; total: number;
   transactionId: string | null;
+  kitchenId: string;
+  deliveryAddress: string;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
   lines: { itemId: string; name: string; qty: number; unitPrice: number; image: string }[];
 };
 export type SupportInput = {

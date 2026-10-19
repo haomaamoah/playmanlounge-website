@@ -1,4 +1,4 @@
-import { audit, checkOrigin, checked, endpoint, rateLimit, requireAdmin } from "@/lib/admin/server";
+import { assertKitchenOrderAccess, audit, checkOrigin, checked, endpoint, rateLimit, requireAdmin } from "@/lib/admin/server";
 import { ApiFailure } from "@/lib/admin/validation";
 import { orderDTO, updatePayment } from "@/lib/db/orders";
 import { db } from "@/lib/db/server";
@@ -18,6 +18,7 @@ export async function POST(request: Request, context: Context) {
     const current = await db().from("orders").select("*").eq("id", id).maybeSingle();
     if (!current.data && !current.error) throw new ApiFailure(404, "Order not found.");
     const row = checked(current.data, current.error);
+    assertKitchenOrderAccess(row,admin);
     if (row.payment_status !== "pending") return { ok: true, item: orderDTO(row), message: "This payment is no longer pending." };
     const reference = row.transaction_id ? String(row.transaction_id) : "";
     if (!isTransactionId(reference)) throw new ApiFailure(409, "This order has no PaySwitch reference to check.");

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { menu } from "../content";
-import { hydrateOrder } from "./order";
+import { hydrateOrder, parseOrderRequest } from "./order";
 const request = {name:"Ama",phone:"+233200000000",email:"ama@example.com",fulfilment:"delivery" as const,preferredTime:"13:00",notes:"",lines:[{id:"chairman",qty:2}]};
 test("server hydration uses supplied live catalog prices and photos", () => {
   const dish = {...menu.find(i => i.id === "chairman")!,price:27.5,image:"https://example.com/dish.webp"};
@@ -14,4 +14,13 @@ test("empty live catalog never falls back to static menu", () => {
 });
 test("legacy pure hydration still uses fixture catalog", () => {
   assert.equal(hydrateOrder(request).order?.total,50);
+});
+test("delivery address and paired GPS coordinates survive order hydration", () => {
+  const parsed = parseOrderRequest({...request,deliveryAddress:"Adenta, Accra",deliveryLatitude:5.71,deliveryLongitude:-0.17});
+  assert.equal(parsed.errors,undefined);
+  const result = hydrateOrder(parsed.data!);
+  assert.equal(result.order?.deliveryAddress,"Adenta, Accra");
+  assert.equal(result.order?.deliveryLatitude,5.71);
+  assert.equal(result.order?.deliveryLongitude,-0.17);
+  assert.ok(parseOrderRequest({...request,deliveryLatitude:5.71}).errors?.fulfilment);
 });

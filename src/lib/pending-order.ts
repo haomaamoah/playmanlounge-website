@@ -27,6 +27,9 @@ export type PendingOrder = {
     fulfilment: Fulfilment;
     preferredTime: string;
     notes: string;
+    deliveryAddress?: string;
+    deliveryLatitude?: number;
+    deliveryLongitude?: number;
   };
   lines: { id: string; qty: number }[];
 };

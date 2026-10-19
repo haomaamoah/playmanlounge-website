@@ -44,6 +44,9 @@ export async function POST(request: Request) {
       fulfilment: order.fulfilment as HydratedOrder["fulfilment"],
       preferredTime: String(order.preferred_time),
       notes: String(order.notes),
+      deliveryAddress: String(order.delivery_address ?? ""),
+      deliveryLatitude: typeof order.delivery_latitude === "number" ? order.delivery_latitude : null,
+      deliveryLongitude: typeof order.delivery_longitude === "number" ? order.delivery_longitude : null,
       lines: lines.map((line) => ({
         item: {
           id: String(line.itemId), name: String(line.name), description: "",

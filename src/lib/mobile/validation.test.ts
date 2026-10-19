@@ -169,6 +169,16 @@ test("order: a delivery order folds the address into the notes", () => {
   assert.equal(order({ ...delivery({ notes: undefined }) }).storedNotes, "Delivery address: Nikoi Olai St, blue gate");
 });
 
+test("order: optional GPS coordinates are validated as a pair for delivery", () => {
+  const parsed = order(delivery({deliveryLatitude:5.61,deliveryLongitude:-0.19}));
+  assert.equal(parsed.deliveryLatitude,5.61);
+  assert.equal(parsed.deliveryLongitude,-0.19);
+  assert.deepEqual(fields(() => order(delivery({deliveryLatitude:5.61}))),["deliveryLatitude"]);
+  assert.deepEqual(fields(() => order(delivery({deliveryLongitude:-0.19}))),["deliveryLatitude"]);
+  assert.deepEqual(fields(() => order(delivery({deliveryLatitude:91,deliveryLongitude:0}))),["deliveryLatitude"]);
+  assert.deepEqual(fields(() => order(delivery({fulfilment:"pickup",deliveryAddress:undefined,deliveryLatitude:5.6,deliveryLongitude:-0.2}))),["deliveryAddress"]);
+});
+
 test("order: pickup keeps the notes as typed and rejects an address", () => {
   const pickup = delivery({ fulfilment: "pickup", deliveryAddress: undefined });
   assert.equal(order(pickup).storedNotes, "Extra pepper please");

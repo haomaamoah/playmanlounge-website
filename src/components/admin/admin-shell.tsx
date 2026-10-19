@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { House, ClipboardList, UtensilsCrossed, UsersRound, MessagesSquare, Settings, LogOut, ShieldCheck } from "lucide-react";
+import { House, ClipboardList, UtensilsCrossed, UsersRound, MessagesSquare, Settings, LogOut, ShieldCheck, Store } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AdminProfile, SessionResponse } from "@/lib/admin/contracts";
 import { site } from "@/lib/content";
@@ -15,6 +15,7 @@ const links = [
   { path: "/menu", label: "Menu", icon: UtensilsCrossed },
   { path: "/customers", label: "Customers", icon: UsersRound },
   { path: "/administrators", label: "Administrators", icon: ShieldCheck, managerOnly: true },
+  { path: "/kitchens", label: "Kitchens", icon: Store, managerOnly: true },
   { path: "/support", label: "Support", icon: MessagesSquare },
   { path: "/settings", label: "Settings", icon: Settings },
 ];

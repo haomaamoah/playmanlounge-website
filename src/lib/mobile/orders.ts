@@ -1,7 +1,7 @@
 import "server-only";
 import { formatGhs, pesewas, site } from "../content";
 import { getCatalog } from "../db/catalog";
-import { notificationStore } from "../db/orders";
+import { getNearestKitchenId, notificationStore } from "../db/orders";
 import { jsonBody } from "../admin/server";
 import { hydrateOrder, formatPlacedAt } from "../mail/order";
 import { sendOrderReceipts } from "../mail/send";
@@ -21,7 +21,7 @@ import { UUID_PATTERN, parseIdempotencyKey, parseMobileOrder, parseOrdersQuery, 
 type Row = Record<string, unknown>;
 
 // Exactly the columns the customer role may read (see the migration's column grants).
-const ORDER_COLUMNS = "id,order_ref,status,payment_status,fulfilment,preferred_time,notes,total,customer_name,customer_phone,lines,created_at,updated_at";
+const ORDER_COLUMNS = "id,order_ref,status,payment_status,fulfilment,preferred_time,notes,total,customer_name,customer_phone,lines,delivery_address,delivery_latitude,delivery_longitude,created_at,updated_at";
 // The app waits for this response (20 s receive timeout) and serverless functions are billed and limited by it.
 const RECEIPT_TIMEOUT_MS = 5000;
 
@@ -54,6 +54,9 @@ export function receiptOrder(row: Row): HydratedOrder {
     fulfilment: row.fulfilment as HydratedOrder["fulfilment"],
     preferredTime: String(row.preferred_time),
     notes: String(row.notes),
+    deliveryAddress: String(row.delivery_address ?? ""),
+    deliveryLatitude: typeof row.delivery_latitude === "number" ? row.delivery_latitude : null,
+    deliveryLongitude: typeof row.delivery_longitude === "number" ? row.delivery_longitude : null,
     lines,
     total: Number(row.total),
     payment:
@@ -115,7 +118,9 @@ export async function placeOrder(request: Request, customer: Customer): Promise<
   if (earlier) return replay(earlier, input);
 
   const priced = hydrateOrder(
-    { name: input.name, phone: input.phone, email: customer.email, fulfilment: input.fulfilment, preferredTime: input.preferredTime, notes: input.storedNotes, lines: input.lines },
+    { name: input.name, phone: input.phone, email: customer.email, fulfilment: input.fulfilment,
+      preferredTime: input.preferredTime, notes: input.storedNotes, deliveryAddress:input.deliveryAddress,
+      deliveryLatitude:input.deliveryLatitude ?? undefined,deliveryLongitude:input.deliveryLongitude ?? undefined,lines: input.lines },
     { method: "delivery" },
     await getCatalog(),
   );
@@ -143,6 +148,10 @@ export async function placeOrder(request: Request, customer: Customer): Promise<
       fulfilment: order.fulfilment,
       preferred_time: order.preferredTime,
       notes: order.notes,
+      delivery_address:input.deliveryAddress,
+      delivery_latitude:input.deliveryLatitude,
+      delivery_longitude:input.deliveryLongitude,
+      kitchen_id:await getNearestKitchenId(input.deliveryLatitude,input.deliveryLongitude),
       total: order.total,
       lines,
       payment_status: input.payment.method === "momo" ? "pending" : "cod",

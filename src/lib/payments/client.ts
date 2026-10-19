@@ -79,6 +79,9 @@ export type StartPaymentInput = {
   fulfilment: "pickup" | "delivery";
   preferredTime: string;
   notes: string;
+  deliveryAddress?: string;
+  deliveryLatitude?: number;
+  deliveryLongitude?: number;
   lines: { id: string; qty: number }[];
   expectedTotal: number;
   acceptedTerms?: boolean;

@@ -23,15 +23,20 @@ export async function requireAdmin(): Promise<AdminProfile> {
   const auth = await authClient();
   const { data: { user }, error } = await auth.auth.getUser();
   if (error || !user) throw new ApiFailure(401,"Sign in to continue.");
-  const { data, error: profileError } = await db().from("admin_profiles").select("id,email,role,is_blocked").eq("id",user.id).single();
+  const { data, error: profileError } = await db().from("admin_profiles").select("id,email,role,is_blocked,kitchen_id").eq("id",user.id).single();
   if (profileError || !data || (data.role !== "admin" && data.role !== "manager")) throw new ApiFailure(403,"Administrator access required.");
   if (data.is_blocked) throw new ApiFailure(401,"This account is blocked. Sign in again.");
-  return { id: data.id, email: data.email, role: data.role };
+  return { id: data.id, email: data.email, role: data.role, kitchenId: data.kitchen_id ? String(data.kitchen_id) : null };
 }
 export async function requireManager(): Promise<AdminProfile> {
   const admin = await requireAdmin();
   if (admin.role !== "manager") throw new ApiFailure(403,"Manager access required.");
   return admin;
+}
+export function assertKitchenOrderAccess(order: { kitchen_id?: unknown }, admin: AdminProfile) {
+  if (admin.role === "manager") return;
+  if (!admin.kitchenId) throw new ApiFailure(403,"This administrator is not assigned to a kitchen.");
+  if (String(order.kitchen_id ?? "") !== admin.kitchenId) throw new ApiFailure(404,"Order not found.");
 }
 export async function setAuthBlocked(userId: string, blocked: boolean) {
   const { error } = await db().auth.admin.updateUserById(userId,{ban_duration:blocked ? "876000h" : "none"});

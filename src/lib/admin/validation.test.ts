@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accountBlockInput, administratorCreateInput, availableOrderStatuses, canTransition, menuInput, object, password, supportInput } from "./validation.ts";
+import { accountBlockInput, administratorCreateInput, availableOrderStatuses, canTransition, kitchenInput, menuInput, object, password, supportInput } from "./validation.ts";
 
 test("unknown fields, malformed objects and invalid support are rejected", () => {
   assert.throws(() => object({role:"admin"},["email"]));
@@ -16,6 +16,11 @@ test("menu fields validate cents, types and immutable id", () => {
   assert.throws(() => menuInput({width:1.5},true));
   assert.throws(() => menuInput({},false));
   assert.deepEqual(menuInput({price:0.1,isActive:false},true),{price:0.1,isActive:false});
+  assert.deepEqual(kitchenInput({name:"Adenta Kitchen",address:"Adenta, Accra",latitude:5.7,longitude:-0.16}),{
+    name:"Adenta Kitchen",address:"Adenta, Accra",latitude:5.7,longitude:-0.16,
+  });
+  assert.throws(() => kitchenInput({name:"Adenta",address:"Adenta, Accra",latitude:5.7,longitude:"-0.16"}));
+  assert.throws(() => kitchenInput({latitude:5.7},true));
 });
 test("order transitions cannot resurrect terminal states", () => {
   assert.ok(canTransition("pending","cooking"));
@@ -39,12 +44,13 @@ test("password verification preserves significant whitespace", () => {
   assert.throws(() => password("short",12));
 });
 test("manager account inputs validate initial credentials and block state", () => {
-  assert.deepEqual(administratorCreateInput({ email: "NEW@example.com", password: "long temporary password" }), {
-    email: "new@example.com", password: "long temporary password",
+  const kitchenId = "123e4567-e89b-42d3-a456-426614174000";
+  assert.deepEqual(administratorCreateInput({ email: "NEW@example.com", password: "long temporary password", kitchenId }), {
+    email: "new@example.com", password: "long temporary password", kitchenId,
   });
-  assert.throws(() => administratorCreateInput({ email: "bad", password: "long temporary password" }));
-  assert.throws(() => administratorCreateInput({ email: "new@example.com", password: "short" }));
-  assert.throws(() => administratorCreateInput({ email: "new@example.com", password: "long temporary password", role: "manager" }));
+  assert.throws(() => administratorCreateInput({ email: "bad", password: "long temporary password", kitchenId }));
+  assert.throws(() => administratorCreateInput({ email: "new@example.com", password: "short", kitchenId }));
+  assert.throws(() => administratorCreateInput({ email: "new@example.com", password: "long temporary password", kitchenId, role: "manager" }));
   assert.equal(accountBlockInput({ isBlocked: true }), true);
   assert.equal(accountBlockInput({ isBlocked: false }), false);
   assert.throws(() => accountBlockInput({ isBlocked: "true" }));

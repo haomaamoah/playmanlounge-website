@@ -13,6 +13,8 @@ export type Submission = {
   fulfilment: string;
   preferredTime: string;
   storedNotes: string;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
   lines: { id: string; qty: number }[];
   expectedTotal?: number;
   payment?: { method: "delivery" | "momo" };
@@ -37,6 +39,8 @@ export function sameSubmission(saved: Record<string, unknown>, incoming: Submiss
     saved.fulfilment === incoming.fulfilment &&
     saved.preferred_time === incoming.preferredTime &&
     saved.notes === incoming.storedNotes &&
+    (incoming.deliveryLatitude === undefined || (saved.delivery_latitude == null ? null : Number(saved.delivery_latitude)) === incoming.deliveryLatitude) &&
+    (incoming.deliveryLongitude === undefined || (saved.delivery_longitude == null ? null : Number(saved.delivery_longitude)) === incoming.deliveryLongitude) &&
     signature(savedLines) === signature(incoming.lines) &&
     (incoming.payment === undefined || (saved.transaction_id ? "momo" : "delivery") === incoming.payment.method) &&
     (incoming.expectedTotal === undefined || pesewas(Number(saved.total)) === pesewas(incoming.expectedTotal))

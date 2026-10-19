@@ -9,6 +9,7 @@ const base: AdminOrder = {
   id: "PML-2001", createdAt: "2025-01-02T12:00:00.000Z", updatedAt: "2025-01-02T12:00:00.000Z",
   customerName: "Kofi", customerPhone: "0240000000", customerEmail: "", fulfilment: "pickup", preferredTime: "", notes: "",
   lines: [], total: 40, status: "pending", paymentStatus: "pending", transactionId: "123456789012",
+  kitchenId:"kitchen-a",deliveryAddress:"",deliveryLatitude:null,deliveryLongitude:null,
 };
 
 test("pending PaySwitch payments are clickable in the admin table", () => {

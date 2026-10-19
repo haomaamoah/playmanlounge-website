@@ -438,6 +438,7 @@ export function CheckoutView() {
           fulfilment: "delivery",
           preferredTime,
           notes: orderNotes,
+          deliveryAddress: area,
         },
         lines: lines.map(({ id, qty }) => ({ id, qty })),
       };
@@ -513,6 +514,7 @@ export function CheckoutView() {
       fulfilment: "delivery",
       preferredTime,
       notes: orderNotes,
+      deliveryAddress: area,
       lines: lines.map(({ id, qty }) => ({ id, qty })),
       payment: { method: "delivery" },
       acceptedTerms: true,

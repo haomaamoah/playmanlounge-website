@@ -185,6 +185,8 @@ export type MobileOrderInput = {
   fulfilment: Fulfilment;
   preferredTime: string;
   deliveryAddress: string;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
   /** Exactly what the customer typed (trimmed). */
   notes: string;
   /** What is persisted: the delivery address folded into the notes. */
@@ -197,7 +199,7 @@ export type MobileOrderInput = {
 /** How the customer pays. The wallet number is normalised to 233XXXXXXXXX for the gateway. */
 export type MobilePayment = { method: "delivery" } | { method: "momo"; network: MomoNetwork; momoNumber: string };
 
-const ORDER_KEYS = ["name", "phone", "fulfilment", "preferredTime", "deliveryAddress", "notes", "lines", "expectedTotal", "payment"] as const;
+const ORDER_KEYS = ["name", "phone", "fulfilment", "preferredTime", "deliveryAddress", "deliveryLatitude", "deliveryLongitude", "notes", "lines", "expectedTotal", "payment"] as const;
 const PAYMENT_KEYS = ["method", "network", "momoNumber"] as const;
 
 /** Absent means pay on delivery, so older app builds keep working unchanged. */
@@ -295,6 +297,19 @@ export function parseMobileOrder(raw: unknown, accountEmail: string): MobileOrde
   // One line, always: the stored notes read "Delivery address: <address>\n\n<notes>", so the app, the kitchen board
   // and anything that splits at the first blank line can rely on the address never containing one.
   const deliveryAddress = asText("deliveryAddress", true).replace(/\s*[\r\n]+\s*/g, ", ").replace(/[ \t]+/g, " ").trim();
+  const coordinate = (key: "deliveryLatitude" | "deliveryLongitude", minimum: number, maximum: number) => {
+    const value = body[key];
+    if (value === undefined) return null;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
+      errors[key] = "Choose a valid delivery location.";
+      return null;
+    }
+    return value;
+  };
+  const deliveryLatitude = coordinate("deliveryLatitude",-90,90);
+  const deliveryLongitude = coordinate("deliveryLongitude",-180,180);
+  if ((deliveryLatitude === null) !== (deliveryLongitude === null))
+    errors.deliveryLatitude ??= "Choose a valid delivery location.";
 
   const fulfilment = body.fulfilment === "delivery" || body.fulfilment === "pickup" ? body.fulfilment : undefined;
   if (!fulfilment) errors.fulfilment = "Choose pickup or delivery.";
@@ -303,7 +318,7 @@ export function parseMobileOrder(raw: unknown, accountEmail: string): MobileOrde
     if (!deliveryAddress) errors.deliveryAddress = "Enter a delivery address.";
     else if (deliveryAddress.length < ADDRESS_MIN) errors.deliveryAddress = "Enter a fuller delivery address.";
     else if (deliveryAddress.length > ADDRESS_MAX) errors.deliveryAddress = `Keep the address under ${ADDRESS_MAX} characters.`;
-  } else if (fulfilment === "pickup" && deliveryAddress) {
+  } else if (fulfilment === "pickup" && (deliveryAddress || deliveryLatitude !== null || deliveryLongitude !== null)) {
     errors.deliveryAddress = "A delivery address is only for delivery orders.";
   }
 
@@ -327,7 +342,7 @@ export function parseMobileOrder(raw: unknown, accountEmail: string): MobileOrde
     errors[field] ??= message;
   }
   throwIfAny(errors);
-  return { name, phone, fulfilment: fulfilment!, preferredTime, deliveryAddress, notes, storedNotes, lines, expectedTotal, payment };
+  return { name, phone, fulfilment: fulfilment!, preferredTime, deliveryAddress, deliveryLatitude, deliveryLongitude, notes, storedNotes, lines, expectedTotal, payment };
 }
 
 const ISO_UTC = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,6})?(Z|\+00:00)$/;

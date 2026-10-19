@@ -10,6 +10,9 @@ export type OrderRequest = {
   fulfilment: Fulfilment;
   preferredTime: string;
   notes: string;
+  deliveryAddress?: string;
+  deliveryLatitude?: number;
+  deliveryLongitude?: number;
   lines: OrderLineInput[];
   company?: string;
   acceptedTerms?: boolean;
@@ -24,6 +27,9 @@ export type HydratedOrder = {
   fulfilment: Fulfilment;
   preferredTime: string;
   notes: string;
+  deliveryAddress: string;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
   lines: { item: MenuItem; qty: number; lineTotal: number }[];
   total: number;
   payment: PaymentInfo;

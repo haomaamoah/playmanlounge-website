@@ -11,6 +11,7 @@ const order: AdminOrder = {
   customerEmail: "ama@example.com", fulfilment: "delivery", preferredTime: "", notes: "Extra pepper",
   lines: [{ itemId: "jollof", name: "Jollof", qty: 2, unitPrice: 50, image: "/media/jollof.webp" }], total: 100,
   status: "cooking", paymentStatus: "paid", transactionId: "TX-9",
+  kitchenId:"kitchen-a",deliveryAddress:"",deliveryLatitude:null,deliveryLongitude:null,
 };
 
 test("customer orders table shows Order and Payment without customer names", () => {

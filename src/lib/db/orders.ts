@@ -7,13 +7,18 @@ import type { PaymentInfo } from "../email";
 import type { DeliveryStore } from "../mail/delivery";
 import { formatPlacedAt } from "../mail/order";
 import { db } from "./server";
+import { nearestKitchen } from "../kitchens/routing";
 
 export function orderDTO(r: Record<string, unknown>): AdminOrder {
   return {id:String(r.id),createdAt:String(r.created_at),updatedAt:String(r.updated_at),
     customerName:String(r.customer_name),customerEmail:String(r.customer_email),customerPhone:String(r.customer_phone),
     fulfilment:r.fulfilment as AdminOrder["fulfilment"],preferredTime:String(r.preferred_time),notes:String(r.notes),
     status:r.status as AdminOrder["status"],paymentStatus:r.payment_status as AdminOrder["paymentStatus"],
-    total:Number(r.total),transactionId:r.transaction_id ? String(r.transaction_id) : null,lines:r.lines as AdminOrder["lines"]};
+    total:Number(r.total),transactionId:r.transaction_id ? String(r.transaction_id) : null,
+    kitchenId:String(r.kitchen_id),deliveryAddress:String(r.delivery_address ?? ""),
+    deliveryLatitude:typeof r.delivery_latitude === "number" ? r.delivery_latitude : null,
+    deliveryLongitude:typeof r.delivery_longitude === "number" ? r.delivery_longitude : null,
+    lines:r.lines as AdminOrder["lines"]};
 }
 export function supportDTO(r: Record<string, unknown>): SupportRequest {
   return {id:String(r.id),customerName:String(r.customer_name),customerEmail:String(r.customer_email),
@@ -24,7 +29,9 @@ export async function persistOrder(order: HydratedOrder, transactionId?: string,
   const lines = order.lines.map(l => ({itemId:l.item.id,name:l.item.name,qty:l.qty,unitPrice:l.item.price,image:l.item.image}));
   const row = {order_ref:order.orderRef,customer_name:order.name,customer_email:order.email,customer_phone:order.phone,
     fulfilment:order.fulfilment,preferred_time:order.preferredTime,notes:order.notes,total:order.total,lines,
-    payment_status:transactionId ? "pending" : "cod",transaction_id:transactionId ?? null,request_key:requestKey ?? null};
+    payment_status:transactionId ? "pending" : "cod",transaction_id:transactionId ?? null,request_key:requestKey ?? null,
+    delivery_address:order.deliveryAddress,delivery_latitude:order.deliveryLatitude,delivery_longitude:order.deliveryLongitude,
+    kitchen_id:await getNearestKitchenId(order.deliveryLatitude,order.deliveryLongitude)};
   if (transactionId || requestKey) {
     const {data:existing,error} = await db().from("orders").select("*").eq(transactionId ? "transaction_id" : "request_key",transactionId ?? requestKey!).maybeSingle();
     if (error) throw error;
@@ -33,12 +40,25 @@ export async function persistOrder(order: HydratedOrder, transactionId?: string,
       const signature = (entries: typeof lines) => JSON.stringify(entries.map(l => [l.itemId,l.qty]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
       if (Number(existing.total) !== order.total || existing.customer_email !== order.email || existing.customer_phone !== order.phone ||
           signature(existing.lines) !== signature(lines) || existing.fulfilment !== order.fulfilment ||
-          existing.preferred_time !== order.preferredTime || existing.notes !== order.notes) throw new ApiFailure(409,"The existing submission does not match this order.");
+          existing.preferred_time !== order.preferredTime || existing.notes !== order.notes ||
+          String(existing.delivery_address ?? "") !== order.deliveryAddress ||
+          (existing.delivery_latitude == null ? null : Number(existing.delivery_latitude)) !== order.deliveryLatitude ||
+          (existing.delivery_longitude == null ? null : Number(existing.delivery_longitude)) !== order.deliveryLongitude)
+        throw new ApiFailure(409,"The existing submission does not match this order.");
       return adopt(order,existing);
     }
   }
   const {data,error} = await db().rpc("create_order",{p_order:row});
   return adopt(order,checked(data,error));
+}
+export async function getNearestKitchenId(latitude: number | null | undefined, longitude: number | null | undefined): Promise<string | null> {
+  if (latitude == null || longitude == null) return null;
+  const { data,error } = await db().from("kitchens").select("id,latitude,longitude").eq("is_active",true);
+  if (error) throw error;
+  const kitchens = (data ?? []).map((kitchen) => ({
+    id:String(kitchen.id),latitude:Number(kitchen.latitude),longitude:Number(kitchen.longitude),
+  }));
+  return nearestKitchen(kitchens,latitude,longitude)?.id ?? null;
 }
 /** Receipts always describe the stored order, so a replay or resend carries the original ticket. */
 function adopt(order: HydratedOrder, saved: Record<string, unknown>) {

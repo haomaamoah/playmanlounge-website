@@ -13,6 +13,9 @@ export type MobileOrder = {
   fulfilment: string;
   preferredTime: string;
   notes: string;
+  deliveryAddress: string;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
   total: number;
   customerName: string;
   customerPhone: string;
@@ -65,6 +68,9 @@ export function mobileOrder(row: Row): MobileOrder {
     fulfilment: String(row.fulfilment),
     preferredTime: String(row.preferred_time ?? ""),
     notes: String(row.notes ?? ""),
+    deliveryAddress: String(row.delivery_address ?? ""),
+    deliveryLatitude: typeof row.delivery_latitude === "number" ? row.delivery_latitude : null,
+    deliveryLongitude: typeof row.delivery_longitude === "number" ? row.delivery_longitude : null,
     total: Number(row.total),
     customerName: String(row.customer_name ?? ""),
     customerPhone: String(row.customer_phone ?? ""),

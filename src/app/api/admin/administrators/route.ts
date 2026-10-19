@@ -11,7 +11,7 @@ export const GET = endpoint(async (request) => {
   const parsedOffset = Number(url.searchParams.get("offset") ?? 0);
   const limit = Number.isInteger(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 50;
   const offset = Number.isInteger(parsedOffset) ? Math.max(0, parsedOffset) : 0;
-  let query = db().from("admin_profiles").select("id,email,created_at,is_blocked", { count: "exact" })
+  let query = db().from("admin_profiles").select("id,email,created_at,is_blocked,kitchen_id", { count: "exact" })
     .eq("role", "admin").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
   if (search) query = query.or(textSearchFilter(search, ["email"]));
   const { data, error, count } = await query;
@@ -22,8 +22,11 @@ export const POST = endpoint(async (request) => {
   checkOrigin(request);
   const manager = await requireManager();
   await rateLimit(request, "manager-create-admin", 20, 900, manager.id);
-  const { email: address, password: initialPassword } = administratorCreateInput(await jsonBody(request));
+  const { email: address, password: initialPassword, kitchenId } = administratorCreateInput(await jsonBody(request));
   const client = db();
+  const {data:kitchen,error:kitchenError} = await client.from("kitchens").select("id").eq("id",kitchenId).eq("is_active",true).maybeSingle();
+  if (kitchenError) throw kitchenError;
+  if (!kitchen) throw new ApiFailure(400,"Choose an active kitchen for this administrator.");
   const { data, error } = await client.auth.admin.createUser({
     email: address,
     password: initialPassword,
@@ -40,6 +43,7 @@ export const POST = endpoint(async (request) => {
     id: user.id,
     email: address,
     role: "admin",
+    kitchen_id: kitchenId,
   });
   if (profileError) {
     const { error: cleanupError } = await client.auth.admin.deleteUser(user.id);
@@ -54,5 +58,5 @@ export const POST = endpoint(async (request) => {
     if (cleanupError) console.error("[manager-api] failed to remove administrator after its audit record could not be written");
     throw error;
   }
-  return { ok: true, item: { id: user.id, email: address, created_at: user.created_at, is_blocked: false } };
+  return { ok: true, item: { id: user.id, email: address, created_at: user.created_at, is_blocked: false, kitchen_id:kitchenId } };
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ListResponse, ManagedAdmin } from "@/lib/admin/contracts";
+import type { Kitchen, ListResponse, ManagedAdmin } from "@/lib/admin/contracts";
 import { EmptyState, PageHeading, ResourceState, adminRequest, dateLabel } from "./admin-ui";
 
 export function AdministratorList() {
@@ -15,6 +15,8 @@ export function AdministratorList() {
   const [emailDraft, setEmailDraft] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
+  const [kitchenError, setKitchenError] = useState("");
   const key = `${query}:${offset}:${revision}`;
 
   useEffect(() => {
@@ -27,6 +29,14 @@ export function AdministratorList() {
       .catch((reason: Error) => { if (!controller.signal.aborted) setResult({ data: null, key, error: reason.message }); });
     return () => controller.abort();
   }, [key, query, offset, revision]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    adminRequest<{ok:true;items:Kitchen[]}>("/api/admin/kitchens",{signal:controller.signal})
+      .then((response) => { if (!controller.signal.aborted) { setKitchens(response.items); setKitchenError(""); } })
+      .catch((reason:Error) => { if (!controller.signal.aborted) setKitchenError(reason.message); });
+    return () => controller.abort();
+  }, []);
 
   const current = result?.key === key;
   const data = current ? result.data : null;
@@ -47,13 +57,28 @@ export function AdministratorList() {
     try {
       await adminRequest("/api/admin/administrators", {
         method: "POST",
-        body: JSON.stringify({ email: values.get("email"), password: values.get("password") }),
+        body: JSON.stringify({ email: values.get("email"), password: values.get("password"), kitchenId:values.get("kitchenId") }),
       });
       form.reset();
       setOffset(0); setQuery(""); setSearch(""); setRevision((value) => value + 1);
       setActionSuccess("Administrator account created. Share the temporary password securely and ask the new administrator to change it in Settings.");
     } catch (reason) { setActionError((reason as Error).message); setRevision((value) => value + 1); }
     finally { setBusyId(""); }
+  }
+
+  async function assignKitchen(admin:ManagedAdmin,kitchenId:string) {
+    setBusyId(admin.id); setActionError(""); setActionSuccess("");
+    try {
+      await adminRequest(`/api/admin/administrators/${encodeURIComponent(admin.id)}`,{
+        method:"PATCH",body:JSON.stringify({kitchenId}),
+      });
+      setRevision((value) => value + 1);
+      setActionSuccess(`Assigned ${admin.email} to ${kitchens.find((kitchen) => kitchen.id === kitchenId)?.name ?? "the selected kitchen"}.`);
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : "Could not assign this administrator.");
+    } finally {
+      setBusyId("");
+    }
   }
 
   async function saveEmail(admin: ManagedAdmin, event: React.FormEvent<HTMLFormElement>) {
@@ -98,11 +123,16 @@ export function AdministratorList() {
       <h2>Add administrator</h2>
       <p>Set a temporary initial password. It is used only to create the account; ask the new administrator to change it in Settings.</p>
       <form className="admin-form admin-admin-create" onSubmit={createAdmin}>
-        <fieldset disabled={busyId === "create"}>
+        <fieldset disabled={busyId === "create" || !kitchens.some((kitchen) => kitchen.is_active)}>
           <label>Email address<input name="email" type="email" autoComplete="email" maxLength={254} required /></label>
           <label>Temporary password<input name="password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
+          <label>Kitchen<select name="kitchenId" required defaultValue="">
+            <option value="" disabled>Select a kitchen</option>
+            {kitchens.filter((kitchen) => kitchen.is_active).map((kitchen) => <option key={kitchen.id} value={kitchen.id}>{kitchen.name}</option>)}
+          </select></label>
         </fieldset>
-        <button className="admin-button" disabled={busyId === "create"}>{busyId === "create" ? "Creating…" : "Create administrator"}</button>
+        <button className="admin-button" disabled={busyId === "create" || !kitchens.some((kitchen) => kitchen.is_active)}>{busyId === "create" ? "Creating…" : "Create administrator"}</button>
+        {kitchenError && <p role="alert" className="admin-error">{kitchenError}</p>}
       </form>
     </section>
     {actionError && <p role="alert" className="admin-error">{actionError}</p>}
@@ -120,7 +150,7 @@ export function AdministratorList() {
       <div className="admin-table-scroll">
         <table className="admin-table">
           <caption className="sr-only">Administrator accounts</caption>
-          <thead><tr><th>Email</th><th>Created</th><th>Account</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Email</th><th>Created</th><th>Account</th><th>Kitchen and actions</th></tr></thead>
           <tbody>{data.items.map((admin) => <tr key={admin.id}>
             <td>{editingId === admin.id
               ? <form className="admin-account-email-form" onSubmit={(event) => void saveEmail(admin, event)}>
@@ -134,6 +164,12 @@ export function AdministratorList() {
             <td>{dateLabel(admin.created_at)}</td>
             <td><span className={`admin-account-status${admin.is_blocked ? " is-blocked" : ""}`}>{admin.is_blocked ? "Blocked" : "Active"}</span></td>
             <td><div className="admin-actions">
+              <label className="admin-admin-kitchen"><span className="sr-only">Kitchen for {admin.email}</span>
+                <select aria-label={`Kitchen for ${admin.email}`} value={admin.kitchen_id}
+                  disabled={busyId === admin.id} onChange={(event) => void assignKitchen(admin,event.target.value)}>
+                  {kitchens.map((kitchen) => <option key={kitchen.id} value={kitchen.id} disabled={!kitchen.is_active && kitchen.id !== admin.kitchen_id}>{kitchen.name}{kitchen.is_active ? "" : " (inactive)"}</option>)}
+                </select>
+              </label>
               {!editingId && <button className="admin-button admin-button-secondary" disabled={busyId === admin.id}
                 onClick={() => { setEditingId(admin.id); setEmailDraft(admin.email); }}>Edit email</button>}
               <button className={`admin-button ${admin.is_blocked ? "admin-button-secondary" : "admin-button-danger"}`}

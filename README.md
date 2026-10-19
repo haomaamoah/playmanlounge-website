@@ -185,6 +185,8 @@ The cocoa bar has **Terms and Conditions** and **Return Policy** buttons, then *
 
 ## Supabase backend setup
 
+The latest kitchen-routing migration is `supabase/migrations/202610190001_kitchens.sql`. Apply it after the existing migrations and before deploying this version: it seeds Adenta and Dansoman, assigns administrators and existing orders, and adds dedicated delivery address/GPS columns. Coordinate-bearing orders route to the nearest active kitchen; legacy requests without coordinates remain supported and use a random-kitchen fallback.
+
 Use a user-approved Supabase project; these scripts never create a project. The versioned migrations are `supabase/migrations/202610090001_backend.sql`, `202610090002_email_thumbnails.sql`, `202610090003_delivery_and_attempts.sql` (receipt delivery ledger, superseded payment attempts), `202610130001_customer_portal.sql` (website customer portal), `202610120001_mobile_customers.sql` (mobile order/support links), `202610130002_mobile_customer_phone.sql` (normalized phone lookup), and `202610140001_switch_payment_to_delivery.sql` (mobile-money retries and switching an existing order to pay on delivery). Apply each **once**, in that order, through that project's SQL editor, or use the idempotent CLI wrapper (requires `psql`):
 
 ```bash
