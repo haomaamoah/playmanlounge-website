@@ -9,7 +9,7 @@ export const POST = endpoint(async (request) => {
   const rider = await requireRider(request);
   const body = object(await jsonBody(request), ["currentPassword", "newPassword"]);
   const currentPassword = password(body.currentPassword, 5);
-  const newPassword = password(body.newPassword, 12);
+  const newPassword = password(body.newPassword, 6);
   const client = publicClient();
   const verified = await client.auth.signInWithPassword({
     email: rider.email,

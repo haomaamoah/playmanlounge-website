@@ -67,8 +67,8 @@ export function RiderSettings() {
     <form className="rider-form rider-card" onSubmit={(event) => void changePassword(event)}>
       <h2>Change password</h2>
       <label>Current password<input name="currentPassword" type="password" autoComplete="current-password" minLength={5} maxLength={128} required /></label>
-      <label>New password<input name="newPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
-      <label>Confirm new password<input name="confirmPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
+      <label>New password<input name="newPassword" type="password" autoComplete="new-password" minLength={6} maxLength={128} required /></label>
+      <label>Confirm new password<input name="confirmPassword" type="password" autoComplete="new-password" minLength={6} maxLength={128} required /></label>
       <button className="rider-button rider-button-secondary" disabled={busy}>{busy ? "Saving…" : "Change password"}</button>
     </form>
   </section>;
