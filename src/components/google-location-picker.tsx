@@ -367,12 +367,22 @@ export function GoogleDirectionsMap({
         line = new maps.Polyline({
           map,
           path: route.path.map((point) => ({ lat: point.lat, lng: point.lng })),
-          strokeColor: "#16803c",
+          strokeColor: "#1a73e8",
           strokeOpacity: 0.95,
           strokeWeight: 6,
         });
-        new maps.Marker({ map, position: { lat: originLat, lng: originLng }, label: "K", title: "Kitchen" });
-        new maps.Marker({ map, position: { lat: destinationLat, lng: destinationLng }, label: "D", title: "Delivery address" });
+        new maps.Marker({
+          map,
+          position: { lat: originLat, lng: originLng },
+          icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+          title: "Kitchen",
+        });
+        new maps.Marker({
+          map,
+          position: { lat: destinationLat, lng: destinationLng },
+          icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+          title: "Delivery address",
+        });
         if (route.viewport) map.fitBounds(route.viewport);
         const distance = route.distanceMeters == null
           ? ""
