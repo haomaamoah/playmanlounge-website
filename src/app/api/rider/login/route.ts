@@ -15,8 +15,8 @@ export const POST = endpoint(async (request) => {
 
 export const DELETE = endpoint(async (request) => {
   checkOrigin(request);
-  const auth = await authClient();
-  const { error } = await auth.auth.signOut();
+  const auth = await authClient("rider");
+  const { error } = await auth.auth.signOut({ scope: "local" });
   if (error) throw new ApiFailure(503, "Could not sign out.");
   return { ok: true };
 });

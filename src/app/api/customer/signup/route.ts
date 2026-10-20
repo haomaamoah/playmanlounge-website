@@ -42,7 +42,7 @@ export const POST = endpoint(async (request) => {
   if (profileError || !profile) {
     throw new ApiFailure(503, "Your account was created, but customer access is not ready. Please try signing in shortly.");
   }
-  const auth = await authClient();
+  const auth = await authClient("customer");
   const { error: signInError } = await auth.auth.signInWithPassword({ email, password: derivedPassword });
   if (signInError) {
     throw new ApiFailure(503, "Your account was created, but sign-in could not finish. Please log in.");

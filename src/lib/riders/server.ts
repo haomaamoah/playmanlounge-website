@@ -47,7 +47,7 @@ export async function requireRider(request: Request) {
     if (error || !data.user) throw new ApiFailure(401, "Sign in to continue.");
     user = data.user;
   } else {
-    const auth = await authClient();
+    const auth = await authClient("rider");
     const { data, error } = await auth.auth.getUser();
     if (error || !data.user) throw new ApiFailure(401, "Sign in to continue.");
     user = data.user;
@@ -73,7 +73,7 @@ export async function signInRider(email: string, password: string) {
 
 export async function signInRiderWeb(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  const auth = await authClient();
+  const auth = await authClient("rider");
   const { data, error } = await auth.auth.signInWithPassword({
     email: normalizedEmail,
     password,
@@ -82,7 +82,7 @@ export async function signInRiderWeb(email: string, password: string) {
   try {
     return publicRider(await riderForUser(data.user));
   } catch (failure) {
-    await auth.auth.signOut();
+    await auth.auth.signOut({ scope: "local" });
     throw failure;
   }
 }

@@ -13,7 +13,7 @@ export type CustomerProfile = {
 };
 
 export async function requireCustomer() {
-  const auth = await authClient();
+  const auth = await authClient("customer");
   const { data: { user }, error } = await auth.auth.getUser();
   if (error || !user) {
     throw new ApiFailure(401, "Sign in to continue.");

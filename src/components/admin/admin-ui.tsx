@@ -20,9 +20,12 @@ export function useAdminBasePath() {
 }
 
 export async function adminRequest<T = { ok: true }>(url: string, init: RequestInit = {}): Promise<T> {
+  const portal = window.location.pathname.startsWith("/man/") || window.location.pathname === "/man"
+    ? "manager"
+    : "admin";
   const response = await fetch(url, {
     ...init, cache: "no-store", credentials: "same-origin",
-    headers: { ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init.headers },
+    headers: { "X-PML-Portal": portal, ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init.headers },
   });
   const data = await response.json().catch(() => null);
   if (!response.ok || data?.ok !== true) {

@@ -10,7 +10,7 @@ export default async function CustomerAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const auth = await authClient();
+  const auth = await authClient("customer");
   const { data: { user }, error } = await auth.auth.getUser();
   if (error || !user) {
     redirect("/customer/login?next=%2Fapp");

@@ -12,17 +12,17 @@ export const POST = endpoint(async (request) => {
   await rateLimit(request, "customer-login-account", 8, 900, identifier.toLowerCase());
 
   const account = await findCustomer(identifier);
-  const auth = await authClient();
+  const auth = await authClient("customer");
   const { data, error } = await auth.auth.signInWithPassword({
     email: account.email,
     password: deriveCustomerPassword(account.email, password),
   });
   if (error || !data.user || data.user.id !== account.id) {
-    if (!error && data.user) await auth.auth.signOut();
+    if (!error && data.user) await auth.auth.signOut({ scope: "local" });
     throw new ApiFailure(401, "Invalid email/phone or password.");
   }
   if (!await hasCustomerProfile(data.user.id)) {
-    await auth.auth.signOut();
+    await auth.auth.signOut({ scope: "local" });
     throw new ApiFailure(401, "Invalid email/phone or password.");
   }
   return { ok: true };

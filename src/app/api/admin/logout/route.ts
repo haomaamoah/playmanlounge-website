@@ -5,7 +5,7 @@ export const POST = endpoint(async request => {
   const admin = await requireAdmin();
   object(await jsonBody(request),[]);
   await audit(admin.id,"logout");
-  const {error} = await (await authClient()).auth.signOut();
+  const {error} = await (await authClient()).auth.signOut({scope:"local"});
   if (error) throw error;
   return {ok:true};
 });

@@ -24,7 +24,7 @@ export const POST = endpoint(async (request) => {
     await db().auth.admin.signOut(verified.data.session.access_token, "global");
     return { ok: true };
   }
-  const auth = await authClient();
+  const auth = await authClient("rider");
   const { error } = await auth.auth.updateUser({ password: newPassword });
   if (error) throw new ApiFailure(503, "Could not update your password.");
   return { ok: true };

@@ -14,7 +14,7 @@ export const POST = endpoint(async request => {
     await audit(admin.id,"login_success");
     return {ok:true,admin};
   } catch {
-    await auth.auth.signOut();
+    await auth.auth.signOut({ scope: "local" });
     await audit(null,"login_denied");
     throw new ApiFailure(403,"Administrator access required.");
   }

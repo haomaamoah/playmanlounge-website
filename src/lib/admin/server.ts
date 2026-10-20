@@ -1,19 +1,21 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { db } from "../db/server";
 import { ApiFailure } from "./validation";
 import type { AdminProfile } from "./contracts";
+import { authCookieName, authPortalFromHeader, type AuthPortal } from "./session-scope";
 
-export async function authClient() {
+export async function authClient(portal?: AuthPortal) {
   const jar = await cookies();
+  const scope = portal ?? authPortalFromHeader((await headers()).get("x-pml-portal")) ?? "admin";
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) throw new ApiFailure(503,"Authentication is not configured.");
   return createServerClient(url,key,{
-    cookieOptions: { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" },
+    cookieOptions: { name: authCookieName(scope), httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" },
     cookies: { getAll: () => jar.getAll(), setAll: values => {
       for (const { name,value,options } of values) jar.set(name,value,{...options,httpOnly:true,secure:process.env.NODE_ENV === "production",sameSite:"lax",path:"/"});
     } },
