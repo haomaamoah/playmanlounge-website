@@ -1,6 +1,10 @@
 import { ApiFailure } from "../admin/validation";
 
 export type Coordinates = { latitude: number; longitude: number };
+
+function latLng(point: Coordinates) {
+  return { latitude: point.latitude, longitude: point.longitude };
+}
 export type DrivingRoute = {
   encodedPolyline: string;
   distanceMeters: number;
@@ -24,8 +28,8 @@ export async function computeDrivingRoute(
           "routes.polyline.encodedPolyline,routes.distanceMeters,routes.duration",
       },
       body: JSON.stringify({
-        origin: { location: { latLng: origin } },
-        destination: { location: { latLng: destination } },
+        origin: { location: { latLng: latLng(origin) } },
+        destination: { location: { latLng: latLng(destination) } },
         travelMode: "DRIVE",
         polylineQuality: "OVERVIEW",
       }),

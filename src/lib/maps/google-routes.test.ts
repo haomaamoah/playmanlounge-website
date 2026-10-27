@@ -51,6 +51,31 @@ test("computes a driving route with only the requested route fields", async () =
   });
 });
 
+test("sends only latitude and longitude to Google", async () => {
+  let body = "";
+  const origin = { latitude: 5.63, longitude: -0.157, updatedAt: "2026-10-27T17:10:59.191Z" };
+  const destination = { latitude: 5.7, longitude: -0.16, name: "Adenta Kitchen" };
+  await computeDrivingRoute(
+    "server-key",
+    origin,
+    destination,
+    async (_input, init) => {
+      body = String(init?.body);
+      return Response.json({
+        routes: [{ polyline: { encodedPolyline: "encoded" }, distanceMeters: 1000, duration: "100s" }],
+      });
+    },
+  );
+  assert.deepEqual(JSON.parse(body).origin.location.latLng, {
+    latitude: 5.63,
+    longitude: -0.157,
+  });
+  assert.deepEqual(JSON.parse(body).destination.location.latLng, {
+    latitude: 5.7,
+    longitude: -0.16,
+  });
+});
+
 test("rejects unavailable or incomplete Google route responses", async () => {
   await assert.rejects(
     computeDrivingRoute(
