@@ -10,5 +10,5 @@ export const GET = endpoint(async (request: Request, context: Context) => {
   const rider = await requireRider(request);
   const { id } = await context.params;
   if (!uuidPattern.test(id)) throw new ApiFailure(404, "Delivery not found.");
-  return { ok: true, item: await getRiderOrder(id, rider) };
+  return { ok: true, item: await getRiderOrder(id, rider, { includeTaken: true }) };
 });

@@ -41,11 +41,18 @@ export function riderOrderDTO(row: Row, kitchen: Row | null, rider: Row | null, 
   };
 }
 
-export async function getRiderOrder(id: string, rider: RiderProfile) {
+export async function getRiderOrder(
+  id: string,
+  rider: RiderProfile,
+  options?: { includeTaken?: boolean },
+) {
   const { data, error } = await db().from("orders").select("*").eq("id", id).maybeSingle();
   if (error) throw new ApiFailure(503, "Could not load this delivery.");
   if (!data || data.fulfilment !== "delivery") throw new ApiFailure(404, "Delivery not found.");
-  if (data.rider_id && data.rider_id !== rider.id) throw new ApiFailure(409, "Someone else has taken this order.");
+  const takenByOther = Boolean(data.rider_id && data.rider_id !== rider.id);
+  if (takenByOther && !options?.includeTaken) {
+    throw new ApiFailure(409, "Someone else has taken this order.");
+  }
   if (!data.rider_id && (data.status === "cancelled" || !["paid", "cod"].includes(data.payment_status))) {
     throw new ApiFailure(409, "This order is not available for delivery.");
   }
@@ -53,7 +60,7 @@ export async function getRiderOrder(id: string, rider: RiderProfile) {
     data.kitchen_id
       ? db().from("kitchens").select("name,latitude,longitude").eq("id", data.kitchen_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    data.rider_id
+    data.rider_id && !takenByOther
       ? db().from("rider_profiles").select("id,name,phone,bike_model,bike_color,license_plate").eq("id", data.rider_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db().from("rider_locations").select("latitude,longitude,updated_at").eq("rider_id", rider.id).maybeSingle(),
