@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { GoogleLocationPicker } from "@/components/google-location-picker";
 import type { Kitchen } from "@/lib/admin/contracts";
-import { EmptyState, PageHeading, ResourceState, adminRequest, useAdminResource } from "./admin-ui";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
+import { EmptyState, PageHeading, ResourceState, adminRequest } from "./admin-ui";
 
-type KitchenListResponse = { ok:true; items:Kitchen[] };
+type KitchenListResponse = { ok:true; items:Kitchen[]; total:number };
 
 function kitchenPayload(form: HTMLFormElement) {
   const values = new FormData(form);
@@ -45,7 +46,10 @@ function KitchenLocation({ kitchen }: { kitchen?: Kitchen }) {
 }
 
 export function KitchenList() {
-  const {data,loading,error,reload} = useAdminResource<KitchenListResponse>("/api/admin/kitchens");
+  const [revision, setRevision] = useState(0);
+  const list = useInfiniteList<Kitchen>(String(revision), (offset, signal) =>
+    adminRequest<KitchenListResponse>(`/api/admin/kitchens?limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
+      .then((data) => ({ items: data.items, total: data.total })));
   const [busy,setBusy] = useState("");
   const [actionError,setActionError] = useState("");
   const [notice,setNotice] = useState("");
@@ -68,7 +72,7 @@ export function KitchenList() {
         setNewKitchenFormVersion((version) => version + 1);
       }
       setNotice(id ? "Kitchen details saved." : "Kitchen added.");
-      reload();
+      setRevision((value) => value + 1);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : "The kitchen could not be saved.");
     } finally {
@@ -92,12 +96,12 @@ export function KitchenList() {
     </section>
     {actionError && <p role="alert" className="admin-error">{actionError}</p>}
     {notice && <p role="status" className="admin-success">{notice}</p>}
-    <ResourceState loading={loading} error={error} retry={reload} />
-    {data && (data.items.length ? <div className="admin-report">
+    <ResourceState loading={list.loading} error={list.error} retry={list.reload} />
+    {!list.loading && !list.error && (list.items.length ? <div className="admin-report">
       <div className="admin-table-scroll"><table className="admin-table">
         <caption className="sr-only">Kitchen locations</caption>
         <thead><tr><th>Name and address</th><th>Latitude</th><th>Longitude</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>{data.items.map((kitchen) => <tr key={kitchen.id}>
+        <tbody>{list.items.map((kitchen) => <tr key={kitchen.id}>
           <td colSpan={5}>
             <form className="admin-kitchen-row" onSubmit={(event) => void save(event,kitchen.id)}>
               <label>Name<input name="name" defaultValue={kitchen.name} required minLength={2} maxLength={100} /></label>
@@ -109,5 +113,6 @@ export function KitchenList() {
         </tr>)}</tbody>
       </table></div>
     </div> : <EmptyState title="No kitchens yet">Add the first kitchen location to begin assigning orders.</EmptyState>)}
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
   </>;
 }

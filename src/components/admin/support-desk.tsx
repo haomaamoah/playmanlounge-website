@@ -2,37 +2,39 @@
 
 import { useState } from "react";
 import type { ListResponse, SupportRequest } from "@/lib/admin/contracts";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
-import { Badge, EmptyState, PageHeading, ResourceState, adminRequest, dateLabel, useAdminResource } from "./admin-ui";
+import { Badge, EmptyState, PageHeading, ResourceState, adminRequest, dateLabel } from "./admin-ui";
 
 export function SupportDesk() {
   const [filter, setFilter] = useState("");
-  const [offset, setOffset] = useState(0);
   const [busyId, setBusyId] = useState("");
   const [mutationError, setMutationError] = useState("");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
-  const { data, error, loading, reload } = useAdminResource<ListResponse<SupportRequest>>(`/api/admin/support?status=${filter}&q=${encodeURIComponent(query)}&limit=50&offset=${offset}`);
+  const list = useInfiniteList<SupportRequest>(`${filter}:${query}`, (offset, signal) =>
+    adminRequest<ListResponse<SupportRequest>>(`/api/admin/support?status=${filter}&q=${encodeURIComponent(query)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
+      .then((data) => ({ items: data.items, total: data.total })));
   async function toggle(item: SupportRequest) {
     setBusyId(item.id); setMutationError(""); setNotice("");
     const status = item.status === "open" ? "closed" : "open";
     try {
       await adminRequest(`/api/admin/support/${encodeURIComponent(item.id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
-      setNotice(`“${item.subject}” marked ${status}.`); reload();
+      setNotice(`“${item.subject}” marked ${status}.`); list.reload();
     } catch (err) { setMutationError((err as Error).message); }
     finally { setBusyId(""); }
   }
   return <>
-    <PageHeading title="Support" description="Customer questions and complaints, received from the website. Keep every request accounted for." action={<button className="admin-button admin-button-secondary" onClick={reload}>Refresh</button>} />
-    <PortalSearch admin label="Search support by subject, message, customer name, email, or phone" placeholder="Search subject, message, name, email, or phone" onSearch={(value) => { setQuery(value); setOffset(0); }} />
-    <div className="admin-toolbar"><div className="admin-filters" role="group" aria-label="Filter support requests">{[["", "All"], ["open", "Open"], ["closed", "Closed"]].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); setOffset(0); }}>{label}</button>)}</div>{data && <span role="status">{data.total} requests</span>}</div>
+    <PageHeading title="Support" description="Customer questions and complaints, received from the website. Keep every request accounted for." action={<button className="admin-button admin-button-secondary" onClick={list.reload}>Refresh</button>} />
+    <PortalSearch admin label="Search support by subject, message, customer name, email, or phone" placeholder="Search subject, message, name, email, or phone" onSearch={setQuery} />
+    <div className="admin-toolbar"><div className="admin-filters" role="group" aria-label="Filter support requests">{[["", "All"], ["open", "Open"], ["closed", "Closed"]].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>{!list.loading && <span role="status">{list.total} requests</span>}</div>
     {mutationError && <p className="admin-error" role="alert">{mutationError}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}
-    <ResourceState loading={loading} error={error} retry={reload} />
-    {data && (data.items.length ? <ul className="admin-support-list">{data.items.map((item) => <li key={item.id}>
+    <ResourceState loading={list.loading} error={list.error} retry={list.reload} />
+    {!list.loading && !list.error && (list.items.length ? <ul className="admin-support-list">{list.items.map((item) => <li key={item.id}>
       <div className="admin-support-heading"><div><h2>{item.subject}</h2><p>{item.customerName} · {dateLabel(item.createdAt)}</p></div><Badge value={item.status}>{item.status === "open" ? "Open" : "Closed"}</Badge></div>
       <p className="admin-preserve admin-support-message">{item.message}</p>
       <div className="admin-support-footer"><div><a href={`mailto:${item.customerEmail}`}>{item.customerEmail}</a>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div><button className="admin-button admin-button-secondary" disabled={Boolean(busyId)} onClick={() => toggle(item)}>{busyId === item.id ? "Saving…" : item.status === "open" ? "Mark closed" : "Reopen request"}</button></div>
     </li>)}</ul> : <EmptyState title={query ? "No matching requests" : filter === "closed" ? "No closed requests yet" : "No requests to show"}>Try another search or status filter, or clear your search to see all requests.</EmptyState>)}
-    {data && data.total > 50 && <div className="admin-pagination"><button className="admin-button admin-button-secondary" disabled={!offset} onClick={() => setOffset(Math.max(0, offset - 50))}>Previous</button><span>{offset + 1}–{Math.min(offset + 50, data.total)} of {data.total}</span><button className="admin-button admin-button-secondary" disabled={offset + 50 >= data.total} onClick={() => setOffset(offset + 50)}>Next</button></div>}
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
   </>;
 }

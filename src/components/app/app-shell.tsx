@@ -5,14 +5,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, LogOut, Menu, MessagesSquare, Settings, ShoppingBag, UtensilsCrossed, X } from "lucide-react";
 import { useState } from "react";
-import { site, type MenuGroup } from "@/lib/content";
+import { formatGhs, site, type MenuGroup } from "@/lib/content";
 import { CatalogProvider } from "./catalog-context";
 import { useMockStore } from "@/lib/mocks/store";
 
 export function AppShell({ children, customerName, menuGroups }: { children: React.ReactNode; customerName: string; menuGroups: MenuGroup[] | null }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { bagCount } = useMockStore();
+  const { bagCount, bagTotal } = useMockStore();
+  const onBagFlow = pathname === "/app/bag" || pathname.startsWith("/app/checkout");
+  const showBagBar = bagCount > 0 && !onBagFlow;
   const [logoutError, setLogoutError] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const firstName = customerName.trim().split(/\s+/)[0] || "there";
@@ -101,7 +103,7 @@ export function AppShell({ children, customerName, menuGroups }: { children: Rea
           </div>
         </header>
         {logoutError && <p role="alert" className="bg-destructive/10 px-4 py-2 text-center text-sm">{logoutError}</p>}
-        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-10">
+        <main id="main" className={`mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-10 ${showBagBar ? "pb-28" : ""}`}>
           <div className="mb-4 flex justify-end">
             <Link
               href="/app/bag"
@@ -118,6 +120,20 @@ export function AppShell({ children, customerName, menuGroups }: { children: Rea
           </div>
           <CatalogProvider groups={menuGroups}>{children}</CatalogProvider>
         </main>
+        {showBagBar && (
+          <Link
+            href="/app/bag"
+            className="bg-cocoa text-cream fixed inset-x-4 bottom-4 z-40 flex min-h-14 items-center justify-between gap-3 px-4 shadow-lg md:left-[calc(232px+1.5rem)] md:right-6"
+            style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+          >
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <ShoppingBag className="size-5" aria-hidden="true" />
+              Bag
+              <span className="bg-palm grid size-6 place-items-center text-xs font-bold">{bagCount}</span>
+            </span>
+            <span className="font-display text-xl">{formatGhs(bagTotal)}</span>
+          </Link>
+        )}
       </div>
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">

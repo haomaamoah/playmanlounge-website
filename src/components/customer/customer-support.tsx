@@ -1,22 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import type { ListResponse, SupportRequest } from "@/lib/admin/contracts";
+import type { SupportRequest } from "@/lib/admin/contracts";
 import { Badge, dateLabel } from "@/components/admin/admin-ui";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
-import { useCustomerResource } from "./customer-orders";
 
 export function CustomerSupport() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
-  const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
-  const { data, error: historyError } = useCustomerResource<ListResponse<SupportRequest>>(
-    `/api/customer/support?q=${encodeURIComponent(query)}&limit=50&offset=${offset}&revision=${revision}`,
-    "Could not load your support requests.",
-  );
+  const list = useInfiniteList<SupportRequest>(`${query}:${revision}`, async (offset, signal) => {
+    const response = await fetch(`/api/customer/support?q=${encodeURIComponent(query)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`, { cache: "no-store", credentials: "same-origin", signal });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Could not load your support requests.");
+    return { items: data.items as SupportRequest[], total: Number(data.total ?? 0) };
+  });
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,7 +39,6 @@ export function CustomerSupport() {
       if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Your message could not be sent.");
       form.reset();
       setNotice("Your message has been sent. Our team will get back to you.");
-      setOffset(0);
       setRevision((value) => value + 1);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Your message could not be sent.");
@@ -75,26 +75,20 @@ export function CustomerSupport() {
       </div>
       <PortalSearch label="Search your support requests by subject, message, or status"
         placeholder="Search subject, message, or status"
-        onSearch={(value) => { setQuery(value); setOffset(0); }} />
-      {historyError && <p role="alert" className="text-destructive">{historyError}</p>}
-      {!data && !historyError && <p role="status">Loading your requests…</p>}
-      {data && <>
-        <p role="status" className="text-muted-foreground text-sm">{data.total} {query ? "matching " : ""}requests</p>
-        {data.items.length ? <ul className="mt-4 space-y-4">{data.items.map((item) => <li key={item.id} className="rounded border border-border p-5">
+        onSearch={setQuery} />
+      {list.error && <p role="alert" className="text-destructive">{list.error}</p>}
+      {list.loading && <p role="status">Loading your requests…</p>}
+      {!list.loading && !list.error && <>
+        <p role="status" className="text-muted-foreground text-sm">{list.total} {query ? "matching " : ""}requests</p>
+        {list.items.length ? <ul className="mt-4 space-y-4">{list.items.map((item) => <li key={item.id} className="rounded border border-border p-5">
           <div className="flex items-start justify-between gap-3">
             <div><h3 className="font-semibold">{item.subject}</h3><p className="text-muted-foreground mt-1 text-sm">{dateLabel(item.createdAt)}</p></div>
             <Badge value={item.status}>{item.status === "open" ? "Open" : "Closed"}</Badge>
           </div>
           <p className="mt-3 whitespace-pre-wrap break-words">{item.message}</p>
         </li>)}</ul> : <p className="mt-4">{query ? "No matching requests. Try another search or clear it." : "No requests yet. Messages sent from your account will appear here."}</p>}
-        {data.total > 50 && <div className="mt-6 flex flex-wrap items-center gap-4">
-          <button type="button" disabled={!offset} className="min-h-11 rounded border border-border px-4 disabled:opacity-50"
-            onClick={() => setOffset(Math.max(0, offset - 50))}>Previous</button>
-          <span>{offset + 1}–{Math.min(offset + 50, data.total)} of {data.total}</span>
-          <button type="button" disabled={offset + 50 >= data.total} className="min-h-11 rounded border border-border px-4 disabled:opacity-50"
-            onClick={() => setOffset(offset + 50)}>Next</button>
-        </div>}
       </>}
+      <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
     </section>
   </section>;
 }

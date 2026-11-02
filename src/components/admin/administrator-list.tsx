@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type { Kitchen, ListResponse, ManagedAdmin } from "@/lib/admin/contracts";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { EmptyState, PageHeading, ResourceState, adminRequest, dateLabel } from "./admin-ui";
 
 export function AdministratorList() {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
-  const [result, setResult] = useState<{ data: ListResponse<ManagedAdmin> | null; key: string; error: string } | null>(null);
   const [busyId, setBusyId] = useState("");
   const [editingId, setEditingId] = useState("");
   const [emailDraft, setEmailDraft] = useState("");
@@ -17,18 +16,11 @@ export function AdministratorList() {
   const [actionSuccess, setActionSuccess] = useState("");
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [kitchenError, setKitchenError] = useState("");
-  const key = `${query}:${offset}:${revision}`;
-
-  useEffect(() => {
-    const controller = new AbortController();
+  const list = useInfiniteList<ManagedAdmin>(`${query}:${revision}`, (offset, signal) =>
     adminRequest<ListResponse<ManagedAdmin>>(
-      `/api/admin/administrators?q=${encodeURIComponent(query)}&limit=50&offset=${offset}`,
-      { signal: controller.signal },
-    )
-      .then((data) => { if (!controller.signal.aborted) setResult({ data, key, error: "" }); })
-      .catch((reason: Error) => { if (!controller.signal.aborted) setResult({ data: null, key, error: reason.message }); });
-    return () => controller.abort();
-  }, [key, query, offset, revision]);
+      `/api/admin/administrators?q=${encodeURIComponent(query)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`,
+      { signal },
+    ).then((data) => ({ items: data.items, total: data.total })));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -38,14 +30,8 @@ export function AdministratorList() {
     return () => controller.abort();
   }, []);
 
-  const current = result?.key === key;
-  const data = current ? result.data : null;
-  const error = current ? result.error : "";
-  const loading = !current;
-
   function searchAdmins(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setOffset(0);
     setQuery(search.trim());
   }
 
@@ -60,7 +46,7 @@ export function AdministratorList() {
         body: JSON.stringify({ email: values.get("email"), password: values.get("password"), kitchenId:values.get("kitchenId") }),
       });
       form.reset();
-      setOffset(0); setQuery(""); setSearch(""); setRevision((value) => value + 1);
+      setQuery(""); setSearch(""); setRevision((value) => value + 1);
       setActionSuccess("Administrator account created. Share the temporary password securely and ask the new administrator to change it in Settings.");
     } catch (reason) { setActionError((reason as Error).message); setRevision((value) => value + 1); }
     finally { setBusyId(""); }
@@ -143,15 +129,15 @@ export function AdministratorList() {
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search administrator email" maxLength={80} />
       </label>
       <button className="admin-button" type="submit">Search</button>
-      {data && <span>{data.total} {data.total === 1 ? "administrator" : "administrators"}</span>}
+      {!list.loading && <span>{list.total} {list.total === 1 ? "administrator" : "administrators"}</span>}
     </form>
-    <ResourceState loading={loading} error={error} retry={() => setRevision((value) => value + 1)} />
-    {data && (data.items.length ? <>
+    <ResourceState loading={list.loading} error={list.error} retry={list.reload} />
+    {!list.loading && !list.error && (list.items.length ? <>
       <div className="admin-table-scroll">
         <table className="admin-table">
           <caption className="sr-only">Administrator accounts</caption>
           <thead><tr><th>Email</th><th>Created</th><th>Account</th><th>Kitchen and actions</th></tr></thead>
-          <tbody>{data.items.map((admin) => <tr key={admin.id}>
+          <tbody>{list.items.map((admin) => <tr key={admin.id}>
             <td>{editingId === admin.id
               ? <form className="admin-account-email-form" onSubmit={(event) => void saveEmail(admin, event)}>
                 <label><span className="sr-only">New email address for {admin.email}</span>
@@ -182,15 +168,9 @@ export function AdministratorList() {
           </tr>)}</tbody>
         </table>
       </div>
-      {data.total > 50 && <div className="admin-pagination">
-        <button className="admin-button admin-button-secondary" disabled={!offset}
-          onClick={() => setOffset(Math.max(0, offset - 50))}>Previous</button>
-        <span>{offset + 1}–{Math.min(offset + 50, data.total)} of {data.total}</span>
-        <button className="admin-button admin-button-secondary" disabled={offset + 50 >= data.total}
-          onClick={() => setOffset(offset + 50)}>Next</button>
-      </div>}
     </> : <EmptyState title={query ? "No administrators found" : "No administrator accounts yet"}>
       {query ? "Try another email address." : "Administrator accounts will appear here after you add them."}
     </EmptyState>)}
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
   </>;
 }

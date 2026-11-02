@@ -1,9 +1,10 @@
 "use client";
 
 import { Bike, MapPin, Pencil, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { ItemResponse, ListResponse } from "@/lib/admin/contracts";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { adminRequest, EmptyState, PageHeading, ResourceState } from "./admin-ui";
 import { RiderTrackingMap } from "@/components/rider-tracking-map";
 
@@ -34,7 +35,6 @@ type RiderLocation = {
 const statusLabels = { blocked: "Blocked", on_delivery: "On delivery", available: "Available", offline: "Offline" };
 
 export function RiderList() {
-  const [result, setResult] = useState<{ key: string; items: Rider[] | null; error: string } | null>(null);
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
@@ -42,15 +42,9 @@ export function RiderList() {
   const [busy, setBusy] = useState("");
   const [editing, setEditing] = useState("");
   const [tracking, setTracking] = useState<RiderLocation | null>(null);
-  const key = `${search}:${revision}`;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    adminRequest<ListResponse<Rider>>(`/api/admin/riders?q=${encodeURIComponent(search)}&limit=100`, { signal: controller.signal })
-      .then((response) => { if (!controller.signal.aborted) setResult({ key, items: response.items, error: "" }); })
-      .catch((reason: Error) => { if (!controller.signal.aborted) setResult({ key, items: null, error: reason.message }); });
-    return () => controller.abort();
-  }, [key, search]);
+  const list = useInfiniteList<Rider>(`${search}:${revision}`, (offset, signal) =>
+    adminRequest<ListResponse<Rider>>(`/api/admin/riders?q=${encodeURIComponent(search)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
+      .then((response) => ({ items: response.items, total: response.total })));
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -126,10 +120,9 @@ export function RiderList() {
     ? { latitude: tracking.activeOrder.kitchen.latitude, longitude: tracking.activeOrder.kitchen.longitude }
     : null;
 
-  const current = result?.key === key;
-  const items = current ? result.items ?? [] : [];
-  const loading = !current;
-  const error = current ? result.error : "";
+  const items = list.items;
+  const loading = list.loading;
+  const error = list.error;
 
   return <>
     <PageHeading title="Riders" description="Create rider accounts, manage access and view live delivery locations." />
@@ -155,9 +148,9 @@ export function RiderList() {
       <label className="admin-customer-search"><span className="sr-only">Search riders</span>
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search rider, email or phone" maxLength={80} />
       </label>
-      <span>{items.length} riders</span>
+      <span>{loading ? "Riders" : `${list.total} riders`}</span>
     </div>
-    <ResourceState loading={loading} error={error} retry={() => setRevision((value) => value + 1)} />
+    <ResourceState loading={loading} error={error} retry={list.reload} />
     {!loading && !error && (items.length ? <div className="admin-rider-list">
       {items.map((rider) => <article className="admin-report admin-rider-card" key={rider.id}>
         {editing === rider.id ? <form className="admin-form" onSubmit={(event) => void save(rider, event)}>
@@ -186,6 +179,7 @@ export function RiderList() {
         </>}
       </article>)}
     </div> : <EmptyState title="No riders found">Create a rider account or try a different search.</EmptyState>)}
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
     <Dialog open={tracking !== null} onOpenChange={(open) => { if (!open) setTracking(null); }}>
       <DialogContent className="google-map-dialog sm:max-w-4xl">
         <DialogHeader>

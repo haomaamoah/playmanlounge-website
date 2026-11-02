@@ -1,19 +1,36 @@
 import { endpoint } from "@/lib/admin/server";
+import { pagination } from "@/lib/admin/pagination";
+import { orderSearchFilter, searchQuery } from "@/lib/admin/search";
 import { ApiFailure } from "@/lib/admin/validation";
 import { db } from "@/lib/db/server";
 import { publicRider, requireRider } from "@/lib/riders/server";
 
+const riderQueues = ["open", "claimed", "delivered", "cancelled"] as const;
+
+/** What this rider is allowed to see for one queue. Open jobs are unclaimed; the other queues are only theirs. */
+function riderOrderScope(riderId: string, queue: string) {
+  const open = "and(rider_id.is.null,status.in.(pending,cooking,ready),payment_status.in.(paid,cod))";
+  const claimed = `and(rider_id.eq.${riderId},rider_delivery_status.in.(assigned,picked_up),status.neq.cancelled)`;
+  if (queue === "open") return open;
+  if (queue === "claimed") return claimed;
+  if (queue === "delivered") return `and(rider_id.eq.${riderId},or(rider_delivery_status.eq.delivered,status.eq.completed))`;
+  if (queue === "cancelled") return `and(rider_id.eq.${riderId},status.eq.cancelled)`;
+  return `${claimed},${open}`;
+}
+
 export const GET = endpoint(async (request) => {
   const rider = await requireRider(request);
-  const url = new URL(request.url);
-  const limitValue = Number(url.searchParams.get("limit") ?? 50);
-  const limit = Number.isInteger(limitValue) ? Math.min(100, Math.max(1, limitValue)) : 50;
-  const { data, error } = await db().from("orders").select("*")
+  const { url, limit, offset } = pagination(request);
+  const search = searchQuery(url);
+  const queue = url.searchParams.get("queue") ?? "";
+  if (queue && !riderQueues.includes(queue as never)) throw new ApiFailure(400, "Invalid delivery filter.");
+  let query = db().from("orders").select("*", { count: "exact" })
     .eq("fulfilment", "delivery")
-    .or(`rider_id.eq.${rider.id},and(rider_id.is.null,status.in.(pending,cooking,ready))`)
-    .in("payment_status", ["paid", "cod"])
-    .not("status", "eq", "cancelled")
-    .order("created_at", { ascending: false }).limit(limit);
+    .or(riderOrderScope(rider.id, queue))
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (search) query = query.or(orderSearchFilter(search));
+  const { data, error, count } = await query;
   if (error) throw new ApiFailure(503, "Could not load deliveries.");
   const kitchenIds = [...new Set((data ?? []).map((row) => row.kitchen_id).filter(Boolean))];
   const [kitchensResult, locationResult] = await Promise.all([
@@ -32,6 +49,7 @@ export const GET = endpoint(async (request) => {
   return {
     ok: true,
     rider: publicRider(rider),
+    total: count ?? 0,
     items: (data ?? []).map((row) => ({
       id: row.id,
       ref: row.order_ref,

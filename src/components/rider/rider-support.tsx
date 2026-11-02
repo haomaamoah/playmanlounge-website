@@ -1,22 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { riderRequest } from "./rider-api";
 
 type Ticket = { id: string; subject: string; message: string; status: string; created_at: string };
 export function RiderSupport() {
-  const [items, setItems] = useState<Ticket[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    riderRequest<{ ok: true; items: Ticket[] }>("/api/rider/support", { signal: controller.signal })
-      .then((result) => { if (!controller.signal.aborted) setItems(result.items); })
-      .catch((reason: Error) => { if (!controller.signal.aborted) setError(reason.message); });
-    return () => controller.abort();
-  }, [revision]);
+  const list = useInfiniteList<Ticket>(String(revision), (offset, signal) =>
+    riderRequest<{ ok: true; items: Ticket[]; total: number }>(`/api/rider/support?limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
+      .then((result) => ({ items: result.items, total: result.total })));
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -36,10 +32,12 @@ export function RiderSupport() {
       <label>Message<textarea name="message" minLength={10} maxLength={4000} rows={5} required /></label>
       <button className="rider-button" disabled={busy}>{busy ? "Sending…" : "Send request"}</button>
     </form>
-    {error && <p className="rider-error" role="alert">{error}</p>}
+    {(error || list.error) && <p className="rider-error" role="alert">{error || list.error}</p>}
     {notice && <p className="rider-success" role="status">{notice}</p>}
     <h2>Previous requests</h2>
-    {items.map((item) => <article className="rider-card" key={item.id}><strong>{item.subject}</strong><p>{item.message}</p><span>{item.status} · {new Date(item.created_at).toLocaleString()}</span></article>)}
-    {!items.length && <p>No support requests yet.</p>}
+    {list.loading && <p role="status">Loading your requests…</p>}
+    {list.items.map((item) => <article className="rider-card" key={item.id}><strong>{item.subject}</strong><p>{item.message}</p><span>{item.status} · {new Date(item.created_at).toLocaleString()}</span></article>)}
+    {!list.loading && !list.items.length && <p>No support requests yet.</p>}
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
   </section>;
 }

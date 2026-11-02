@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AdminOrder } from "@/lib/admin/contracts";
 import { OrderTable } from "@/components/admin/admin-ui";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
 
 export function useCustomerResource<T>(url: string, errorMessage = "Could not load your orders.") {
@@ -33,13 +34,19 @@ export function CustomerOrdersView({ orders }: { orders: AdminOrder[] }) {
 
 export function CustomerOrders() {
   const [query, setQuery] = useState("");
-  const { data, error } = useCustomerResource<{ ok: true; orders: AdminOrder[] }>(`/api/customer/orders?q=${encodeURIComponent(query)}`);
+  const list = useInfiniteList<AdminOrder>(query, async (offset, signal) => {
+    const response = await fetch(`/api/customer/orders?q=${encodeURIComponent(query)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`, { cache: "no-store", credentials: "same-origin", signal });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Could not load your orders.");
+    return { items: data.orders as AdminOrder[], total: Number(data.total ?? 0) };
+  });
   return <section>
     <h1 className="font-display text-4xl">Your orders</h1>
     <p className="text-muted-foreground mt-3">Recent orders placed with this account.</p>
     <PortalSearch label="Search your orders by order ID or payment reference" placeholder="Search order ID or payment reference" onSearch={setQuery} />
-    {error && <p role="alert" className="text-destructive mt-6">{error}</p>}
-    {!data && !error && <p role="status" className="mt-6">Loading your orders…</p>}
-    {data && (query && !data.orders.length ? <p role="status" className="mt-6">No matching orders. Try another reference or clear your search.</p> : <CustomerOrdersView orders={data.orders} />)}
+    {list.error && <p role="alert" className="text-destructive mt-6">{list.error}</p>}
+    {list.loading && <p role="status" className="mt-6">Loading your orders…</p>}
+    {!list.loading && !list.error && (query && !list.items.length ? <p role="status" className="mt-6">No matching orders. Try another reference or clear your search.</p> : <CustomerOrdersView orders={list.items} />)}
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
   </section>;
 }

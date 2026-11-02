@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { Bike, MapPin } from "lucide-react";
+import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
+import { PortalSearch } from "@/components/portal-search";
 import { riderRequest } from "./rider-api";
 
 type RiderOrder = {
@@ -19,27 +22,66 @@ type RiderOrder = {
   kitchen: { name: string; latitude: number; longitude: number } | null;
 };
 
+const deliveryFilters = [
+  { value: "", label: "All" },
+  { value: "open", label: "Open" },
+  { value: "claimed", label: "Claimed" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 export function RiderOrders() {
-  const [items, setItems] = useState<RiderOrder[]>([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const search = useSearchParams();
+  const initialQueue = search.get("queue") ?? "";
+  const [queue, setQueue] = useState(deliveryFilters.some((entry) => entry.value === initialQueue) ? initialQueue : "");
+  const [query, setQuery] = useState("");
   const [version, setVersion] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    riderRequest<{ ok: true; items: RiderOrder[] }>("/api/rider/orders", { signal: controller.signal })
-      .then((result) => { if (!controller.signal.aborted) { setItems(result.items); setError(""); } })
-      .catch((reason: Error) => { if (!controller.signal.aborted) setError(reason.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [version]);
+  const filtering = Boolean(queue || query);
+  const list = useInfiniteList<RiderOrder>(`${queue}:${query}:${version}`, (offset, signal) => {
+    const params = new URLSearchParams({
+      queue,
+      q: query,
+      limit: String(LIST_PAGE_SIZE),
+      offset: String(offset),
+    });
+    return riderRequest<{ ok: true; items: RiderOrder[]; total: number }>(`/api/rider/orders?${params}`, { signal })
+      .then((result) => ({ items: result.items, total: result.total }));
+  });
+
   return <section>
-    <header className="rider-page-heading"><div><h1 className="font-display">Delivery orders</h1><p>Claim an open delivery or continue an order assigned to you.</p></div>
-      <button className="rider-button rider-button-secondary" onClick={() => { setLoading(true); setVersion((value) => value + 1); }}>Refresh</button>
+    <header className="rider-page-heading">
+      <div>
+        <h1 className="font-display">Delivery orders</h1>
+        <p>Claim an open delivery or continue an order assigned to you.</p>
+      </div>
+      <button className="rider-button rider-button-secondary" onClick={() => setVersion((value) => value + 1)}>Refresh</button>
     </header>
-    {error && <p className="rider-error" role="alert">{error}</p>}
-    {loading && <p role="status">Loading delivery orders…</p>}
-    {!loading && !error && !items.length && <p className="rider-empty">No open or assigned deliveries right now.</p>}
-    <div className="rider-order-list">{items.map((order) => {
+    <PortalSearch
+      label="Search orders by order ID, reference, customer name, email, or phone"
+      placeholder="Search order ID, customer name, email, or phone"
+      onSearch={setQuery}
+    />
+    <div className="rider-toolbar">
+      <div className="rider-filters" role="group" aria-label="Filter deliveries">
+        {deliveryFilters.map((entry) => (
+          <button
+            key={entry.value}
+            type="button"
+            aria-pressed={entry.value === queue}
+            onClick={() => setQueue(entry.value)}
+          >{entry.label}</button>
+        ))}
+      </div>
+    </div>
+    {list.error && <p className="rider-error" role="alert">{list.error}</p>}
+    {list.loading && <p role="status">Loading delivery orders…</p>}
+    {!list.loading && !list.error && <p className="rider-results" aria-live="polite">{list.total} matching orders</p>}
+    {!list.loading && !list.error && !list.items.length && (
+      <p className="rider-empty">{filtering
+        ? "No matching deliveries. Try another search or filter, or choose All."
+        : "No open or assigned deliveries right now."}</p>
+    )}
+    <div className="rider-order-list">{list.items.map((order) => {
       const mine = order.riderDeliveryStatus !== null;
       return <article className="rider-card" key={order.id}>
         <div className="rider-card-title"><Bike aria-hidden="true" /><div><h2>{order.ref}</h2><span>{mine ? order.riderDeliveryStatus === "picked_up" ? "Picked up · on the way" : order.riderDeliveryStatus === "delivered" ? "Delivered" : "Accepted · awaiting pickup" : "Open delivery"}</span></div></div>
@@ -48,5 +90,6 @@ export function RiderOrders() {
         <Link className="rider-button" href={`/rider/orders/${encodeURIComponent(order.id)}`}>{mine ? "Open delivery" : "View and claim"}</Link>
       </article>;
     })}</div>
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
   </section>;
 }

@@ -1,18 +1,25 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bike, House, ClipboardList, MessagesSquare, Settings, LogOut } from "lucide-react";
+import { ClipboardList, House, LogOut, MessagesSquare, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
+import { site } from "@/lib/content";
 import { riderRequest } from "./rider-api";
 
 type RiderSession = { ok: true; rider: { id: string; name: string; email: string } };
+
 const links = [
   { href: "/rider", label: "Home", icon: House },
   { href: "/rider/orders", label: "Orders", icon: ClipboardList },
   { href: "/rider/support", label: "Support", icon: MessagesSquare },
   { href: "/rider/settings", label: "Settings", icon: Settings },
 ];
+
+function isCurrent(pathname: string, href: string) {
+  return href === "/rider" ? pathname === href : pathname.startsWith(href);
+}
 
 export function RiderShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -52,15 +59,40 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
 
   if (isLogin) return <div className="rider-root rider-auth">{children}</div>;
   if (!rider) return <div className="rider-root rider-gate" role="status">{error || "Checking your secure rider account…"}</div>;
+
   return <div className="rider-root rider-workspace">
-    <header className="rider-header">
-      <Link className="rider-brand" href="/rider"><Bike size={25} /> <span>Play Man Lounge<br /><small>Rider portal</small></span></Link>
-      <nav aria-label="Rider navigation">{links.map(({ href, label, icon: Icon }) =>
-        <Link key={href} href={href} aria-current={href === "/rider" ? pathname === href ? "page" : undefined : pathname.startsWith(href) ? "page" : undefined}>
-          <Icon size={19} aria-hidden="true" /><span>{label}</span>
-        </Link>)}</nav>
-      <div className="rider-account"><span>{rider.name}</span><button className="rider-button rider-button-secondary" onClick={() => void signOut()} disabled={busy}><LogOut size={16} />{busy ? "Signing out…" : "Sign out"}</button></div>
-    </header>
-    <main className="rider-main">{error && <p className="rider-error" role="alert">{error}</p>}{children}</main>
+    <a className="rider-skip" href="#main">Skip to workspace</a>
+    <aside className="rider-sidebar">
+      <Link href="/rider" className="rider-brand">
+        <Image src={site.logo.src} alt="" width={48} height={48} />
+        <span>
+          <strong className="font-display">Rider desk</strong>
+          <small>Play Man Lounge</small>
+        </span>
+      </Link>
+      <nav aria-label="Rider navigation">
+        {links.map(({ href, label, icon: Icon }) => {
+          const active = isCurrent(pathname, href);
+          return <Link key={href} href={href} aria-current={active ? "page" : undefined}>
+            <Icon size={19} aria-hidden="true" />
+            <span>{label}</span>
+          </Link>;
+        })}
+      </nav>
+      <div className="rider-account">
+        <span title={`${rider.name} · ${rider.email}`}>
+          <strong>{rider.name}</strong>
+          <small>{rider.email}</small>
+        </span>
+        <button type="button" onClick={() => void signOut()} disabled={busy}>
+          <LogOut size={18} aria-hidden="true" />
+          {busy ? "Signing out…" : "Sign out"}
+        </button>
+      </div>
+    </aside>
+    <main id="main" className="rider-main">
+      {error && <p className="rider-error" role="alert">{error}</p>}
+      {children}
+    </main>
   </div>;
 }

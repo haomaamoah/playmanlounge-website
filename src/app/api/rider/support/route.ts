@@ -1,15 +1,18 @@
 import { audit, checkOrigin, endpoint, jsonBody } from "@/lib/admin/server";
+import { pagination } from "@/lib/admin/pagination";
 import { ApiFailure, object, text } from "@/lib/admin/validation";
 import { db } from "@/lib/db/server";
 import { requireRider } from "@/lib/riders/server";
 
 export const GET = endpoint(async (request) => {
   const rider = await requireRider(request);
-  const { data, error } = await db().from("rider_support_requests")
-    .select("id,subject,message,status,created_at,updated_at")
-    .eq("rider_id", rider.id).order("created_at", { ascending: false }).limit(50);
+  const { limit, offset } = pagination(request);
+  const { data, error, count } = await db().from("rider_support_requests")
+    .select("id,subject,message,status,created_at,updated_at", { count: "exact" })
+    .eq("rider_id", rider.id).order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) throw new ApiFailure(503, "Could not load your support requests.");
-  return { ok: true, items: data ?? [] };
+  return { ok: true, items: data ?? [], total: count ?? 0 };
 });
 
 export const POST = endpoint(async (request) => {
