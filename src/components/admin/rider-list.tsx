@@ -27,6 +27,7 @@ type RiderLocation = {
     ref: string;
     deliveryStatus: string;
     destination: { address: string; latitude: number | null; longitude: number | null };
+    kitchen: { name: string; latitude: number | null; longitude: number | null } | null;
   } | null;
 };
 
@@ -120,7 +121,10 @@ export function RiderList() {
   const destination = tracking?.activeOrder?.destination;
   const target = destination?.latitude != null && destination.longitude != null
     ? { latitude: destination.latitude, longitude: destination.longitude }
-    : location ? { latitude: location.latitude, longitude: location.longitude } : null;
+    : null;
+  const kitchenPoint = tracking?.activeOrder?.kitchen?.latitude != null && tracking.activeOrder.kitchen.longitude != null
+    ? { latitude: tracking.activeOrder.kitchen.latitude, longitude: tracking.activeOrder.kitchen.longitude }
+    : null;
 
   const current = result?.key === key;
   const items = current ? result.items ?? [] : [];
@@ -190,9 +194,10 @@ export function RiderList() {
             {tracking?.rider.name}{tracking?.activeOrder ? ` · ${tracking.activeOrder.ref} · ${destination?.address ?? ""}` : ""}
           </DialogDescription>
         </DialogHeader>
-        {location && target ? <RiderTrackingMap
+        {location ? <RiderTrackingMap
           initialLocation={{ latitude: location.latitude, longitude: location.longitude }}
           destination={target}
+          kitchen={kitchenPoint}
           locationUrl={`/api/admin/riders/${encodeURIComponent(tracking!.rider.id)}/location`}
         /> : <p role="status">This rider has not shared a GPS location yet.</p>}
       </DialogContent>

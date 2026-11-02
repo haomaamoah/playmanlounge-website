@@ -2,22 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "./google-location-picker";
+import { mapPinIcon } from "./map-pins";
 
 type Point = { latitude: number; longitude: number };
 
+function hasPoint(point: Point | null | undefined): point is Point {
+  return typeof point?.latitude === "number" && typeof point.longitude === "number";
+}
+
 export function RiderTrackingMap({
   initialLocation,
-  destination,
+  destination = null,
+  kitchen = null,
   locationUrl,
 }: {
   initialLocation: Point | null;
-  destination: Point;
+  destination?: Point | null;
+  kitchen?: Point | null;
   locationUrl: string;
 }) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const riderMarker = useRef<google.maps.Marker | null>(null);
   const destinationMarker = useRef<google.maps.Marker | null>(null);
+  const kitchenMarker = useRef<google.maps.Marker | null>(null);
   const routeLine = useRef<google.maps.Polyline | null>(null);
   const [location, setLocation] = useState(initialLocation);
   const locationRef = useRef(location);
@@ -25,8 +33,10 @@ export function RiderTrackingMap({
   const [error, setError] = useState("");
   const [mapError, setMapError] = useState("");
   const [loading, setLoading] = useState(true);
-  const destinationLat = destination.latitude;
-  const destinationLng = destination.longitude;
+  const destinationLat = hasPoint(destination) ? destination.latitude : null;
+  const destinationLng = hasPoint(destination) ? destination.longitude : null;
+  const kitchenLat = hasPoint(kitchen) ? kitchen.latitude : null;
+  const kitchenLng = hasPoint(kitchen) ? kitchen.longitude : null;
 
   useEffect(() => {
     let active = true;
@@ -63,7 +73,11 @@ export function RiderTrackingMap({
       const currentLocation = locationRef.current;
       const center = currentLocation
         ? { lat: currentLocation.latitude, lng: currentLocation.longitude }
-        : { lat: destinationLat, lng: destinationLng };
+        : destinationLat !== null && destinationLng !== null
+          ? { lat: destinationLat, lng: destinationLng }
+          : kitchenLat !== null && kitchenLng !== null
+            ? { lat: kitchenLat, lng: kitchenLng }
+            : { lat: 5.6037, lng: -0.187 };
       const instance = new maps.Map(node.current, {
         center,
         zoom: 13,
@@ -74,15 +88,28 @@ export function RiderTrackingMap({
       riderMarker.current = new maps.Marker({
         map: instance,
         position: center,
-        icon: "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
+        icon: mapPinIcon(maps, "rider"),
         title: "Rider's current location",
+        zIndex: 3,
       });
-      destinationMarker.current = new maps.Marker({
-        map: instance,
-        position: { lat: destinationLat, lng: destinationLng },
-        icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-        title: "Delivery destination",
-      });
+      if (destinationLat !== null && destinationLng !== null) {
+        destinationMarker.current = new maps.Marker({
+          map: instance,
+          position: { lat: destinationLat, lng: destinationLng },
+          icon: mapPinIcon(maps, "customer"),
+          title: "Customer",
+          zIndex: 1,
+        });
+      }
+      if (kitchenLat !== null && kitchenLng !== null) {
+        kitchenMarker.current = new maps.Marker({
+          map: instance,
+          position: { lat: kitchenLat, lng: kitchenLng },
+          icon: mapPinIcon(maps, "kitchen"),
+          title: "Kitchen",
+          zIndex: 2,
+        });
+      }
       routeLine.current = new maps.Polyline({ map: instance, strokeColor: "#1a73e8", strokeOpacity: 0.95, strokeWeight: 5 });
       setLoading(false);
     }).catch((reason: unknown) => {
@@ -95,10 +122,11 @@ export function RiderTrackingMap({
       active = false;
       riderMarker.current?.setMap(null);
       destinationMarker.current?.setMap(null);
+      kitchenMarker.current?.setMap(null);
       routeLine.current?.setMap(null);
       map.current = null;
     };
-  }, [destinationLat, destinationLng]);
+  }, [destinationLat, destinationLng, kitchenLat, kitchenLng]);
 
   useEffect(() => {
     let active = true;
@@ -106,6 +134,14 @@ export function RiderTrackingMap({
     if (!instance || !location) return;
     const origin = { lat: location.latitude, lng: location.longitude };
     riderMarker.current?.setPosition(origin);
+    if (destinationLat === null || destinationLng === null) {
+      routeLine.current?.setPath([]);
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(origin);
+      if (kitchenLat !== null && kitchenLng !== null) bounds.extend({ lat: kitchenLat, lng: kitchenLng });
+      if (kitchenLat !== null) instance.fitBounds(bounds);
+      return;
+    }
     void loadGoogleMaps().then((maps) => maps.routes.Route.computeRoutes({
       origin,
       destination: { lat: destinationLat, lng: destinationLng },
@@ -121,13 +157,16 @@ export function RiderTrackingMap({
       if (active) setError(reason instanceof Error ? reason.message : "The rider route could not be refreshed.");
     });
     return () => { active = false; };
-  }, [location, destinationLat, destinationLng, loading]);
+  }, [location, destinationLat, destinationLng, kitchenLat, kitchenLng, loading]);
 
   return <div>
     <div ref={node} className="google-map-canvas google-route-canvas" aria-label="Live rider location and delivery destination" />
     {loading && <p className="google-location-message" role="status">Loading live rider map…</p>}
     {mapError && <p className="google-location-error" role="alert">Map unavailable: {mapError}</p>}
     {error && <p className="google-location-error" role="status">{error}</p>}
+    <p className="google-location-message">
+      Scooter: rider{kitchenLat !== null ? " · Pot: kitchen" : ""}{destinationLat !== null ? " · House: customer" : ""}
+    </p>
   </div>;
 }
 
@@ -168,16 +207,16 @@ export function RiderMissionMap({
       const instance = new maps.Map(node.current, { center, zoom: 12, mapTypeControl: true, streetViewControl: false });
       map.current = instance;
       riderMarker.current = new maps.Marker({
-        map: instance, position: center, icon: "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
-        title: "Rider's current location",
+        map: instance, position: center, icon: mapPinIcon(maps, "rider"),
+        title: "Rider's current location", zIndex: 3,
       });
       kitchenMarker.current = new maps.Marker({
         map: instance, position: { lat: kitchenLat, lng: kitchenLng },
-        title: "Kitchen",
+        icon: mapPinIcon(maps, "kitchen"), title: "Kitchen", zIndex: 2,
       });
       destinationMarker.current = new maps.Marker({
         map: instance, position: { lat: destinationLat, lng: destinationLng },
-        icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png", title: "Customer destination",
+        icon: mapPinIcon(maps, "customer"), title: "Customer destination", zIndex: 1,
       });
       yellowRoute.current = new maps.Polyline({ map: instance, strokeColor: "#f4b400", strokeOpacity: .95, strokeWeight: 5 });
       blueRoute.current = new maps.Polyline({ map: instance, strokeColor: "#1a73e8", strokeOpacity: .95, strokeWeight: 5 });
@@ -254,6 +293,6 @@ export function RiderMissionMap({
     {mapError && <p className="google-location-error" role="alert">Map unavailable: {mapError}</p>}
     {!location && <p className="google-location-error" role="status">Enable location sharing to show your current position and routes.</p>}
     {error && <p className="google-location-error" role="status">{error}</p>}
-    <p className="google-location-message">Orange: rider · Green: customer · {pickedUp ? "Blue: route to customer" : "Yellow: route to kitchen · Blue: route to customer"}</p>
+    <p className="google-location-message">Scooter: rider · Pot: kitchen · House: customer · {pickedUp ? "Blue: route to customer" : "Yellow: route to kitchen · Blue: route to customer"}</p>
   </div>;
 }

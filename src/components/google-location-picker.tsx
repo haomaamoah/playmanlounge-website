@@ -5,6 +5,7 @@ import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { mapPinIcon } from "./map-pins";
 
 const accra = { lat: 5.6037, lng: -0.187 };
 let mapsPromise: Promise<typeof google.maps> | null = null;
@@ -46,6 +47,7 @@ export function GoogleLocationPicker({
   required = false,
   error,
   name,
+  pin: pinKind = "customer",
 }: {
   label: string;
   value: Location;
@@ -53,6 +55,7 @@ export function GoogleLocationPicker({
   required?: boolean;
   error?: string;
   name?: string;
+  pin?: "kitchen" | "customer";
 }) {
   const [query, setQuery] = useState(value.address);
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompleteSuggestion[]>([]);
@@ -180,7 +183,13 @@ export function GoogleLocationPicker({
         fullscreenControl: true,
       });
       mapRef.current = map;
-      const marker = markerRef.current ?? new maps.Marker({ map, position: center, draggable: true, title: "Delivery or kitchen location" });
+      const marker = markerRef.current ?? new maps.Marker({
+        map,
+        position: center,
+        draggable: true,
+        icon: mapPinIcon(maps, pinKind),
+        title: pinKind === "kitchen" ? "Kitchen location" : "Delivery location",
+      });
       marker.setMap(map);
       markerRef.current = marker;
       marker.setPosition(center);
@@ -375,13 +384,13 @@ export function GoogleDirectionsMap({
         new maps.Marker({
           map,
           position: { lat: originLat, lng: originLng },
-          icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+          icon: mapPinIcon(maps, "kitchen"),
           title: "Kitchen",
         });
         new maps.Marker({
           map,
           position: { lat: destinationLat, lng: destinationLng },
-          icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+          icon: mapPinIcon(maps, "customer"),
           title: "Delivery address",
         });
         if (route.viewport) map.fitBounds(route.viewport);

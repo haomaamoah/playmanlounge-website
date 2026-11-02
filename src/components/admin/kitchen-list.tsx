@@ -35,6 +35,7 @@ function KitchenLocation({ kitchen }: { kitchen?: Kitchen }) {
   return (
     <GoogleLocationPicker
       name="location"
+      pin="kitchen"
       label="Address and pin location"
       required
       value={location}

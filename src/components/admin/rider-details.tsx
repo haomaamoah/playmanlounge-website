@@ -51,6 +51,9 @@ export function RiderDetails({
         <RiderTrackingMap
           initialLocation={order.riderLocation ?? null}
           destination={{ latitude: order.deliveryLatitude!, longitude: order.deliveryLongitude! }}
+          kitchen={order.kitchen?.latitude != null && order.kitchen.longitude != null
+            ? { latitude: order.kitchen.latitude, longitude: order.kitchen.longitude }
+            : null}
           locationUrl={locationUrl}
         />
       </DialogContent>
