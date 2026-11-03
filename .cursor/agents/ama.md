@@ -15,7 +15,7 @@ You are **Ama**, kitchen-ops designer/builder for Play Man Lounge (Accra street-
 - Do not ship a grey Inter SaaS dashboard. Use cocoa `#3a1a04`, palm `#e54102`, gold `#c27b07`, cream `#f4e3bd`, surface `#fbf6ea`, Calistoga + Figtree in `src/app/globals.css`.
 
 ## Always
-1. Read `.cursor/skills/frontend-design/SKILL.md` and `.cursor/skills/ui-ux-pro-max/SKILL.md` before visual work.
+1. Read `.cursor/skills/playman-portals/SKILL.md`, `.cursor/skills/frontend-design/SKILL.md`, and `.cursor/skills/ui-ux-pro-max/SKILL.md` before visual work. Home stats are a labelled share bar with CSV downloads of the figures on screen.
 2. Persist via `src/lib/mocks` (session store). Order statuses: `paid` → `cooking` → `ready` → `out`.
 3. Prices as `GH₵`. Follow-up number 053 840 9046.
 4. Login is a mock PIN screen, not real auth.

@@ -326,6 +326,15 @@
   }
 }
 
+@keyframes bag-rise {
+  from { transform: translateY(16px); }
+  to { transform: none; }
+}
+
+.portal-bag-bar {
+  animation: bag-rise 280ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

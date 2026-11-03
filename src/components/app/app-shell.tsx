@@ -123,7 +123,7 @@ export function AppShell({ children, customerName, menuGroups }: { children: Rea
         {showBagBar && (
           <Link
             href="/app/bag"
-            className="bg-cocoa text-cream fixed inset-x-4 bottom-4 z-40 flex min-h-14 items-center justify-between gap-3 px-4 shadow-lg md:left-[calc(232px+1.5rem)] md:right-6"
+            className="portal-bag-bar bg-cocoa text-cream fixed inset-x-4 bottom-4 z-40 flex min-h-14 items-center justify-between gap-3 px-4 shadow-lg md:left-[calc(232px+1.5rem)] md:right-6"
             style={{ marginBottom: "env(safe-area-inset-bottom)" }}
           >
             <span className="inline-flex items-center gap-2 font-semibold">

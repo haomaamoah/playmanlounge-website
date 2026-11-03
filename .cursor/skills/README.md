@@ -7,6 +7,7 @@ Agent Skills live in `.cursor/skills/<name>/SKILL.md` and are committed, so they
 | `frontend-design` | [anthropics/claude-code](https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md) | Anthropic |
 | `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | MIT |
 | `brand` | same repo, shipped alongside `ui-ux-pro-max` | MIT |
+| `playman-portals` | this repo | project |
 
 `ui-ux-pro-max` and `brand` were authored for Claude under `.claude/skills/`; they were copied into `.cursor/skills/` because Cursor discovers skills there. Test fixtures were dropped; the searchable data under `ui-ux-pro-max/data/` was kept.
 

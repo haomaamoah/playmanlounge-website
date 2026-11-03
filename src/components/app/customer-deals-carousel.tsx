@@ -98,7 +98,7 @@ export function CustomerDealsCarousel({ groups }: { groups: MenuGroup[] }) {
               className="bg-surface border-border flex w-[86%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border sm:w-[calc((100%_-_1rem)/2)]">
               <div className="bg-cocoa relative aspect-[4/3] overflow-hidden">
                 <Image src={deal.image} alt={deal.name} fill
-                  sizes="(max-width: 639px) 86vw, 48vw" className="object-cover" />
+                  sizes="(max-width: 639px) 86vw, 48vw" className="object-cover motion-safe:transition-transform motion-safe:duration-300 hover:scale-105" />
               </div>
               <div className="flex flex-1 flex-col p-4">
                 <p className="text-palm-ink mb-1 text-xs font-bold tracking-wider uppercase">

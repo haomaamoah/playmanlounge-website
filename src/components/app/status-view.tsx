@@ -45,14 +45,13 @@ export function StatusView() {
         {order.customerName}, headed to {order.deliveryArea}. Kitchen will move
         this ticket as they cook.
       </p>
-      <ol className="mt-8 grid grid-cols-4 gap-1">
+      <ol className="mt-8 grid grid-cols-4 gap-2">
         {ORDER_STATUSES.map((status, index) => (
           <li key={status} className="text-center">
+            <span className={`block h-1.5 ${index <= step ? "bg-palm" : "bg-border"}`} />
             <span
-              className={`block border-b-4 pb-2 text-xs font-semibold sm:text-sm ${
-                index <= step
-                  ? "border-palm text-cocoa"
-                  : "border-border text-muted-foreground"
+              className={`mt-2 block text-xs font-semibold sm:text-sm ${
+                index <= step ? "text-cocoa" : "text-muted-foreground"
               }`}
             >
               {statusLabel(status)}
