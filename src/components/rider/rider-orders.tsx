@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Bike, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
+import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
+import { useMenuGroups } from "@/components/orders/use-menu-groups";
+import { menuPlacement, placementLabel, shortOrderId } from "@/lib/orders/display";
 import { riderRequest } from "./rider-api";
 
 type RiderOrder = {
@@ -20,6 +23,7 @@ type RiderOrder = {
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
   kitchen: { name: string; latitude: number; longitude: number } | null;
+  firstItemId: string;
 };
 
 const deliveryFilters = [
@@ -30,12 +34,20 @@ const deliveryFilters = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+function deliveryCopy(status: string | null) {
+  if (status === "picked_up") return { tone: "riding", label: "Picked up · on the way", action: "Open delivery" };
+  if (status === "delivered") return { tone: "done", label: "Delivered", action: "Open delivery" };
+  if (status !== null) return { tone: "accepted", label: "Accepted · awaiting pickup", action: "Open delivery" };
+  return { tone: "open", label: "Open delivery", action: "View and claim" };
+}
+
 export function RiderOrders() {
   const search = useSearchParams();
   const initialQueue = search.get("queue") ?? "";
   const [queue, setQueue] = useState(deliveryFilters.some((entry) => entry.value === initialQueue) ? initialQueue : "");
   const [query, setQuery] = useState("");
   const [version, setVersion] = useState(0);
+  const groups = useMenuGroups();
   const filtering = Boolean(queue || query);
   const list = useInfiniteList<RiderOrder>(`${queue}:${query}:${version}`, (offset, signal) => {
     const params = new URLSearchParams({
@@ -82,12 +94,23 @@ export function RiderOrders() {
         : "No open or assigned deliveries right now."}</p>
     )}
     <div className="rider-order-list">{list.items.map((order) => {
-      const mine = order.riderDeliveryStatus !== null;
-      return <article className="rider-card" key={order.id}>
-        <div className="rider-card-title"><Bike aria-hidden="true" /><div><h2>{order.ref}</h2><span>{mine ? order.riderDeliveryStatus === "picked_up" ? "Picked up · on the way" : order.riderDeliveryStatus === "delivered" ? "Delivered" : "Accepted · awaiting pickup" : "Open delivery"}</span></div></div>
-        <p><MapPin size={16} aria-hidden="true" />{order.deliveryAddress || "Delivery coordinates saved"}</p>
-        <p>Customer: {order.customerName} · Kitchen: {order.kitchen?.name ?? "Unavailable"}</p>
-        <Link className="rider-button" href={`/rider/orders/${encodeURIComponent(order.id)}`}>{mine ? "Open delivery" : "View and claim"}</Link>
+      const placement = menuPlacement(order.firstItemId, groups);
+      const delivery = deliveryCopy(order.riderDeliveryStatus);
+      const kind = placementLabel(placement);
+      return <article className="rider-card rider-ticket" key={order.id}>
+        <Link className="rider-ticket-link" href={`/rider/orders/${encodeURIComponent(order.id)}`} aria-label={`Open order ${order.ref}, ${kind}`}>
+          <span className="rider-ticket-mark">
+            <MenuPlacementImage placement={placement} alt={kind} />
+          </span>
+          <h2 className="rider-ticket-id font-display">{shortOrderId(order.ref)}</h2>
+          <span className={`rider-ticket-status is-${delivery.tone}`}>{delivery.label}</span>
+          <span className="rider-ticket-address">
+            <MapPin size={16} aria-hidden="true" />
+            <span>{order.deliveryAddress || "Delivery coordinates saved"}</span>
+          </span>
+          <span className="rider-ticket-meta">Customer: {order.customerName} · Kitchen: {order.kitchen?.name ?? "Unavailable"}</span>
+          <span className="rider-ticket-action">{delivery.action}</span>
+        </Link>
       </article>;
     })}</div>
     <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />

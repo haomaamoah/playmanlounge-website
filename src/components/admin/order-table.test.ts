@@ -15,15 +15,16 @@ const base: AdminOrder = {
 test("pending PaySwitch payments are clickable in the admin table", () => {
   const html = renderToStaticMarkup(createElement(OrderTable, { items: [base] }));
   assert.match(html, /<button[^>]*aria-label="Check PaySwitch payment status for PML-2001"/);
-  assert.match(html, />PML-2001\.\.\.\.\.\.<\/a>/);
+  assert.match(html, /href="\/admin\/orders\/PML-2001"/);
+  assert.match(html, />PML-2\.\.\.</);
   assert.doesNotMatch(html, />PML-2001<\/a>/);
 });
 
 test("settled, pay-on-delivery and customer-portal payments are not clickable", () => {
   for (const order of [{ ...base, paymentStatus: "paid" as const }, { ...base, paymentStatus: "cod" as const, transactionId: null }]) {
-    assert.doesNotMatch(renderToStaticMarkup(createElement(OrderTable, { items: [order] })), /<button/);
+    assert.doesNotMatch(renderToStaticMarkup(createElement(OrderTable, { items: [order] })), /Check PaySwitch payment status/);
   }
-  assert.doesNotMatch(renderToStaticMarkup(createElement(OrderTable, { items: [base], checkPayments: false })), /<button/);
+  assert.doesNotMatch(renderToStaticMarkup(createElement(OrderTable, { items: [base], checkPayments: false })), /Check PaySwitch payment status/);
 });
 
 test("kitchen status options follow the legal transition sequence and payment gate", () => {
@@ -36,16 +37,19 @@ test("kitchen status options follow the legal transition sequence and payment ga
   assert.deepEqual(availableOrderStatuses("cancelled", "paid"), ["cancelled"]);
 });
 
-test("admin order table renders an inline kitchen status selector", () => {
+test("admin order rows show kitchen status as text and proceed or cancel actions", () => {
   const paidOrder = { ...base, paymentStatus: "paid" as const };
   const html = renderToStaticMarkup(createElement(OrderTable, { items: [paidOrder] }));
-  assert.match(html, /class="admin-order-status-select admin-badge-pending"/);
-  assert.match(html, /aria-label="Kitchen status for order PML-2001"/);
-  assert.match(html, /<option value="cooking">Cooking<\/option>/);
-  assert.match(html, /<option value="ready">Ready<\/option>/);
+  assert.match(html, /<th>Actions<\/th>/);
+  assert.match(html, /admin-badge-pending/);
+  assert.doesNotMatch(html, /<select/);
+  assert.match(html, /aria-label="Proceed order PML-2001 to Cooking"/);
+  assert.match(html, /aria-label="Cancel order PML-2001"/);
+  assert.match(html, />Proceed</);
+  assert.match(html, />Cancel</);
 });
 
-test("kitchen status selector uses the matching payment badge palette", () => {
+test("proceed is disabled when the order is completed or cancelled", () => {
   const html = renderToStaticMarkup(
     createElement(OrderTable, {
       items: [
@@ -54,24 +58,14 @@ test("kitchen status selector uses the matching payment badge palette", () => {
       ],
     }),
   );
-  assert.match(html, /class="admin-order-status-select admin-badge-completed is-terminal"/);
-  assert.match(html, /class="admin-order-status-select admin-badge-cancelled is-terminal"/);
+  assert.match(html, /admin-badge-completed/);
+  assert.match(html, /admin-badge-cancelled/);
+  assert.equal((html.match(/admin-order-action-proceed" disabled=""/g) ?? []).length, 2);
+  assert.equal((html.match(/admin-order-action-cancel" disabled=""/g) ?? []).length, 2);
 });
 
-test("terminal kitchen statuses show a lock beside the disabled selector", () => {
-  const terminalHtml = renderToStaticMarkup(
-    createElement(OrderTable, {
-      items: [
-        { ...base, status: "completed", paymentStatus: "paid" },
-        { ...base, id: "PML-2002", status: "cancelled", paymentStatus: "failed" },
-      ],
-    }),
-  );
-  assert.equal((terminalHtml.match(/<svg[^>]*admin-order-status-lock/g) ?? []).length, 2);
-  assert.equal((terminalHtml.match(/disabled=""/g) ?? []).length, 2);
-
-  const activeHtml = renderToStaticMarkup(
-    createElement(OrderTable, { items: [{ ...base, paymentStatus: "paid" }] }),
-  );
-  assert.doesNotMatch(activeHtml, /admin-order-status-lock/);
+test("proceed stays off until payment is confirmed", () => {
+  const html = renderToStaticMarkup(createElement(OrderTable, { items: [base] }));
+  assert.match(html, /admin-order-action-proceed" disabled=""/);
+  assert.doesNotMatch(html, /admin-order-action-cancel" disabled=""/);
 });

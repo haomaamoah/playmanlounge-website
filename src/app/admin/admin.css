@@ -96,7 +96,13 @@
 .admin-table td { padding: 18px; border-top: 1px solid var(--border); background: #fffaf0; vertical-align: middle; }
 .admin-table tbody tr:hover td { background: #f7edda; }
 .admin-table small { display: block; color: #6b4a28; font-size: 12px; margin-top: 5px; }
-.admin-order-link { font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; overflow-wrap: anywhere; }
+.admin-kind-heading, .admin-kind-cell { width: 76px; }
+.admin-kind-cell { padding-right: 8px; }
+.admin-kind-image { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; display: block; }
+.admin-table tbody tr.admin-order-row { position: relative; }
+.admin-order-link { position: static; font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; color: inherit; }
+.admin-order-link::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.admin-payment-check, .admin-order-status-control { position: relative; z-index: 2; }
 .admin-payment-check { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; justify-self: start; }
 .admin-payment-check .admin-badge { text-decoration: underline; text-underline-offset: 3px; }
 .admin-payment-check:hover:not(:disabled) .admin-badge { background: var(--rice-cream); border-color: var(--admin-control-border); }
@@ -113,6 +119,13 @@
 .admin-root .admin-order-status-select.is-terminal { padding-right: 58px; }
 .admin-root .admin-order-status-select:hover:not(:disabled) { border-color: var(--admin-control-border); filter: brightness(.97); }
 .admin-root .admin-order-status-select:disabled { cursor: not-allowed; opacity: 1; }
+.admin-order-actions { display: flex; align-items: flex-start; gap: 14px; }
+.admin-order-action { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 44px; padding: 0; border: 0; background: transparent; color: #3a1a04; font-size: 12px; font-weight: 600; line-height: 1.2; cursor: pointer; }
+.admin-order-action-dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; }
+.admin-order-action-proceed .admin-order-action-dot { background: #1b7a45; }
+.admin-order-action-cancel .admin-order-action-dot { background: #9b1c0a; }
+.admin-order-action:hover:not(:disabled) .admin-order-action-dot { filter: brightness(1.08); }
+.admin-order-action:disabled { cursor: not-allowed; opacity: .4; }
 .admin-order-status-lock { position: absolute; top: 50%; right: 32px; width: 15px; height: 15px; color: currentColor; opacity: .8; pointer-events: none; transform: translateY(-50%); }
 .admin-table small[role="alert"] { color: #9b1c0a; }
 .admin-table small[role="status"] { color: #235137; }
@@ -269,7 +282,7 @@
   .admin-table-scroll:has(.admin-order-link) .admin-table tbody { display: grid; gap: 10px; }
   .admin-table-scroll:has(.admin-order-link) .admin-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--admin-rule); border-radius: 4px; background: #fffaf0; }
   .admin-table-scroll:has(.admin-order-link) .admin-table td { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 12px; border: 0; background: transparent; overflow-wrap: anywhere; }
-  .admin-table-scroll:has(.admin-order-link) .admin-table td:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--admin-rule); }
+  .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-kind-cell { grid-column: auto; align-content: center; width: auto; }
   .admin-table-scroll:has(.admin-order-link) .admin-table .admin-cell-label { display: block; color: #6b4a28; font-size: 12px; }
   .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-number { text-align: left; }
   .admin-form-grid { grid-template-columns: 1fr; }

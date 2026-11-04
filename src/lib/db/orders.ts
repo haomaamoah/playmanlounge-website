@@ -5,6 +5,7 @@ import { checked } from "../admin/server";
 import type { HydratedOrder } from "../mail/types";
 import type { PaymentInfo } from "../email";
 import type { DeliveryStore } from "../mail/delivery";
+import { pesewas } from "../content";
 import { formatPlacedAt } from "../mail/order";
 import { db } from "./server";
 import { nearestKitchen } from "../kitchens/routing";
@@ -40,13 +41,20 @@ export async function persistOrder(order: HydratedOrder, transactionId?: string,
     if (error) throw error;
     if (existing) {
       // A genuine paid reference may not be replayed against another basket/customer.
+      // Coordinates are compared loosely: Postgres rounds the pin, and the page
+      // resubmits the original map value after the wallet has already been charged.
       const signature = (entries: typeof lines) => JSON.stringify(entries.map(l => [l.itemId,l.qty]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
-      if (Number(existing.total) !== order.total || existing.customer_email !== order.email || existing.customer_phone !== order.phone ||
+      const samePlace = (stored: unknown, next: number | null) => {
+        if (stored == null || next == null) return stored == null && next == null;
+        const value = Number(stored);
+        return Number.isFinite(value) && Math.abs(value - next) < 0.00001;
+      };
+      if (pesewas(Number(existing.total)) !== pesewas(order.total) || existing.customer_email !== order.email || existing.customer_phone !== order.phone ||
           signature(existing.lines) !== signature(lines) || existing.fulfilment !== order.fulfilment ||
-          existing.preferred_time !== order.preferredTime || existing.notes !== order.notes ||
+          existing.preferred_time !== order.preferredTime || String(existing.notes ?? "") !== order.notes ||
           String(existing.delivery_address ?? "") !== order.deliveryAddress ||
-          (existing.delivery_latitude == null ? null : Number(existing.delivery_latitude)) !== order.deliveryLatitude ||
-          (existing.delivery_longitude == null ? null : Number(existing.delivery_longitude)) !== order.deliveryLongitude)
+          !samePlace(existing.delivery_latitude, order.deliveryLatitude) ||
+          !samePlace(existing.delivery_longitude, order.deliveryLongitude))
         throw new ApiFailure(409,"The existing submission does not match this order.");
       return adopt(order,existing);
     }

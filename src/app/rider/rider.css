@@ -58,14 +58,66 @@
 .rider-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-block: 28px; }
 .rider-stats article, .rider-card, .rider-map-panel { padding: 20px; border: 1px solid #d4c49a; border-radius: 6px; background: #fffaf0; }
 .rider-stats article { display: grid; gap: 12px; }
-.rider-stats article span, .rider-card-title span { color: var(--rider-muted); font-size: 14px; }
+.rider-stats article span { color: var(--rider-muted); font-size: 14px; }
 .rider-stats strong { font-size: 32px; }
-.rider-order-list { display: grid; gap: 14px; }
-.rider-card-title { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
-.rider-card-title > svg { width: 40px; height: 40px; padding: 9px; border-radius: 50%; background: var(--rider-cream); }
-.rider-card-title h2 { margin: 0; }
+.rider-order-list { display: grid; gap: 10px; }
+.rider-order-list .rider-ticket { padding: 0; container-type: inline-size; }
+.rider-ticket-link {
+  display: grid;
+  grid-template-columns: 72px auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "mark id status . action"
+    "mark address address address address"
+    "mark meta meta meta meta";
+  column-gap: 14px;
+  row-gap: 6px;
+  align-items: center;
+  min-height: 44px;
+  padding: 12px 16px 12px 12px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.rider-ticket-link:hover { background: #f7edda; }
+.rider-ticket-link:focus-visible { outline: 3px solid #c27b07; outline-offset: 2px; }
+.rider-ticket-mark { grid-area: mark; align-self: start; display: grid; place-items: center; width: 72px; height: 72px; }
+.rider-ticket-mark .admin-kind-image { display: block; width: 72px; height: auto; aspect-ratio: 1; object-fit: cover; border: 1px solid #d4c49a; border-radius: 4px; }
+.rider-ticket-id { grid-area: id; margin: 0; font-size: 1.375rem; font-weight: 400; line-height: 1; white-space: nowrap; }
+.rider-ticket-status { grid-area: status; justify-self: start; display: inline-flex; align-items: center; max-width: 100%; min-height: 28px; padding: 2px 8px; border: 1px solid #d4c49a; border-radius: 4px; background: var(--rider-cream); color: var(--rider-cocoa); font-size: 13px; font-weight: 600; line-height: 1.25; white-space: nowrap; }
+.rider-ticket-status.is-open { border-color: #e7b5a2; background: #fde8df; color: #9b1c0a; }
+.rider-ticket-status.is-accepted, .rider-ticket-status.is-riding { border-color: #e2c48a; background: #f8e6cf; color: #6a3b08; }
+.rider-ticket-status.is-done { border-color: #b7cbb0; background: #e9f1e5; color: #235137; }
+.rider-ticket-address { grid-area: address; display: flex; align-items: flex-start; gap: 6px; min-width: 0; color: var(--rider-cocoa); font-size: 15px; font-weight: 600; line-height: 1.35; }
+.rider-ticket-address svg { flex: 0 0 auto; margin-top: 2px; }
+.rider-ticket-address span, .rider-ticket-meta { min-width: 0; overflow-wrap: anywhere; }
+.rider-ticket-meta { grid-area: meta; color: var(--rider-muted); font-size: 13px; line-height: 1.35; }
+.rider-ticket-action { grid-area: action; color: #b83200; font-size: 14px; font-weight: 700; line-height: 1.3; white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  .rider-ticket-link { transition: background-color 160ms ease-out; }
+}
+@container (max-width: 539px) {
+  .rider-ticket-link {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "mark id action"
+      "mark status status"
+      "mark address address"
+      "mark meta meta";
+    column-gap: 12px;
+    padding: 10px 12px;
+  }
+  .rider-ticket-mark, .rider-ticket-mark .admin-kind-image { width: 64px; }
+  .rider-ticket-mark { height: 64px; }
+  .rider-ticket-id { font-size: 1.25rem; }
+  .rider-ticket-status { white-space: normal; }
+}
+@media (max-width: 360px) {
+  .rider-ticket-link { grid-template-columns: 56px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px; }
+  .rider-ticket-mark, .rider-ticket-mark .admin-kind-image { width: 56px; }
+  .rider-ticket-mark { height: 56px; }
+  .rider-ticket-id { font-size: 1.15rem; }
+}
 .rider-card p { display: flex; align-items: center; gap: 7px; }
-.rider-card > .rider-button { margin-top: 8px; }
 .rider-status { display: inline-flex; padding: 6px 10px; border: 1px solid #9d865f; border-radius: 4px; background: var(--rider-cream); font-size: 13px; font-weight: 600; text-transform: capitalize; }
 .rider-order-meta { display: grid; gap: 6px; margin-block: 18px; padding: 16px; background: #fffaf0; border: 1px solid #d4c49a; border-radius: 6px; }
 .rider-order-meta p { display: flex; align-items: center; gap: 8px; margin: 0; }

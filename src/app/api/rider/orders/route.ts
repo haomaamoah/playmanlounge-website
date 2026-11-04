@@ -7,6 +7,12 @@ import { publicRider, requireRider } from "@/lib/riders/server";
 
 const riderQueues = ["open", "claimed", "delivered", "cancelled"] as const;
 
+function firstLineItemId(lines: unknown) {
+  if (!Array.isArray(lines) || typeof lines[0] !== "object" || lines[0] === null) return "";
+  const id = (lines[0] as { itemId?: unknown }).itemId;
+  return typeof id === "string" ? id : "";
+}
+
 /** What this rider is allowed to see for one queue. Open jobs are unclaimed; the other queues are only theirs. */
 function riderOrderScope(riderId: string, queue: string) {
   const open = "and(rider_id.is.null,status.in.(pending,cooking,ready),payment_status.in.(paid,cod))";
@@ -64,6 +70,7 @@ export const GET = endpoint(async (request) => {
       deliveryLatitude: row.delivery_latitude,
       deliveryLongitude: row.delivery_longitude,
       kitchen: kitchens.get(row.kitchen_id) ?? null,
+      firstItemId: firstLineItemId(row.lines),
       rider: row.rider_id ? riders.get(row.rider_id) ?? null : null,
       riderLocation: row.rider_id === rider.id ? ownLocation : null,
     })),

@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { createContext, useContext } from "react";
 import Link from "next/link";
-import { LockKeyhole, MapPin } from "lucide-react";
-import { availableOrderStatuses, type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
+import { menuPlacement, placementLabel, shortOrderId } from "@/lib/orders/display";
+import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
+import { useMenuGroups } from "@/components/orders/use-menu-groups";
+import { MapPin } from "lucide-react";
+import { type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
 import { GoogleDirectionsMap } from "@/components/google-location-picker";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -102,69 +105,100 @@ export function PaymentCell({ order, canCheck }: { order: AdminOrder; canCheck: 
   </>;
 }
 
-function OrderStatusCell({ order, editable, onUpdated }: { order: AdminOrder; editable: boolean; onUpdated?: () => void }) {
+/** The single next kitchen step. Delivery goes out before it is completed; pickup completes from ready. */
+export function nextKitchenStatus(order: Pick<AdminOrder, "status" | "paymentStatus" | "fulfilment">): OrderStatus | null {
+  if (order.status === "completed" || order.status === "cancelled") return null;
+  const next: OrderStatus | null =
+    order.status === "pending" ? "cooking" :
+    order.status === "cooking" ? "ready" :
+    order.status === "ready" ? (order.fulfilment === "delivery" ? "out" : "completed") :
+    order.status === "out" ? "completed" :
+    null;
+  if (!next) return null;
+  if (order.paymentStatus !== "paid" && order.paymentStatus !== "cod") return null;
+  return next;
+}
+
+function OrderStatusCell({ order }: { order: AdminOrder }) {
+  return <Badge value={order.status}>{orderLabels[order.status]}</Badge>;
+}
+
+function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: () => void }) {
   const [status, setStatus] = useState<OrderStatus>(order.status);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"proceed" | "cancel" | "">("");
   const [message, setMessage] = useState("");
-  const options = availableOrderStatuses(order.status, order.paymentStatus);
-  async function update(next: OrderStatus) {
-    if (next === order.status) return;
-    if (next === "cancelled" && !window.confirm("Cancel this order? This changes kitchen fulfilment only and does not issue a refund.")) {
-      setStatus(order.status);
-      return;
-    }
-    setBusy(true);
+  const current = { ...order, status };
+  const next = nextKitchenStatus(current);
+  const cancelled = status === "cancelled";
+  const proceedDisabled = busy !== "" || next === null;
+  const cancelDisabled = busy !== "" || cancelled || status === "completed";
+
+  async function update(action: "proceed" | "cancel", target: OrderStatus) {
+    if (action === "cancel" && !window.confirm("Cancel this order? This changes kitchen fulfilment only and does not issue a refund.")) return;
+    setBusy(action);
     setMessage("");
     try {
       const data = await adminRequest<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(order.id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ status: next }),
+        body: JSON.stringify({ status: target }),
       });
       setStatus(data.item.status);
       onUpdated?.();
     } catch (err) {
-      setStatus(order.status);
       setMessage((err as Error).message);
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
-  if (!editable) return <Badge value={status}>{orderLabels[status]}</Badge>;
-  const locked = status === "completed" || status === "cancelled";
+
   return <>
-    <span
-      className="admin-order-status-control"
-      title={locked ? `${orderLabels[status]} orders cannot be changed` : undefined}
-    >
-      <select
-        className={`admin-order-status-select admin-badge-${status}${locked ? " is-terminal" : ""}`}
-        aria-label={`Kitchen status for order ${order.id}`}
-        value={status}
-        disabled={busy || options.length === 1}
-        onChange={(event) => void update(event.target.value as OrderStatus)}
+    <div className="admin-order-actions">
+      <button
+        type="button"
+        className="admin-order-action admin-order-action-proceed"
+        disabled={proceedDisabled}
+        aria-label={next ? `Proceed order ${order.id} to ${orderLabels[next]}` : `Proceed is unavailable for order ${order.id}`}
+        onClick={() => { if (next) void update("proceed", next); }}
       >
-        {options.map((value) => <option value={value} key={value}>{orderLabels[value]}</option>)}
-      </select>
-      {locked && <LockKeyhole className="admin-order-status-lock" aria-hidden="true" />}
-    </span>
-    {busy && <small role="status">Saving kitchen status…</small>}
+        <span className="admin-order-action-dot" aria-hidden="true" />
+        {busy === "proceed" ? "Saving…" : "Proceed"}
+      </button>
+      <button
+        type="button"
+        className="admin-order-action admin-order-action-cancel"
+        disabled={cancelDisabled}
+        aria-label={`Cancel order ${order.id}`}
+        onClick={() => void update("cancel", "cancelled")}
+      >
+        <span className="admin-order-action-dot" aria-hidden="true" />
+        {busy === "cancel" ? "Saving…" : "Cancel"}
+      </button>
+    </div>
     {message && <small role="alert">{message}</small>}
   </>;
 }
 
 export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments = true, canUpdateStatus = true, onOrderUpdated }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean; canUpdateStatus?: boolean; onOrderUpdated?: () => void }) {
   const basePath = useAdminBasePath();
+  const groups = useMenuGroups();
   const orderHrefBase = hrefBase ?? `${basePath}/orders`;
   const orderHeading = showCustomer ? "Order / customer" : "Order";
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
-    <thead><tr><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th><th className="admin-number">Total</th></tr></thead>
-    <tbody>{items.map((order) => <tr key={order.id}>
-      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={`${orderHrefBase}/${encodeURIComponent(order.id)}`}>{`${order.id.slice(0, 8)}......`}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
+    <thead><tr><th className="admin-kind-heading">Type</th><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th>{canUpdateStatus && <th>Actions</th>}<th className="admin-number">Total</th></tr></thead>
+    <tbody>{items.map((order) => {
+      const placement = menuPlacement(order.lines[0]?.itemId, groups);
+      const href = `${orderHrefBase}/${encodeURIComponent(order.id)}`;
+      const label = placementLabel(placement);
+      return <tr key={order.id} className="admin-order-row">
+      <td className="admin-kind-cell"><span className="admin-cell-label">Type</span><MenuPlacementImage placement={placement} alt={label} /></td>
+      <td><span className="admin-cell-label">{orderHeading}</span><Link className="admin-order-link" href={href} aria-label={`Open order ${order.id}, ${label}`}>{shortOrderId(order.id)}</Link>{showCustomer && <small>{order.customerName}</small>}</td>
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><PaymentCell key={order.paymentStatus} order={order} canCheck={checkPayments} /></td>
-      <td><span className="admin-cell-label">Kitchen status</span><OrderStatusCell key={`${order.id}-${order.status}-${order.paymentStatus}`} order={order} editable={canUpdateStatus} onUpdated={onOrderUpdated} /></td>
+      <td><span className="admin-cell-label">Kitchen status</span><OrderStatusCell order={order} /></td>
+      {canUpdateStatus && <td><span className="admin-cell-label">Actions</span><OrderActions key={`${order.id}-${order.status}-${order.paymentStatus}`} order={order} onUpdated={onOrderUpdated} /></td>}
       <td className="admin-number"><span className="admin-cell-label">Total</span>{formatGhs(order.total)}</td>
-    </tr>)}</tbody>
+    </tr>;
+    })}</tbody>
   </table></div>;
 }
 
