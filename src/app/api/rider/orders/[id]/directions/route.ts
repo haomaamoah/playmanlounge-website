@@ -1,6 +1,7 @@
 import { endpoint } from "@/lib/admin/server";
 import { ApiFailure } from "@/lib/admin/validation";
 import { computeDrivingRoute } from "@/lib/maps/google-routes";
+import { deliveryRouteLeg } from "@/lib/maps/route-leg";
 import { getRiderOrder } from "@/lib/riders/orders";
 import { requireRider } from "@/lib/riders/server";
 
@@ -27,25 +28,27 @@ export const GET = endpoint(async (request: Request, context: Context) => {
   const apiKey = process.env.GOOGLE_ROUTES_API_KEY;
   if (!apiKey) throw new ApiFailure(503, "Google Routes is not configured.");
 
-  const pickedUp = order.riderDeliveryStatus === "picked_up";
+  const toCustomer = deliveryRouteLeg(order.status) === "customer";
   const location = order.riderLocation;
   const [kitchenRoute, customerRoute] = await Promise.all([
-    !pickedUp && location
+    !toCustomer && location
       ? computeDrivingRoute(apiKey, location, {
           latitude: kitchen.latitude,
           longitude: kitchen.longitude,
         })
       : Promise.resolve(null),
-    computeDrivingRoute(
-      apiKey,
-      pickedUp && location
-        ? location
-        : { latitude: kitchen.latitude, longitude: kitchen.longitude },
-      destination,
-    ),
+    toCustomer && location
+      ? computeDrivingRoute(apiKey, location, destination)
+      : Promise.resolve(null),
   ]);
   return {
     ok: true,
-    item: { pickedUp, location, kitchenRoute, customerRoute },
+    item: {
+      pickedUp: order.riderDeliveryStatus === "picked_up",
+      toCustomer,
+      location,
+      kitchenRoute,
+      customerRoute,
+    },
   };
 });

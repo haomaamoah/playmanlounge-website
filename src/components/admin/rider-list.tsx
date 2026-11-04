@@ -27,6 +27,7 @@ type RiderLocation = {
   activeOrder: {
     id: string;
     ref: string;
+    status: string;
     deliveryStatus: string;
     destination: { address: string; latitude: number | null; longitude: number | null };
     kitchen: { name: string; latitude: number | null; longitude: number | null } | null;
@@ -199,6 +200,8 @@ export function RiderList() {
           kitchen={kitchenPoint}
           locationUrl={`/api/admin/riders/${encodeURIComponent(tracking.rider.id)}/location`}
           riderId={tracking.rider.id}
+          orderId={tracking.activeOrder?.id ?? ""}
+          orderStatus={tracking.activeOrder?.status ?? "pending"}
         /> : <p role="status">This rider has not shared a GPS location yet.</p>}
       </DialogContent>
     </Dialog>

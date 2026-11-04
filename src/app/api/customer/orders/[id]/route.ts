@@ -20,6 +20,16 @@ export async function GET(request: Request, context: Context) {
     if (!data && !error) throw new ApiFailure(404, "Order not found.");
     const row = checked(data, error);
     const item = orderDTO(row);
+    let kitchen = null;
+    if (row.kitchen_id) {
+      const kitchenResult = await db().from("kitchens").select("name,latitude,longitude").eq("id", row.kitchen_id).maybeSingle();
+      if (kitchenResult.error) throw new ApiFailure(503, "Could not load the kitchen.");
+      const place = kitchenResult.data;
+      if (place && Number.isFinite(Number(place.latitude)) && Number.isFinite(Number(place.longitude))) {
+        kitchen = { name: String(place.name), latitude: Number(place.latitude), longitude: Number(place.longitude) };
+      }
+    }
+    const withKitchen = { ...item, kitchen };
     if (row.rider_id) {
       const hasActiveDelivery = hasActiveRiderTracking(row.rider_delivery_status);
       const [profile, location] = await Promise.all([
@@ -32,7 +42,7 @@ export async function GET(request: Request, context: Context) {
       return {
         ok: true,
         item: {
-          ...item,
+          ...withKitchen,
           rider: profile.data ? {
             id: profile.data.id, name: profile.data.name, phone: profile.data.phone,
             bikeModel: profile.data.bike_model, bikeColor: profile.data.bike_color,
@@ -45,6 +55,6 @@ export async function GET(request: Request, context: Context) {
         },
       };
     }
-    return { ok: true, item: { ...item, rider: null, riderLocation: null } };
+    return { ok: true, item: { ...withKitchen, rider: null, riderLocation: null } };
   })(request);
 }

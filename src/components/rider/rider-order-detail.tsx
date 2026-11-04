@@ -74,15 +74,32 @@ export function RiderOrderDetail() {
     let latest: GeolocationCoordinates | null = null;
     let lastSent = 0;
     let requestBusy = false;
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        latest = position.coords;
-        setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude, updatedAt: new Date().toISOString() });
-        setError("");
-      },
-      (reason) => setError(reason.code === reason.PERMISSION_DENIED ? "Allow location access to share your live position." : "Could not read your current GPS position."),
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
-    );
+    let watchId = 0;
+    const accept = (position: GeolocationPosition) => {
+      latest = position.coords;
+      setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude, updatedAt: new Date().toISOString() });
+      setError("");
+    };
+    const fail = (reason: GeolocationPositionError) => {
+      setError(reason.code === reason.PERMISSION_DENIED
+        ? "Allow location access to share your live position."
+        : "The browser allowed location, but no GPS position arrived.");
+    };
+    const watch = (accurate: boolean) => {
+      watchId = navigator.geolocation.watchPosition(accept, (reason) => {
+        if (accurate && reason.code !== reason.PERMISSION_DENIED) {
+          navigator.geolocation.clearWatch(watchId);
+          watch(false);
+          return;
+        }
+        fail(reason);
+      }, {
+        enableHighAccuracy: accurate,
+        maximumAge: accurate ? 15000 : 300000,
+        timeout: accurate ? 20000 : 60000,
+      });
+    };
+    watch(true);
     const timer = window.setInterval(() => {
       if (!latest || requestBusy || Date.now() - lastSent < 4500) return;
       requestBusy = true;
@@ -154,7 +171,7 @@ export function RiderOrderDetail() {
         location={location}
         kitchen={{ latitude: order.kitchen!.latitude, longitude: order.kitchen!.longitude }}
         destination={{ latitude: order.deliveryLatitude!, longitude: order.deliveryLongitude! }}
-        pickedUp={order.riderDeliveryStatus === "picked_up"}
+        orderStatus={order.status}
       />}
     </section>}
     {!coordsReady && <p className="rider-error">Map unavailable: kitchen or delivery GPS coordinates are missing.</p>}

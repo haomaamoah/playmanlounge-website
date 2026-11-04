@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { deliveryRouteLeg } from "@/lib/maps/route-leg";
 import { loadGoogleMaps } from "./google-location-picker";
 import { mapPinIcon } from "./map-pins";
 import type { StreamChange } from "@/lib/live/apply";
@@ -17,19 +18,29 @@ export function RiderTrackingMap({
   kitchen = null,
   locationUrl,
   riderId,
+  orderId = "",
+  orderStatus,
+  forCustomer = false,
 }: {
   initialLocation: Point | null;
   destination?: Point | null;
   kitchen?: Point | null;
   locationUrl: string;
   riderId: string;
+  orderId?: string;
+  orderStatus: string;
+  forCustomer?: boolean;
 }) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const riderMarker = useRef<google.maps.Marker | null>(null);
   const destinationMarker = useRef<google.maps.Marker | null>(null);
   const kitchenMarker = useRef<google.maps.Marker | null>(null);
-  const routeLine = useRef<google.maps.Polyline | null>(null);
+  const yellowRoute = useRef<google.maps.Polyline | null>(null);
+  const blueRoute = useRef<google.maps.Polyline | null>(null);
+  const [heard, setHeard] = useState<{ id: string; base: string; status: string } | null>(null);
+  if (heard && (heard.id !== orderId || heard.base !== orderStatus)) setHeard(null);
+  const status = heard && heard.id === orderId && heard.base === orderStatus ? heard.status : orderStatus;
   const [location, setLocation] = useState(initialLocation);
   const locationRef = useRef(location);
   useEffect(() => { locationRef.current = location; }, [location]);
@@ -82,6 +93,17 @@ export function RiderTrackingMap({
   }, [riderId]);
 
   useEffect(() => {
+    if (!orderId) return;
+    const onStream = (event: Event) => {
+      const change = (event as CustomEvent<StreamChange>).detail;
+      if (change.table !== "orders" || change.id !== orderId || typeof change.row?.status !== "string") return;
+      setHeard({ id: orderId, base: orderStatus, status: change.row.status });
+    };
+    window.addEventListener("pml-stream", onStream);
+    return () => window.removeEventListener("pml-stream", onStream);
+  }, [orderId, orderStatus]);
+
+  useEffect(() => {
     let active = true;
     void loadGoogleMaps().then((maps) => {
       if (!active || !node.current) return;
@@ -125,7 +147,8 @@ export function RiderTrackingMap({
           zIndex: 2,
         });
       }
-      routeLine.current = new maps.Polyline({ map: instance, strokeColor: "#1a73e8", strokeOpacity: 0.95, strokeWeight: 5 });
+      yellowRoute.current = new maps.Polyline({ map: instance, strokeColor: "#f4b400", strokeOpacity: 0.95, strokeWeight: 5 });
+      blueRoute.current = new maps.Polyline({ map: instance, strokeColor: "#1a73e8", strokeOpacity: 0.95, strokeWeight: 5 });
       setLoading(false);
     }).catch((reason: unknown) => {
       if (active) {
@@ -138,7 +161,8 @@ export function RiderTrackingMap({
       riderMarker.current?.setMap(null);
       destinationMarker.current?.setMap(null);
       kitchenMarker.current?.setMap(null);
-      routeLine.current?.setMap(null);
+      yellowRoute.current?.setMap(null);
+      blueRoute.current?.setMap(null);
       map.current = null;
     };
   }, [destinationLat, destinationLng, kitchenLat, kitchenLng]);
@@ -146,33 +170,43 @@ export function RiderTrackingMap({
   useEffect(() => {
     let active = true;
     const instance = map.current;
-    if (!instance || !location) return;
-    const origin = { lat: location.latitude, lng: location.longitude };
-    riderMarker.current?.setPosition(origin);
-    if (destinationLat === null || destinationLng === null) {
-      routeLine.current?.setPath([]);
-      const bounds = new google.maps.LatLngBounds();
-      bounds.extend(origin);
-      if (kitchenLat !== null && kitchenLng !== null) bounds.extend({ lat: kitchenLat, lng: kitchenLng });
-      if (kitchenLat !== null) instance.fitBounds(bounds);
+    if (!instance) return;
+    if (location) riderMarker.current?.setPosition({ lat: location.latitude, lng: location.longitude });
+    const toCustomer = forCustomer || deliveryRouteLeg(status) === "customer";
+    const origin = location
+      ? { lat: location.latitude, lng: location.longitude }
+      : forCustomer && kitchenLat !== null && kitchenLng !== null
+        ? { lat: kitchenLat, lng: kitchenLng }
+        : null;
+    const target = toCustomer
+      ? destinationLat !== null && destinationLng !== null ? { lat: destinationLat, lng: destinationLng } : null
+      : kitchenLat !== null && kitchenLng !== null ? { lat: kitchenLat, lng: kitchenLng } : null;
+    if (toCustomer) yellowRoute.current?.setPath([]);
+    else blueRoute.current?.setPath([]);
+    if (!origin || !target) {
+      yellowRoute.current?.setPath([]);
+      blueRoute.current?.setPath([]);
       return;
     }
     void loadGoogleMaps().then((maps) => maps.routes.Route.computeRoutes({
       origin,
-      destination: { lat: destinationLat, lng: destinationLng },
+      destination: target,
       travelMode: maps.TravelMode.DRIVING,
       fields: ["path", "viewport"],
     })).then(({ routes }) => {
       if (!active) return;
       const route = routes?.[0];
       if (!route?.path?.length) throw new Error("Google did not return a driving route.");
-      routeLine.current?.setPath(route.path.map((point) => ({ lat: point.lat, lng: point.lng })));
+      const path = route.path.map((point) => ({ lat: point.lat, lng: point.lng }));
+      yellowRoute.current?.setPath(toCustomer ? [] : path);
+      blueRoute.current?.setPath(toCustomer ? path : []);
       if (route.viewport) instance.fitBounds(route.viewport);
+      setError("");
     }).catch((reason: unknown) => {
       if (active) setError(reason instanceof Error ? reason.message : "The rider route could not be refreshed.");
     });
     return () => { active = false; };
-  }, [location, destinationLat, destinationLng, kitchenLat, kitchenLng, loading]);
+  }, [location, destinationLat, destinationLng, kitchenLat, kitchenLng, loading, status, forCustomer]);
 
   return <div>
     <div ref={node} className="google-map-canvas google-route-canvas" aria-label="Live rider location and delivery destination" />
@@ -181,6 +215,9 @@ export function RiderTrackingMap({
     {error && <p className="google-location-error" role="status">{error}</p>}
     <p className="google-location-message">
       Scooter: rider{kitchenLat !== null ? " · Pot: kitchen" : ""}{destinationLat !== null ? " · House: customer" : ""}
+      {" · "}{forCustomer
+        ? "Blue: route to you"
+        : deliveryRouteLeg(status) === "customer" ? "Blue: route to the customer" : "Yellow: route to the kitchen"}
     </p>
   </div>;
 }
@@ -189,12 +226,12 @@ export function RiderMissionMap({
   location,
   kitchen,
   destination,
-  pickedUp,
+  orderStatus,
 }: {
   location: Point | null;
   kitchen: Point;
   destination: Point;
-  pickedUp: boolean;
+  orderStatus: string;
 }) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
@@ -259,48 +296,39 @@ export function RiderMissionMap({
     if (!instance || !location) return;
     const current = { lat: location.latitude, lng: location.longitude };
     const target = { lat: destinationLat, lng: destinationLng };
+    const toCustomer = deliveryRouteLeg(orderStatus) === "customer";
+    const kitchenPoint = { lat: kitchenLat, lng: kitchenLng };
     riderMarker.current?.setPosition(current);
+    if (toCustomer) yellowRoute.current?.setPath([]);
+    else blueRoute.current?.setPath([]);
     const refreshRoutes = async () => {
       const maps = await loadGoogleMaps();
-      if (pickedUp) {
-        const result = await maps.routes.Route.computeRoutes({
-          origin: current, destination: target, travelMode: maps.TravelMode.DRIVING, fields: ["path", "viewport"],
-        });
-        return { paths: [result.routes?.[0]?.path ?? null] };
-      }
-      const [toKitchen, toCustomer] = await Promise.all([
-        maps.routes.Route.computeRoutes({
-          origin: current, destination: { lat: kitchenLat, lng: kitchenLng },
-          travelMode: maps.TravelMode.DRIVING, fields: ["path", "viewport"],
-        }),
-        maps.routes.Route.computeRoutes({
-          origin: { lat: kitchenLat, lng: kitchenLng }, destination: target,
-          travelMode: maps.TravelMode.DRIVING, fields: ["path", "viewport"],
-        }),
-      ]);
-      return { paths: [toKitchen.routes?.[0]?.path ?? null, toCustomer.routes?.[0]?.path ?? null] };
+      const result = await maps.routes.Route.computeRoutes({
+        origin: current,
+        destination: toCustomer ? target : kitchenPoint,
+        travelMode: maps.TravelMode.DRIVING,
+        fields: ["path", "viewport"],
+      });
+      return result.routes?.[0]?.path ?? null;
     };
-    void refreshRoutes().then(({ paths }) => {
+    void refreshRoutes().then((path) => {
       if (!active) return;
-      if (paths.some((path) => !path?.length)) throw new Error("Google did not return a driving route.");
-      if (pickedUp) {
-        yellowRoute.current?.setPath([]);
-        blueRoute.current?.setPath(paths[0]!.map((point) => ({ lat: point.lat, lng: point.lng })));
-      } else {
-        yellowRoute.current?.setPath(paths[0]!.map((point) => ({ lat: point.lat, lng: point.lng })));
-        blueRoute.current?.setPath(paths[1]!.map((point) => ({ lat: point.lat, lng: point.lng })));
-      }
+      if (!path?.length) throw new Error("Google did not return a driving route.");
+      const line = path.map((point) => ({ lat: point.lat, lng: point.lng }));
+      yellowRoute.current?.setPath([]);
+      blueRoute.current?.setPath([]);
+      yellowRoute.current?.setPath(toCustomer ? [] : line);
+      blueRoute.current?.setPath(toCustomer ? line : []);
       const bounds = new google.maps.LatLngBounds();
       bounds.extend(current);
-      bounds.extend(target);
-      if (!pickedUp) bounds.extend({ lat: kitchenLat, lng: kitchenLng });
+      bounds.extend(toCustomer ? target : kitchenPoint);
       instance.fitBounds(bounds);
       setError("");
     }).catch((reason: unknown) => {
-      if (active) setError(reason instanceof Error ? reason.message : "Could not load the delivery routes.");
+      if (active) setError(reason instanceof Error ? reason.message : "Could not load the route.");
     });
     return () => { active = false; };
-  }, [location, kitchenLat, kitchenLng, destinationLat, destinationLng, pickedUp, loading]);
+  }, [location, kitchenLat, kitchenLng, destinationLat, destinationLng, orderStatus, loading]);
 
   return <div>
     <div ref={node} className="google-map-canvas google-route-canvas" aria-label="Rider position and delivery route" />
@@ -308,6 +336,6 @@ export function RiderMissionMap({
     {mapError && <p className="google-location-error" role="alert">Map unavailable: {mapError}</p>}
     {!location && <p className="google-location-error" role="status">Enable location sharing to show your current position and routes.</p>}
     {error && <p className="google-location-error" role="status">{error}</p>}
-    <p className="google-location-message">Scooter: rider · Pot: kitchen · House: customer · {pickedUp ? "Blue: route to customer" : "Yellow: route to kitchen · Blue: route to customer"}</p>
+    <p className="google-location-message">Scooter: rider · Pot: kitchen · House: customer · {deliveryRouteLeg(orderStatus) === "customer" ? "Blue: route to the customer" : "Yellow: route to the kitchen"}</p>
   </div>;
 }

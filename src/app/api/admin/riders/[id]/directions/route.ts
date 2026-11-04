@@ -2,6 +2,7 @@ import { assertKitchenOrderAccess, endpoint, rateLimit, requireAdmin } from "@/l
 import { ApiFailure } from "@/lib/admin/validation";
 import { db } from "@/lib/db/server";
 import { computeDrivingRoute } from "@/lib/maps/google-routes";
+import { deliveryRouteLeg } from "@/lib/maps/route-leg";
 
 type Context = { params: Promise<{ id: string }> };
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -14,7 +15,7 @@ export const GET = endpoint(async (request: Request, context: Context) => {
   const [profile, location, activeOrder] = await Promise.all([
     db().from("rider_profiles").select("id").eq("id", id).maybeSingle(),
     db().from("rider_locations").select("latitude,longitude").eq("rider_id", id).maybeSingle(),
-    db().from("orders").select("kitchen_id,delivery_latitude,delivery_longitude")
+    db().from("orders").select("kitchen_id,status,delivery_latitude,delivery_longitude")
       .eq("rider_id", id).in("rider_delivery_status", ["assigned", "picked_up"]).maybeSingle(),
   ]);
   if (profile.error || location.error || activeOrder.error) throw new ApiFailure(503, "Could not load route coordinates.");
@@ -24,10 +25,21 @@ export const GET = endpoint(async (request: Request, context: Context) => {
   const latitude = activeOrder.data.delivery_latitude;
   const longitude = activeOrder.data.delivery_longitude;
   if (typeof latitude !== "number" || typeof longitude !== "number") throw new ApiFailure(409, "Delivery GPS coordinates are missing.");
+  const toCustomer = deliveryRouteLeg(String(activeOrder.data.status ?? "")) === "customer";
+  let destination = { latitude, longitude };
+  if (!toCustomer) {
+    if (!activeOrder.data.kitchen_id) throw new ApiFailure(409, "The kitchen is missing map coordinates.");
+    const kitchen = await db().from("kitchens").select("latitude,longitude").eq("id", activeOrder.data.kitchen_id).maybeSingle();
+    if (kitchen.error) throw new ApiFailure(503, "Could not load the kitchen.");
+    if (typeof kitchen.data?.latitude !== "number" || typeof kitchen.data.longitude !== "number") {
+      throw new ApiFailure(409, "The kitchen is missing map coordinates.");
+    }
+    destination = { latitude: kitchen.data.latitude, longitude: kitchen.data.longitude };
+  }
   const apiKey = process.env.GOOGLE_ROUTES_API_KEY;
   if (!apiKey) throw new ApiFailure(503, "Google Routes is not configured.");
   const route = await computeDrivingRoute(apiKey, {
     latitude: Number(location.data.latitude), longitude: Number(location.data.longitude),
-  }, { latitude, longitude });
+  }, destination);
   return { ok: true, route };
 });

@@ -56,6 +56,9 @@ export function RiderDetails({
             : null}
           locationUrl={locationUrl}
           riderId={rider.id}
+          orderId={order.id}
+          orderStatus={order.status}
+          forCustomer={isCustomerView}
         />
       </DialogContent>
     </Dialog>}
