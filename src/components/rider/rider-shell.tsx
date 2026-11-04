@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, House, LogOut, MessagesSquare, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { site } from "@/lib/content";
+import { PortalLive } from "@/components/portal-live";
 import { riderRequest } from "./rider-api";
 
 type RiderSession = { ok: true; rider: { id: string; name: string; email: string } };
@@ -61,6 +62,7 @@ export function RiderShell({ children }: { children: React.ReactNode }) {
   if (!rider) return <div className="rider-root rider-gate" role="status">{error || "Checking your secure rider account…"}</div>;
 
   return <div className="rider-root rider-workspace">
+    <PortalLive portal="rider" />
     <a className="rider-skip" href="#main">Skip to workspace</a>
     <aside className="rider-sidebar">
       <Link href="/rider" className="rider-brand">

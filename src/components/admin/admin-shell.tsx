@@ -7,6 +7,7 @@ import { House, ClipboardList, UtensilsCrossed, UsersRound, MessagesSquare, Sett
 import { useEffect, useState } from "react";
 import type { AdminProfile, SessionResponse } from "@/lib/admin/contracts";
 import { site } from "@/lib/content";
+import { PortalLive } from "@/components/portal-live";
 import { AdminBasePathProvider, adminRequest } from "./admin-ui";
 
 const links = [
@@ -78,6 +79,7 @@ export function AdminShell({ children, basePath = "/admin", managerPortal = fals
     .map(({ path, ...link }) => ({ ...link, href: `${portalBase}${path}` }));
 
   return <div className="admin-root admin-workspace">
+    <PortalLive portal={admin.role === "manager" ? "manager" : "admin"} />
     <a className="admin-skip" href="#main">Skip to workspace</a>
     <aside className={`admin-sidebar${admin.role === "manager" ? " admin-sidebar-manager" : ""}`}>
       <Link href={portalBase} className="admin-brand">

@@ -7,6 +7,7 @@ import { ClipboardList, LogOut, Menu, MessagesSquare, Settings, ShoppingBag, Ute
 import { useState } from "react";
 import { formatGhs, site, type MenuGroup } from "@/lib/content";
 import { CatalogProvider } from "./catalog-context";
+import { PortalLive } from "@/components/portal-live";
 import { useMockStore } from "@/lib/mocks/store";
 
 export function AppShell({ children, customerName, menuGroups }: { children: React.ReactNode; customerName: string; menuGroups: MenuGroup[] | null }) {
@@ -61,6 +62,7 @@ export function AppShell({ children, customerName, menuGroups }: { children: Rea
 
   return (
     <div className="bg-surface min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
+      <PortalLive portal="customer" />
       <a
         href="#main"
         className="sr-only z-[60] bg-cream px-4 py-3 text-cocoa focus:not-sr-only focus:fixed focus:left-3 focus:top-3"

@@ -45,8 +45,22 @@ test("admin order rows show kitchen status as text and proceed or cancel actions
   assert.doesNotMatch(html, /<select/);
   assert.match(html, /aria-label="Proceed order PML-2001 to Cooking"/);
   assert.match(html, /aria-label="Cancel order PML-2001"/);
+  assert.match(html, /lucide-arrow-right/);
+  assert.match(html, /lucide-x/);
   assert.match(html, />Proceed</);
   assert.match(html, />Cancel</);
+  assert.doesNotMatch(html, /admin-order-action-dot/);
+  assert.doesNotMatch(html, /admin-order-action-proceed" disabled=""/);
+  assert.doesNotMatch(html, /admin-order-action-cancel" disabled=""/);
+});
+
+test("customer order tables do not include kitchen proceed or cancel actions", () => {
+  const html = renderToStaticMarkup(createElement(OrderTable, { items: [{ ...base, paymentStatus: "paid" }], canUpdateStatus: false }));
+  assert.doesNotMatch(html, /<th>Actions<\/th>/);
+  assert.doesNotMatch(html, /admin-order-action/);
+  assert.doesNotMatch(html, /lucide-arrow-right/);
+  assert.doesNotMatch(html, />Proceed</);
+  assert.doesNotMatch(html, />Cancel</);
 });
 
 test("proceed is disabled when the order is completed or cancelled", () => {

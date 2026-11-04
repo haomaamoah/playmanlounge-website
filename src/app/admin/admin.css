@@ -102,7 +102,7 @@
 .admin-table tbody tr.admin-order-row { position: relative; }
 .admin-order-link { position: static; font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; color: inherit; }
 .admin-order-link::after { content: ""; position: absolute; inset: 0; z-index: 1; }
-.admin-payment-check, .admin-order-status-control { position: relative; z-index: 2; }
+.admin-payment-check, .admin-order-status-control, .admin-order-actions { position: relative; z-index: 2; }
 .admin-payment-check { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; justify-self: start; }
 .admin-payment-check .admin-badge { text-decoration: underline; text-underline-offset: 3px; }
 .admin-payment-check:hover:not(:disabled) .admin-badge { background: var(--rice-cream); border-color: var(--admin-control-border); }
@@ -119,13 +119,18 @@
 .admin-root .admin-order-status-select.is-terminal { padding-right: 58px; }
 .admin-root .admin-order-status-select:hover:not(:disabled) { border-color: var(--admin-control-border); filter: brightness(.97); }
 .admin-root .admin-order-status-select:disabled { cursor: not-allowed; opacity: 1; }
-.admin-order-actions { display: flex; align-items: flex-start; gap: 14px; }
-.admin-order-action { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 44px; padding: 0; border: 0; background: transparent; color: #3a1a04; font-size: 12px; font-weight: 600; line-height: 1.2; cursor: pointer; }
-.admin-order-action-dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; }
-.admin-order-action-proceed .admin-order-action-dot { background: #1b7a45; }
-.admin-order-action-cancel .admin-order-action-dot { background: #9b1c0a; }
-.admin-order-action:hover:not(:disabled) .admin-order-action-dot { filter: brightness(1.08); }
-.admin-order-action:disabled { cursor: not-allowed; opacity: .4; }
+.admin-order-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; position: relative; z-index: 2; }
+.admin-order-action { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: #3a1a04; font-size: 11px; font-weight: 600; line-height: 1.2; cursor: pointer; }
+.admin-order-action-mark { box-sizing: border-box; width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; border: 1.5px solid transparent; }
+.admin-order-action-mark svg { display: block; }
+.admin-order-action-proceed .admin-order-action-mark { background: #e5f6ea; color: #1b7a45; border-color: #8dcca4; }
+.admin-order-action-cancel .admin-order-action-mark { background: #fdecea; color: #9b1c0a; border-color: #f0b2a8; }
+.admin-order-action-proceed:hover:not(:disabled) .admin-order-action-mark { background: #d4f0dc; }
+.admin-order-action-cancel:hover:not(:disabled) .admin-order-action-mark { background: #fadcd7; }
+.admin-order-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: admin-order-spin 700ms linear infinite; }
+@keyframes admin-order-spin { to { transform: rotate(360deg); } }
+.admin-order-action:focus-visible { outline: 3px solid #c27b07; outline-offset: 2px; }
+.admin-order-action:disabled { cursor: not-allowed; opacity: .45; }
 .admin-order-status-lock { position: absolute; top: 50%; right: 32px; width: 15px; height: 15px; color: currentColor; opacity: .8; pointer-events: none; transform: translateY(-50%); }
 .admin-table small[role="alert"] { color: #9b1c0a; }
 .admin-table small[role="status"] { color: #235137; }

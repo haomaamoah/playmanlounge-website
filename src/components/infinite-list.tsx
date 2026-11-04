@@ -26,6 +26,26 @@ export function useInfiniteList<T>(queryKey: string, load: (offset: number, sign
   const reload = useCallback(() => setTick((value) => value + 1), []);
 
   useEffect(() => {
+    const refresh = () => {
+      const id = generation.current;
+      const controller = new AbortController();
+      loadRef.current(0, controller.signal).then((page) => {
+        if (id !== generation.current) return;
+        seen.current = page.items.length;
+        setState((previous) => previous.key === requestKey ? {
+          ...previous,
+          items: page.items,
+          total: page.total,
+          error: "",
+          phase: "ready",
+        } : previous);
+      }).catch(() => {});
+    };
+    window.addEventListener("pml-db-change", refresh);
+    return () => window.removeEventListener("pml-db-change", refresh);
+  }, [requestKey]);
+
+  useEffect(() => {
     if (current.phase !== "loading") return;
     const id = ++generation.current;
     seen.current = 0;

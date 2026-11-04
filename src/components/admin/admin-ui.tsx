@@ -6,7 +6,7 @@ import Link from "next/link";
 import { menuPlacement, placementLabel, shortOrderId } from "@/lib/orders/display";
 import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
 import { useMenuGroups } from "@/components/orders/use-menu-groups";
-import { MapPin } from "lucide-react";
+import { ArrowRight, MapPin, X } from "lucide-react";
 import { type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
 import { formatGhs } from "@/lib/content";
 import { GoogleDirectionsMap } from "@/components/google-location-picker";
@@ -51,6 +51,22 @@ export function useAdminResource<T>(url: string) {
       .catch((err: Error) => { if (!controller.signal.aborted) setResult({ key, data: null, error: err.message }); });
     return () => controller.abort();
   }, [url, key]);
+  useEffect(() => {
+    let controller: AbortController | null = null;
+    const refresh = () => {
+      controller?.abort();
+      controller = new AbortController();
+      const refreshKey = `${url}:${version}`;
+      adminRequest<T>(url, { signal: controller.signal })
+        .then((value) => { if (!controller?.signal.aborted) setResult({ key: refreshKey, data: value, error: "" }); })
+        .catch(() => {});
+    };
+    window.addEventListener("pml-db-change", refresh);
+    return () => {
+      controller?.abort();
+      window.removeEventListener("pml-db-change", refresh);
+    };
+  }, [url, version]);
   const current = result?.key === key;
   return { data: current ? result.data : null, error: current ? result.error : "", loading: !current, reload };
 }
@@ -158,20 +174,26 @@ function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: () 
         className="admin-order-action admin-order-action-proceed"
         disabled={proceedDisabled}
         aria-label={next ? `Proceed order ${order.id} to ${orderLabels[next]}` : `Proceed is unavailable for order ${order.id}`}
+        aria-busy={busy === "proceed"}
         onClick={() => { if (next) void update("proceed", next); }}
       >
-        <span className="admin-order-action-dot" aria-hidden="true" />
-        {busy === "proceed" ? "Saving…" : "Proceed"}
+        <span className="admin-order-action-mark" aria-hidden="true">
+          {busy === "proceed" ? <span className="admin-order-spinner" /> : <ArrowRight size={16} strokeWidth={2.5} />}
+        </span>
+        Proceed
       </button>
       <button
         type="button"
         className="admin-order-action admin-order-action-cancel"
         disabled={cancelDisabled}
         aria-label={`Cancel order ${order.id}`}
+        aria-busy={busy === "cancel"}
         onClick={() => void update("cancel", "cancelled")}
       >
-        <span className="admin-order-action-dot" aria-hidden="true" />
-        {busy === "cancel" ? "Saving…" : "Cancel"}
+        <span className="admin-order-action-mark" aria-hidden="true">
+          {busy === "cancel" ? <span className="admin-order-spinner" /> : <X size={16} strokeWidth={2.5} />}
+        </span>
+        Cancel
       </button>
     </div>
     {message && <small role="alert">{message}</small>}
