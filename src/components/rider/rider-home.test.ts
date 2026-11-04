@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RiderDashboardStats } from "./rider-home";
+import { RiderDashboardStats, RiderHome } from "./rider-home";
+
+test("rider home has a recent-orders section instead of shortcuts and the full order browser", () => {
+  const html = renderToStaticMarkup(createElement(RiderHome));
+  assert.match(html, /<h2[^>]*id="rider-recent-orders">Recent Orders<\/h2>/);
+  assert.match(html, /Your five most recent available or assigned delivery orders/);
+  assert.match(html, /Loading recent orders/);
+  assert.doesNotMatch(html, /View delivery orders|Update bike details|All delivery orders|Filter deliveries|Search orders|Refresh/);
+});
 
 test("rider statistics render accessible delivery charts with real proportions", () => {
   const html = renderToStaticMarkup(createElement(RiderDashboardStats, { stats: {

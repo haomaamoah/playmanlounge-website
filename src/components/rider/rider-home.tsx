@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bike, CheckCheck, CircleCheck, MessagesSquare } from "lucide-react";
 import type { StreamChange } from "@/lib/live/apply";
 import { riderRequest } from "./rider-api";
-import { RiderOrders } from "./rider-orders";
+import { RiderRecentOrders } from "./rider-orders";
 
 type Stats = { activeDeliveries: number; completedToday: number; completedDeliveries: number; openSupportRequests: number };
 
@@ -79,10 +78,6 @@ export function RiderHome() {
     {error && <p className="rider-error" role="alert">{error}</p>}
     {!stats && !error && <p role="status">Loading delivery stats…</p>}
     {stats && <RiderDashboardStats stats={stats} />}
-    <div className="rider-actions">
-      <Link className="rider-button" href="/rider/orders">View delivery orders</Link>
-      <Link className="rider-button rider-button-secondary" href="/rider/settings">Update bike details</Link>
-    </div>
-    <Suspense fallback={<p role="status">Loading delivery orders…</p>}><RiderOrders dashboard /></Suspense>
+    <RiderRecentOrders />
   </section>;
 }

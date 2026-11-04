@@ -336,9 +336,13 @@ returns 403.
   separate token login/refresh/logout endpoints.
 - Home: four icon/count cards (active, completed today, all-time completed, open
   support), active/completed share chart, today's completed share chart,
-  navigation actions and a searchable paginated order list.
-- Home defaults to `queue=all`: available open jobs plus **this rider's entire
-  assigned history**, including delivered/cancelled orders.
+  followed by **Recent Orders** with at most five orders, newest creation first.
+  The former navigation shortcuts and full searchable list are not on home.
+- Home requests `queue=all&limit=5&offset=0`: available open jobs plus **this
+  rider's assigned history**, including delivered/cancelled orders. Each order
+  stream event refetches the newest five from the authorized API, preserving
+  kitchen details, replacing entries that leave the scope and evicting older
+  entries when a new order arrives. Loading, error and empty states are explicit.
 - `/rider/orders` retains default **Active** behavior for compatibility; filters
   are All orders (`all`), Active (empty), Open, Claimed, Delivered and Cancelled.
 - Order rows show artwork/type, human reference, delivery state, address,
@@ -534,8 +538,9 @@ Consumers:
 - `useAdminResource` merges a matching detail row and folds order events into
   dashboard state; `useCustomerResource` merges matching customer detail data.
 - Rider order detail merges matching order events; rider home reloads statistics
-  on order/support events. No page refresh should be necessary for a normal
-  already-loaded order update.
+  on order/support events and refetches the five Recent Orders on order events
+  (including inserts, updates and deletes). No page refresh should be necessary
+  for a new eligible delivery or a normal already-loaded order update.
 - Maps separately consume rider location changes with finite-coordinate guards.
 - Mutation responses update local state immediately; stream delivery is not a
   reason to leave a successful click visually pending.

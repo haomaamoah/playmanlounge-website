@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
-import { streamMatches } from "@/lib/live/apply";
+import { streamMatches, type StreamChange } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
 import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
@@ -46,13 +46,57 @@ function deliveryCopy(status: string | null, kitchenStatus: string) {
   return { tone: "open", label: "Open delivery", action: "View and claim" };
 }
 
-export function RiderOrders({ dashboard = false }: { dashboard?: boolean }) {
+export function RiderRecentOrders() {
+  const [orders, setOrders] = useState<RiderOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    let request = new AbortController();
+    const load = () => {
+      request.abort();
+      request = new AbortController();
+      const { signal } = request;
+      riderRequest<{ ok: true; items: RiderOrder[]; total: number }>("/api/rider/orders?queue=all&limit=5&offset=0", { signal })
+        .then((result) => {
+          if (active) { setOrders(result.items); setLoading(false); setError(""); }
+        })
+        .catch((reason: Error) => {
+          if (active && !signal.aborted) { setError(reason.message); setLoading(false); }
+        });
+    };
+    const onStream = (event: Event) => {
+      const change = (event as CustomEvent<StreamChange>).detail;
+      if (change.table === "orders") load();
+    };
+    window.addEventListener("pml-stream", onStream);
+    load();
+    return () => {
+      active = false;
+      request.abort();
+      window.removeEventListener("pml-stream", onStream);
+    };
+  }, []);
+  return <section aria-labelledby="rider-recent-orders">
+    <header className="rider-page-heading">
+      <div>
+        <h2 className="font-display" id="rider-recent-orders">Recent Orders</h2>
+        <p>Your five most recent available or assigned delivery orders.</p>
+      </div>
+    </header>
+    {error && <p className="rider-error" role="alert">{error}</p>}
+    {loading && <p role="status">Loading recent orders…</p>}
+    {!loading && !error && !orders.length && <p className="rider-empty">No delivery orders yet.</p>}
+    <div aria-live="polite"><RiderOrderTickets orders={orders} /></div>
+  </section>;
+}
+
+export function RiderOrders() {
   const search = useSearchParams();
-  const initialQueue = search.get("queue") ?? (dashboard ? "all" : "");
+  const initialQueue = search.get("queue") ?? "";
   const [queue, setQueue] = useState(deliveryFilters.some((entry) => entry.value === initialQueue) ? initialQueue : "");
   const [query, setQuery] = useState("");
   const [version, setVersion] = useState(0);
-  const groups = useMenuGroups();
   const filtering = Boolean((queue && queue !== "all") || query);
   const list = useInfiniteList<RiderOrder>(`${queue}:${query}:${version}`, (offset, signal) => {
     const params = new URLSearchParams({
@@ -72,7 +116,7 @@ export function RiderOrders({ dashboard = false }: { dashboard?: boolean }) {
   return <section>
     <header className="rider-page-heading">
       <div>
-        {dashboard ? <h2 className="font-display">All delivery orders</h2> : <h1 className="font-display">Delivery orders</h1>}
+        <h1 className="font-display">Delivery orders</h1>
         <p>Open jobs and your deliveries, including completed and cancelled orders.</p>
       </div>
       <button className="rider-button rider-button-secondary" onClick={() => setVersion((value) => value + 1)}>Refresh</button>
@@ -102,7 +146,14 @@ export function RiderOrders({ dashboard = false }: { dashboard?: boolean }) {
         ? "No matching deliveries. Try another search or filter, or choose All orders."
         : queue === "all" ? "No delivery orders yet." : "No open or assigned deliveries right now."}</p>
     )}
-    <div className="rider-order-list">{list.items.map((order) => {
+    <RiderOrderTickets orders={list.items} />
+    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
+  </section>;
+}
+
+function RiderOrderTickets({ orders }: { orders: RiderOrder[] }) {
+  const groups = useMenuGroups();
+  return <div className="rider-order-list">{orders.map((order) => {
       const placement = menuPlacement(order.firstItemId, groups);
       const delivery = deliveryCopy(order.riderDeliveryStatus, order.status);
       const kind = placementLabel(placement);
@@ -121,7 +172,5 @@ export function RiderOrders({ dashboard = false }: { dashboard?: boolean }) {
           <span className="rider-ticket-action">{delivery.action}</span>
         </Link>
       </article>;
-    })}</div>
-    <InfiniteScroll sentinel={list.sentinel} loadingMore={list.loadingMore} />
-  </section>;
+    })}</div>;
 }
