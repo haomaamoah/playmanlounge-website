@@ -56,6 +56,16 @@ select not exists(select 1 from app_migrations.versions where version='202610160
 \i supabase/migrations/202610160002_notifications.sql
 insert into app_migrations.versions(version) values('202610160002');
 \endif
+select not exists(select 1 from app_migrations.versions where version='202610190001') as apply_kitchens \gset
+\if :apply_kitchens
+\i supabase/migrations/202610190001_kitchens.sql
+insert into app_migrations.versions(version) values('202610190001');
+\endif
+select not exists(select 1 from app_migrations.versions where version='202610200001') as apply_riders \gset
+\if :apply_riders
+\i supabase/migrations/202610200001_riders.sql
+insert into app_migrations.versions(version) values('202610200001');
+\endif
 select not exists(select 1 from app_migrations.versions where version='202611040001') as apply10 \gset
 \if :apply10
 \i supabase/migrations/202611040001_realtime.sql

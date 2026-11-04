@@ -4,8 +4,7 @@ import { orderSearchFilter, searchQuery } from "@/lib/admin/search";
 import { ApiFailure } from "@/lib/admin/validation";
 import { db } from "@/lib/db/server";
 import { publicRider, requireRider } from "@/lib/riders/server";
-
-const riderQueues = ["open", "claimed", "delivered", "cancelled"] as const;
+import { riderOrderScope, riderQueues } from "@/lib/riders/order-queue";
 
 function firstLineItemId(lines: unknown) {
   if (!Array.isArray(lines) || typeof lines[0] !== "object" || lines[0] === null) return "";
@@ -13,23 +12,12 @@ function firstLineItemId(lines: unknown) {
   return typeof id === "string" ? id : "";
 }
 
-/** What this rider is allowed to see for one queue. Open jobs are unclaimed; the other queues are only theirs. */
-function riderOrderScope(riderId: string, queue: string) {
-  const open = "and(rider_id.is.null,status.in.(pending,cooking,ready),payment_status.in.(paid,cod))";
-  const claimed = `and(rider_id.eq.${riderId},rider_delivery_status.in.(assigned,picked_up),status.neq.cancelled)`;
-  if (queue === "open") return open;
-  if (queue === "claimed") return claimed;
-  if (queue === "delivered") return `and(rider_id.eq.${riderId},or(rider_delivery_status.eq.delivered,status.eq.completed))`;
-  if (queue === "cancelled") return `and(rider_id.eq.${riderId},status.eq.cancelled)`;
-  return `${claimed},${open}`;
-}
-
 export const GET = endpoint(async (request) => {
   const rider = await requireRider(request);
   const { url, limit, offset } = pagination(request);
   const search = searchQuery(url);
   const queue = url.searchParams.get("queue") ?? "";
-  if (queue && !riderQueues.includes(queue as never)) throw new ApiFailure(400, "Invalid delivery filter.");
+  if (queue && !riderQueues.some((value) => value === queue)) throw new ApiFailure(400, "Invalid delivery filter.");
   let query = db().from("orders").select("*", { count: "exact" })
     .eq("fulfilment", "delivery")
     .or(riderOrderScope(rider.id, queue))

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Download } from "lucide-react";
+import { Banknote, CircleCheck, CircleX, ClipboardList, Clock3, Download, MessagesSquare, ShieldCheck, UsersRound, UtensilsCrossed, Wallet } from "lucide-react";
 import type { Dashboard } from "@/lib/admin/contracts";
 import { dashboardSummaryCsv, downloadCsv, recentOrdersCsv } from "@/lib/admin/dashboard-export";
 import { formatGhs } from "@/lib/content";
@@ -37,6 +37,17 @@ function ShareBar({ title, segments }: {
       </ul>
     </figure>
   );
+}
+
+export function DashboardStats({ dashboard }: { dashboard: Dashboard }) {
+  return <dl className={`admin-stats${dashboard.adminCount !== null ? " admin-stats-manager" : ""}`}>
+    <div><dt><ClipboardList size={22} aria-hidden="true" /><span>Orders created</span></dt><dd>{dashboard.totalOrders}</dd></div>
+    <div className="admin-stat-paid"><dt><CircleCheck size={22} aria-hidden="true" /><span>Paid</span></dt><dd>{dashboard.paidOrders}</dd></div>
+    <div className="admin-stat-pending"><dt><Clock3 size={22} aria-hidden="true" /><span>Pending payment</span></dt><dd>{dashboard.pendingOrders}</dd></div>
+    <div className="admin-stat-cod"><dt><Banknote size={22} aria-hidden="true" /><span>Pay on delivery</span></dt><dd>{dashboard.codOrders}</dd></div>
+    <div className="admin-stat-failed"><dt><CircleX size={22} aria-hidden="true" /><span>Failed payments</span></dt><dd>{dashboard.failedPayments}</dd></div>
+    {dashboard.adminCount !== null && <div className="admin-stat-admins"><dt><ShieldCheck size={22} aria-hidden="true" /><span>Administrators</span></dt><dd>{dashboard.adminCount}</dd></div>}
+  </dl>;
 }
 
 export function HomeDashboard() {
@@ -76,15 +87,8 @@ export function HomeDashboard() {
     {dashboard && <>
       <section className="admin-report" aria-labelledby="orders-overview">
         <div className="admin-section-heading"><h2 id="orders-overview">Orders & payments</h2><Link href={`${basePath}/orders`}>View all orders</Link></div>
-        <dl className={`admin-stats${dashboard.adminCount !== null ? " admin-stats-manager" : ""}`}>
-          <div><dt>Orders created</dt><dd>{dashboard.totalOrders}</dd></div>
-          <div className="admin-stat-paid"><dt>Paid</dt><dd>{dashboard.paidOrders}</dd></div>
-          <div className="admin-stat-pending"><dt>Pending payment</dt><dd>{dashboard.pendingOrders}</dd></div>
-          <div className="admin-stat-cod"><dt>Pay on delivery</dt><dd>{dashboard.codOrders}</dd></div>
-          <div className="admin-stat-failed"><dt>Failed payments</dt><dd>{dashboard.failedPayments}</dd></div>
-          {dashboard.adminCount !== null && <div className="admin-stat-admins"><dt>Administrators</dt><dd>{dashboard.adminCount}</dd></div>}
-        </dl>
-        <div className="admin-revenue"><span>Paid revenue</span><strong>{formatGhs(dashboard.revenue)}</strong><small>Excludes pending, failed and pay-on-delivery orders.</small></div>
+        <DashboardStats dashboard={dashboard} />
+        <div className="admin-revenue"><span className="admin-metric-label"><Wallet size={22} aria-hidden="true" />Paid revenue</span><strong>{formatGhs(dashboard.revenue)}</strong><small>Excludes pending, failed and pay-on-delivery orders.</small></div>
         <div className="admin-share-grid">
           <ShareBar
             title="How orders were paid"
@@ -105,12 +109,12 @@ export function HomeDashboard() {
         </div>
       </section>
       <div className="admin-home-secondary">
-        <section className="admin-summary"><h2>Customer care</h2><p><strong>{dashboard.openSupport}</strong> open requests <span>· {dashboard.closedSupport} closed</span></p><Link href={`${basePath}/support`}>Open support desk</Link></section>
-        <section className="admin-summary"><h2>Customers</h2><p><strong>{dashboard.customerCount ?? "—"}</strong> registered customers</p>
+        <section className="admin-summary"><h2 className="admin-metric-label"><MessagesSquare size={22} aria-hidden="true" />Customer care</h2><p><strong>{dashboard.openSupport}</strong> open requests <span>· {dashboard.closedSupport} closed</span></p><Link href={`${basePath}/support`}>Open support desk</Link></section>
+        <section className="admin-summary"><h2 className="admin-metric-label"><UsersRound size={22} aria-hidden="true" />Customers</h2><p><strong>{dashboard.customerCount ?? "—"}</strong> registered customers</p>
           {dashboard.customerCount === null ? <p>Customer records are not set up yet.</p> : null}
           <Link href={`${basePath}/customers`}>View customers</Link>
         </section>
-        <section className="admin-summary"><h2>On the menu</h2><p><strong>{dashboard.menuItems}</strong> menu items</p><Link href={`${basePath}/menu`}>Manage the menu</Link></section>
+        <section className="admin-summary"><h2 className="admin-metric-label"><UtensilsCrossed size={22} aria-hidden="true" />On the menu</h2><p><strong>{dashboard.menuItems}</strong> menu items</p><Link href={`${basePath}/menu`}>Manage the menu</Link></section>
       </div>
       <section className="admin-report"><div className="admin-section-heading"><h2>Recent orders</h2><span>Latest activity</span></div>
         {dashboard.recentOrders.length ? <OrderTable items={dashboard.recentOrders} onOrderUpdated={(order) => {

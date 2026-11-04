@@ -6,10 +6,10 @@ import { requireRider } from "@/lib/riders/server";
 export const GET = endpoint(async (request) => {
   const rider = await requireRider(request);
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   const [active, completedToday, allTime, openSupport] = await Promise.all([
     db().from("orders").select("id", { count: "exact", head: true })
-      .eq("rider_id", rider.id).in("rider_delivery_status", ["assigned", "picked_up"]),
+      .eq("rider_id", rider.id).in("rider_delivery_status", ["assigned", "picked_up"]).neq("status", "cancelled"),
     db().from("orders").select("id", { count: "exact", head: true })
       .eq("rider_id", rider.id).eq("rider_delivery_status", "delivered").gte("updated_at", today.toISOString()),
     db().from("orders").select("id", { count: "exact", head: true })

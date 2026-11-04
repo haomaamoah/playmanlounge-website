@@ -4,6 +4,11 @@ Marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE) â€
 
 Tagline: **Life is tasty.**
 
+For an agent rebuilding the frontend with a different design, use the
+[backend and functional replication guide](docs/REPLICATION_GUIDE.md). It covers
+shared-backend versus fresh-backend setup, every portal's behavior, state
+transitions, APIs, realtime, deployment dependencies, and the live-test scope.
+
 This is a single scrolling page with Home, Promotions + Combo deals (when available), Menu, Gallery, Meet The Team, Make an Order, and Contact Us. Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document: see the board, send an email for delivery or arranged hub pickup.
 
 ## Run it
@@ -215,6 +220,12 @@ Customer Support includes a paginated, searchable request history and refresh co
 Customer sign-up and login are available from the website header at `/customer/signup` and `/customer/login`. Sign-up requires a name, email, 10-digit phone number, and matching passwords of at least six characters. Customer passwords are HMAC-SHA256-derived on the server with `CUSTOMER_AUTH_PEPPER` using the same `pml-customer-v1` format as the mobile API; the raw password is never sent to Supabase Auth. Set a stable pepper of at least 32 characters privately in the hosting environment (do not rotate it without a coordinated password reset). Keep Supabase Auth password requirements at six characters with no required character classes: Supabase receives the 64-character derived hex value. Email/phone login, order lookup, support requests, and password changes live under `/app`; its navigation is Menu, Orders, Support, Settings. Customer settings only allow changing the password, after confirming the current password. The admin sidebar's Customers page searches registered customer profiles by name, email, or phone. No customer analytics page is included in this MVP. The customer migration creates and updates profile rows from Auth metadata and grants authenticated users select access only to their own profile; website routes use service-role access after verifying the current Auth user. When the trusted proxy IP option is off, customer login/sign-up use higher shared rate-limit ceilings; set `TRUST_PROXY_IP=1` only behind a proxy that overwrites the forwarding header.
 
 The demo seeder has been removed. To clean up legacy records explicitly marked `is_demo`, run `REMOVE_DEMO_RECORDS=1 npm run db:cleanup-demo`. This removes only marked orders, their payment attempts (receipt ledger rows cascade with the order), and marked support requests; real customer records are preserved. The dashboard retains the database exclusion safeguard but displays no demo counts or labels. No setup or cleanup script sends emails or charges a wallet.
+
+### Portal dashboards
+
+Admin and manager dashboards use icon-labelled statistic cards with payment-status colours, plus icons for revenue, customer care, customers, and menu summaries. Text labels and values remain visible alongside the decorative icons.
+
+The rider home page shows live statistic cards, an active/completed delivery chart, today's share of all-time completed deliveries (Accra time), and a searchable, paginated delivery list. Its default **All orders** filter includes available unclaimed jobs plus the signed-in rider's assigned, completed, and cancelled deliveries; it never includes another rider's assigned history. The delivery orders page retains its default **Active** queue, with **All orders** available as a separate filter (`GET /api/rider/orders?queue=all`). Statistics refresh on order/support stream events and order lists apply order stream updates directly.
 
 ### API contract and protections
 

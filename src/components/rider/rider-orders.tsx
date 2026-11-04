@@ -10,6 +10,7 @@ import { PortalSearch } from "@/components/portal-search";
 import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
 import { useMenuGroups } from "@/components/orders/use-menu-groups";
 import { menuPlacement, placementLabel, shortOrderId } from "@/lib/orders/display";
+import { visibleInQueue } from "@/lib/riders/order-queue";
 import { riderRequest } from "./rider-api";
 
 type RiderOrder = {
@@ -28,43 +29,31 @@ type RiderOrder = {
 };
 
 const deliveryFilters = [
-  { value: "", label: "All" },
+  { value: "all", label: "All orders" },
+  { value: "", label: "Active" },
   { value: "open", label: "Open" },
   { value: "claimed", label: "Claimed" },
   { value: "delivered", label: "Delivered" },
   { value: "cancelled", label: "Cancelled" },
 ];
 
-function visibleInQueue(queue: string, row: Record<string, unknown>) {
-  const status = String(row.status ?? "");
-  const payment = String(row.paymentStatus ?? "");
-  const delivery = row.riderDeliveryStatus;
-  const open = row.riderId == null && ["pending", "cooking", "ready"].includes(status) && ["paid", "cod"].includes(payment);
-  const claimed = row.riderId != null && (delivery === "assigned" || delivery === "picked_up") && status !== "cancelled";
-  const delivered = row.riderId != null && (delivery === "delivered" || status === "completed");
-  const cancelled = row.riderId != null && status === "cancelled";
-  if (queue === "open") return open;
-  if (queue === "claimed") return claimed;
-  if (queue === "delivered") return delivered;
-  if (queue === "cancelled") return cancelled;
-  return open || claimed;
-}
-
-function deliveryCopy(status: string | null) {
+function deliveryCopy(status: string | null, kitchenStatus: string) {
+  if (kitchenStatus === "cancelled") return { tone: "open", label: "Cancelled", action: "View order" };
+  if (kitchenStatus === "completed") return { tone: "done", label: "Delivered", action: "Open delivery" };
   if (status === "picked_up") return { tone: "riding", label: "Picked up · on the way", action: "Open delivery" };
   if (status === "delivered") return { tone: "done", label: "Delivered", action: "Open delivery" };
   if (status !== null) return { tone: "accepted", label: "Accepted · awaiting pickup", action: "Open delivery" };
   return { tone: "open", label: "Open delivery", action: "View and claim" };
 }
 
-export function RiderOrders() {
+export function RiderOrders({ dashboard = false }: { dashboard?: boolean }) {
   const search = useSearchParams();
-  const initialQueue = search.get("queue") ?? "";
+  const initialQueue = search.get("queue") ?? (dashboard ? "all" : "");
   const [queue, setQueue] = useState(deliveryFilters.some((entry) => entry.value === initialQueue) ? initialQueue : "");
   const [query, setQuery] = useState("");
   const [version, setVersion] = useState(0);
   const groups = useMenuGroups();
-  const filtering = Boolean(queue || query);
+  const filtering = Boolean((queue && queue !== "all") || query);
   const list = useInfiniteList<RiderOrder>(`${queue}:${query}:${version}`, (offset, signal) => {
     const params = new URLSearchParams({
       queue,
@@ -83,8 +72,8 @@ export function RiderOrders() {
   return <section>
     <header className="rider-page-heading">
       <div>
-        <h1 className="font-display">Delivery orders</h1>
-        <p>Claim an open delivery or continue an order assigned to you.</p>
+        {dashboard ? <h2 className="font-display">All delivery orders</h2> : <h1 className="font-display">Delivery orders</h1>}
+        <p>Open jobs and your deliveries, including completed and cancelled orders.</p>
       </div>
       <button className="rider-button rider-button-secondary" onClick={() => setVersion((value) => value + 1)}>Refresh</button>
     </header>
@@ -110,12 +99,12 @@ export function RiderOrders() {
     {!list.loading && !list.error && <p className="rider-results" aria-live="polite">{list.total} matching orders</p>}
     {!list.loading && !list.error && !list.items.length && (
       <p className="rider-empty">{filtering
-        ? "No matching deliveries. Try another search or filter, or choose All."
-        : "No open or assigned deliveries right now."}</p>
+        ? "No matching deliveries. Try another search or filter, or choose All orders."
+        : queue === "all" ? "No delivery orders yet." : "No open or assigned deliveries right now."}</p>
     )}
     <div className="rider-order-list">{list.items.map((order) => {
       const placement = menuPlacement(order.firstItemId, groups);
-      const delivery = deliveryCopy(order.riderDeliveryStatus);
+      const delivery = deliveryCopy(order.riderDeliveryStatus, order.status);
       const kind = placementLabel(placement);
       return <article className="rider-card rider-ticket" key={order.id}>
         <Link className="rider-ticket-link" href={`/rider/orders/${encodeURIComponent(order.id)}`} aria-label={`Open order ${order.ref}, ${kind}`}>
