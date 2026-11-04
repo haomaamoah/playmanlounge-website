@@ -9,18 +9,20 @@ export function RiderSupport() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [revision, setRevision] = useState(0);
-  const list = useInfiniteList<Ticket>(String(revision), (offset, signal) =>
+  const list = useInfiniteList<Ticket>("support", (offset, signal) =>
     riderRequest<{ ok: true; items: Ticket[]; total: number }>(`/api/rider/support?limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
-      .then((result) => ({ items: result.items, total: result.total })));
+      .then((result) => ({ items: result.items, total: result.total })), {
+    table: "rider_support_requests",
+    id: (ticket) => ticket.id,
+  });
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const values = new FormData(form);
     setBusy(true); setError(""); setNotice("");
     try {
-      await riderRequest("/api/rider/support", { method: "POST", body: JSON.stringify({ subject: values.get("subject"), message: values.get("message") }) });
-      form.reset(); setRevision((value) => value + 1); setNotice("Your support request was sent.");
+      const saved = await riderRequest<{ ok: true; item: Ticket }>("/api/rider/support", { method: "POST", body: JSON.stringify({ subject: values.get("subject"), message: values.get("message") }) });
+      form.reset(); list.upsert(saved.item, (item) => item.id); setNotice("Your support request was sent.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not submit your request."); }
     finally { setBusy(false); }
   }

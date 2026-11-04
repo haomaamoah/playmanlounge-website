@@ -6,6 +6,7 @@ import { Plus, Upload } from "lucide-react";
 import type { AdminMenuItem, ItemResponse, ListResponse, MenuInput, UploadResponse } from "@/lib/admin/contracts";
 import { formatGhs, type MenuCategory } from "@/lib/content";
 import { dealKind } from "@/lib/promotions";
+import { streamMatches } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
 import { Badge, EmptyState, PageHeading, ResourceState, adminRequest, useAdminResource } from "./admin-ui";
@@ -32,7 +33,11 @@ export function MenuEditor() {
     adminRequest<ListResponse<AdminMenuItem>>(
       `/api/admin/menu?limit=${LIST_PAGE_SIZE}&offset=${offset}&inactive=${showInactive ? "1" : "0"}&q=${encodeURIComponent(query)}`,
       { signal },
-    ).then((data) => ({ items: data.items, total: data.total })));
+    ).then((data) => ({ items: data.items, total: data.total })), {
+    table: "menu_items",
+    id: (item) => item.id,
+    accept: (row) => (showInactive || row.isActive !== false) && streamMatches(query, [row.id, row.name, row.description, row.groupTitle]),
+  });
   const [draft, setDraft] = useState<MenuInput | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,8 +80,15 @@ export function MenuEditor() {
     setBusy(true); setMutationError(""); setNotice("");
     try {
       const { id, ...fields } = toMenuInput(draft);
-      await adminRequest<ItemResponse<AdminMenuItem>>(editingId ? `/api/admin/menu/${encodeURIComponent(editingId)}` : "/api/admin/menu", { method: editingId ? "PATCH" : "POST", body: JSON.stringify(editingId ? fields : { id, ...fields }) });
-      setDraft(null); setNotice(`${draft.name} saved to the menu.`); list.reload(); groups.reload();
+      const saved = await adminRequest<ItemResponse<AdminMenuItem>>(editingId ? `/api/admin/menu/${encodeURIComponent(editingId)}` : "/api/admin/menu", { method: editingId ? "PATCH" : "POST", body: JSON.stringify(editingId ? fields : { id, ...fields }) });
+      const visible = (showInactive || saved.item.isActive) && streamMatches(query, [saved.item.id, saved.item.name, saved.item.description, saved.item.groupTitle]);
+      if (visible) list.upsert(saved.item, (item) => item.id);
+      else list.remove(saved.item.id, (item) => item.id);
+      groups.setData((current) => {
+        if (!current || current.groups.includes(saved.item.groupId)) return current;
+        return { ...current, groups: [...current.groups, saved.item.groupId].sort() };
+      });
+      setDraft(null); setNotice(`${draft.name} saved to the menu.`);
     } catch (err) { setMutationError((err as Error).message); }
     finally { setBusy(false); }
   }
@@ -85,7 +97,7 @@ export function MenuEditor() {
     setBusy(true); setMutationError("");
     try {
       await adminRequest(`/api/admin/menu/${encodeURIComponent(deleting.id)}`, { method: "DELETE" });
-      setNotice(`${deleting.name} removed from the customer menu. Its order history is preserved.`); setDeleting(null); list.reload(); groups.reload(); requestAnimationFrame(() => addButton.current?.focus());
+      setNotice(`${deleting.name} removed from the customer menu. Its order history is preserved.`); list.remove(deleting.id, (item) => item.id); setDeleting(null); requestAnimationFrame(() => addButton.current?.focus());
     } catch (err) { setMutationError((err as Error).message); }
     finally { setBusy(false); }
   }

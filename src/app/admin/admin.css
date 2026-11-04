@@ -120,8 +120,8 @@
 .admin-root .admin-order-status-select:hover:not(:disabled) { border-color: var(--admin-control-border); filter: brightness(.97); }
 .admin-root .admin-order-status-select:disabled { cursor: not-allowed; opacity: 1; }
 .admin-order-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; position: relative; z-index: 2; }
-.admin-order-action { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: #3a1a04; font-size: 11px; font-weight: 600; line-height: 1.2; cursor: pointer; }
-.admin-order-action-mark { box-sizing: border-box; width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; border: 1.5px solid transparent; }
+.admin-order-action { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 8px 8px 2px; border: 0; background: transparent; color: #3a1a04; font-size: 11px; font-weight: 600; line-height: 1.2; cursor: pointer; }
+.admin-order-action-mark { box-sizing: border-box; width: 28px; height: 28px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; border: 1.5px solid transparent; }
 .admin-order-action-mark svg { display: block; }
 .admin-order-action-proceed .admin-order-action-mark { background: #e5f6ea; color: #1b7a45; border-color: #8dcca4; }
 .admin-order-action-cancel .admin-order-action-mark { background: #fdecea; color: #9b1c0a; border-color: #f0b2a8; }
@@ -136,6 +136,7 @@
 .admin-table small[role="status"] { color: #235137; }
 .admin-number { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .admin-table .admin-number { text-align: right; }
+.admin-root .admin-table:has(.admin-order-row) .admin-number { text-align: left; padding-left: 24px; padding-right: 32px; }
 .admin-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; border: 1px solid #c9b693; background: #f6e9ce; color: #624413; border-radius: 4px; padding: 4px 8px; white-space: nowrap; }
 .admin-badge-paid, .admin-badge-closed, .admin-badge-completed, .admin-badge-open-menu { color: #235137; background: #e9f1e5; border-color: #b7cbb0; }
 .admin-badge-failed, .admin-badge-open, .admin-badge-cancelled { color: #9b1c0a; background: #fbe9df; border-color: #e4b7a5; }
@@ -290,6 +291,7 @@
   .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-kind-cell { grid-column: auto; align-content: center; width: auto; }
   .admin-table-scroll:has(.admin-order-link) .admin-table .admin-cell-label { display: block; color: #6b4a28; font-size: 12px; }
   .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-number { text-align: left; }
+  .admin-root .admin-table-scroll:has(.admin-order-link) .admin-table td.admin-number { text-align: left; padding: 12px 18px; }
   .admin-form-grid { grid-template-columns: 1fr; }
   .admin-admin-create fieldset { grid-template-columns: 1fr; }
   .admin-kitchen-form fieldset, .admin-kitchen-row { grid-template-columns: 1fr; }

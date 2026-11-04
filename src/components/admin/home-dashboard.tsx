@@ -41,7 +41,7 @@ function ShareBar({ title, segments }: {
 
 export function HomeDashboard() {
   const basePath = useAdminBasePath();
-  const { data, loading, error, reload } = useAdminResource<{ ok: true; dashboard: Dashboard }>("/api/admin/dashboard");
+  const { data, loading, error, reload, setData } = useAdminResource<{ ok: true; dashboard: Dashboard }>("/api/admin/dashboard");
   const dashboard = data?.dashboard;
   return <>
     <PageHeading
@@ -113,7 +113,18 @@ export function HomeDashboard() {
         <section className="admin-summary"><h2>On the menu</h2><p><strong>{dashboard.menuItems}</strong> menu items</p><Link href={`${basePath}/menu`}>Manage the menu</Link></section>
       </div>
       <section className="admin-report"><div className="admin-section-heading"><h2>Recent orders</h2><span>Latest activity</span></div>
-        {dashboard.recentOrders.length ? <OrderTable items={dashboard.recentOrders} /> : <EmptyState title="Your first order will appear here">New customer orders will populate this live activity list.</EmptyState>}
+        {dashboard.recentOrders.length ? <OrderTable items={dashboard.recentOrders} onOrderUpdated={(order) => {
+          setData((current) => {
+            if (!current?.dashboard) return current;
+            return {
+              ...current,
+              dashboard: {
+                ...current.dashboard,
+                recentOrders: current.dashboard.recentOrders.map((item) => item.id === order.id ? { ...item, ...order } : item),
+              },
+            };
+          });
+        }} /> : <EmptyState title="Your first order will appear here">New customer orders will populate this live activity list.</EmptyState>}
       </section>
     </>}
   </>;

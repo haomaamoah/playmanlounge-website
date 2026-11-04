@@ -1,13 +1,99 @@
 import { createClient, type RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { authClient } from "@/lib/admin/server";
 import type { AuthPortal } from "@/lib/admin/session-scope";
+import { menuDTO } from "@/lib/db/catalog";
+import { orderDTO, supportDTO } from "@/lib/db/orders";
 import { db } from "@/lib/db/server";
+import type { StreamChange, StreamEventName } from "@/lib/live/apply";
 import { liveChangeVisible, liveTables, type LivePortal, type LiveViewer } from "@/lib/live/changes";
 import { findRider } from "@/lib/riders/server";
 
 export const dynamic = "force-dynamic";
 
 const portals: LivePortal[] = ["customer", "admin", "manager", "rider"];
+
+function riderOrder(raw: Record<string, unknown>) {
+  const lines = Array.isArray(raw.lines) ? raw.lines as { itemId?: string }[] : [];
+  return {
+    id: String(raw.id),
+    ref: String(raw.order_ref ?? ""),
+    status: String(raw.status ?? ""),
+    paymentStatus: String(raw.payment_status ?? ""),
+    riderDeliveryStatus: raw.rider_delivery_status ?? null,
+    riderId: typeof raw.rider_id === "string" ? raw.rider_id : null,
+    customerName: String(raw.customer_name ?? ""),
+    deliveryAddress: String(raw.delivery_address ?? ""),
+    deliveryLatitude: typeof raw.delivery_latitude === "number" ? raw.delivery_latitude : null,
+    deliveryLongitude: typeof raw.delivery_longitude === "number" ? raw.delivery_longitude : null,
+    firstItemId: typeof lines[0]?.itemId === "string" ? lines[0].itemId : "",
+    updatedAt: String(raw.updated_at ?? ""),
+  };
+}
+
+function streamRow(table: string, raw: Record<string, unknown>, portal: LivePortal) {
+  if (table === "orders") return portal === "rider" ? riderOrder(raw) : { ...orderDTO(raw), ref: String(raw.order_ref ?? "") };
+  if (table === "menu_items") return menuDTO(raw);
+  if (table === "support_requests") return supportDTO(raw);
+  if (table === "rider_support_requests") {
+    return {
+      id: String(raw.id ?? ""),
+      subject: String(raw.subject ?? ""),
+      message: String(raw.message ?? ""),
+      status: String(raw.status ?? ""),
+      created_at: String(raw.created_at ?? ""),
+    };
+  }
+  if (table === "rider_locations") {
+    return {
+      id: String(raw.rider_id ?? ""),
+      latitude: Number(raw.latitude),
+      longitude: Number(raw.longitude),
+      updatedAt: String(raw.updated_at ?? ""),
+    };
+  }
+  if (table === "customer_profiles") {
+    return { id: String(raw.id ?? ""), name: raw.name, email: raw.email, phone: raw.phone, created_at: raw.created_at, is_blocked: raw.is_blocked };
+  }
+  if (table === "admin_profiles") {
+    return { id: String(raw.id ?? ""), email: raw.email, created_at: raw.created_at, is_blocked: raw.is_blocked, kitchen_id: raw.kitchen_id };
+  }
+  if (table === "rider_profiles") {
+    return {
+      id: String(raw.id ?? ""), email: raw.email, name: raw.name, phone: raw.phone,
+      bikeModel: raw.bike_model, bikeColor: raw.bike_color, licensePlate: raw.license_plate,
+      isBlocked: raw.is_blocked, createdAt: raw.created_at, updatedAt: raw.updated_at,
+    };
+  }
+  if (table === "kitchens") {
+    return {
+      id: String(raw.id ?? ""), name: raw.name, address: raw.address,
+      latitude: Number(raw.latitude), longitude: Number(raw.longitude), is_active: raw.is_active,
+    };
+  }
+  return { id: String(raw.id ?? "") };
+}
+
+async function riderLocationVisible(viewer: LiveViewer, riderId: string) {
+  if (!riderId) return false;
+  if (viewer.portal === "customer") {
+    const { data, error } = await db().from("orders").select("id")
+      .eq("customer_id", viewer.id).eq("rider_id", riderId)
+      .in("rider_delivery_status", ["assigned", "picked_up"]).limit(1);
+    return !error && Boolean(data?.length);
+  }
+  if (viewer.portal === "admin" && viewer.kitchenId) {
+    const { data, error } = await db().from("orders").select("id")
+      .eq("kitchen_id", viewer.kitchenId).eq("rider_id", riderId)
+      .in("rider_delivery_status", ["assigned", "picked_up"]).limit(1);
+    return !error && Boolean(data?.length);
+  }
+  return false;
+}
+
+function streamId(table: string, raw: Record<string, unknown>) {
+  if (table === "rider_locations") return String(raw.rider_id ?? "");
+  return String(raw.id ?? "");
+}
 
 async function viewerFor(portal: AuthPortal): Promise<LiveViewer | null> {
   const auth = await authClient(portal);
@@ -49,10 +135,28 @@ export async function GET(request: Request) {
       };
       const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
       const channel = client.channel(`pml-${viewer.portal}-${viewer.id}-${crypto.randomUUID()}`);
-      const onChange = (table: string) => (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-        const next = payload.new && Object.keys(payload.new).length > 0 ? payload.new : null;
-        const previous = payload.old && Object.keys(payload.old).length > 0 ? payload.old : null;
-        if (liveChangeVisible(viewer, table, next ?? previous)) send(`data: ${JSON.stringify({ table })}\n\n`);
+      const onChange = (table: string) => async (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+        const record = (value: unknown) => (
+          value && typeof value === "object" && Object.keys(value).length > 0 ? value as Record<string, unknown> : null
+        );
+        const next = record(payload.new);
+        const previous = record(payload.old);
+        const raw = next ?? previous;
+        if (!raw) return;
+        const visible = table === "rider_locations" && (viewer.portal === "admin" || viewer.portal === "customer")
+          ? await riderLocationVisible(viewer, String(raw.rider_id ?? ""))
+          : liveChangeVisible(viewer, table, raw);
+        if (!visible) return;
+        const event = payload.eventType as StreamEventName;
+        const row = event === "DELETE" ? null : streamRow(table, next ?? raw, viewer.portal);
+        const change: StreamChange = {
+          table,
+          event,
+          id: streamId(table, raw),
+          row,
+          previousPaymentStatus: typeof previous?.payment_status === "string" ? previous.payment_status : null,
+        };
+        send(`data: ${JSON.stringify(change)}\n\n`);
       };
       for (const table of liveTables[viewer.portal]) {
         channel.on("postgres_changes", { event: "*", schema: "public", table }, onChange(table));

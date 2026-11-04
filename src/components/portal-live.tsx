@@ -1,26 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import type { StreamChange } from "@/lib/live/apply";
 import type { LivePortal } from "@/lib/live/changes";
 
-/** Keeps the open portal in step with the database. Lists refetch; server pages refresh. */
+/** Subscribes the portal to database changes and hands each emission to the widgets that are listening. */
 export function PortalLive({ portal }: { portal: LivePortal }) {
-  const router = useRouter();
   useEffect(() => {
     const source = new EventSource(`/api/stream?portal=${portal}`);
-    let timer = 0;
-    source.onmessage = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        window.dispatchEvent(new Event("pml-db-change"));
-        router.refresh();
-      }, 400);
+    source.onmessage = (event) => {
+      const change = JSON.parse(event.data) as StreamChange;
+      if (!change?.table || !change.event) return;
+      window.dispatchEvent(new CustomEvent<StreamChange>("pml-stream", { detail: change }));
     };
-    return () => {
-      window.clearTimeout(timer);
-      source.close();
-    };
-  }, [portal, router]);
+    return () => source.close();
+  }, [portal]);
   return null;
 }

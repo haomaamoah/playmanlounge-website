@@ -10,7 +10,7 @@ import { RiderDetails } from "./rider-details";
 export function OrderDetail() {
   const basePath = useAdminBasePath();
   const { id } = useParams<{ id: string }>();
-  const { data, loading, error, reload } = useAdminResource<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(id)}`);
+  const { data, loading, error, reload, setData } = useAdminResource<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(id)}`);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [mutationError, setMutationError] = useState("");
@@ -18,8 +18,9 @@ export function OrderDetail() {
   async function update(status: OrderStatus) {
     setBusy(true); setMutationError(""); setNotice("");
     try {
-      await adminRequest(`/api/admin/orders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
-      setNotice(`Kitchen status changed to ${orderLabels[status].toLowerCase()}.`); setConfirmCancel(false); reload();
+      const saved = await adminRequest<ItemResponse<AdminOrder>>(`/api/admin/orders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      setData((current) => current ? { ...current, item: { ...current.item, ...saved.item } } : current);
+      setNotice(`Kitchen status changed to ${orderLabels[status].toLowerCase()}.`); setConfirmCancel(false);
     } catch (err) { setMutationError((err as Error).message); }
     finally { setBusy(false); }
   }

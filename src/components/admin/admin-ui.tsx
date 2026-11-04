@@ -7,7 +7,8 @@ import { menuPlacement, placementLabel, shortOrderId } from "@/lib/orders/displa
 import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
 import { useMenuGroups } from "@/components/orders/use-menu-groups";
 import { ArrowRight, MapPin, X } from "lucide-react";
-import { type AdminOrder, type ItemResponse, type OrderStatus } from "@/lib/admin/contracts";
+import type { AdminOrder, Dashboard, ItemResponse, OrderStatus } from "@/lib/admin/contracts";
+import { applyDashboardOrders, type StreamChange } from "@/lib/live/apply";
 import { formatGhs } from "@/lib/content";
 import { GoogleDirectionsMap } from "@/components/google-location-picker";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -52,23 +53,33 @@ export function useAdminResource<T>(url: string) {
     return () => controller.abort();
   }, [url, key]);
   useEffect(() => {
-    let controller: AbortController | null = null;
-    const refresh = () => {
-      controller?.abort();
-      controller = new AbortController();
-      const refreshKey = `${url}:${version}`;
-      adminRequest<T>(url, { signal: controller.signal })
-        .then((value) => { if (!controller?.signal.aborted) setResult({ key: refreshKey, data: value, error: "" }); })
-        .catch(() => {});
+    const onStream = (event: Event) => {
+        const change = (event as CustomEvent<StreamChange>).detail;
+      if (!change?.row && change?.event !== "DELETE") return;
+      setResult((previous) => {
+        if (!previous?.data || typeof previous.data !== "object") return previous;
+        const data = previous.data as { item?: { id?: string }; dashboard?: Dashboard };
+        if (data.dashboard && change.table === "orders") {
+          return { ...previous, data: { ...data, dashboard: applyDashboardOrders(data.dashboard, change) } as T };
+        }
+        if (data.item?.id && change.table === "orders" && data.item.id === change.id && change.row) {
+          return { ...previous, data: { ...data, item: { ...data.item, ...change.row } } as T };
+        }
+        return previous;
+      });
     };
-    window.addEventListener("pml-db-change", refresh);
-    return () => {
-      controller?.abort();
-      window.removeEventListener("pml-db-change", refresh);
-    };
-  }, [url, version]);
+    window.addEventListener("pml-stream", onStream);
+    return () => window.removeEventListener("pml-stream", onStream);
+  }, []);
+  const setData = useCallback((value: T | null | ((current: T | null) => T | null)) => {
+    setResult((previous) => {
+      if (!previous) return previous;
+      const next = typeof value === "function" ? (value as (current: T | null) => T | null)(previous.data) : value;
+      return { ...previous, data: next };
+    });
+  }, []);
   const current = result?.key === key;
-  return { data: current ? result.data : null, error: current ? result.error : "", loading: !current, reload };
+  return { data: current ? result.data : null, error: current ? result.error : "", loading: !current, reload, setData };
 }
 
 export function PageHeading({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
@@ -139,7 +150,7 @@ function OrderStatusCell({ order }: { order: AdminOrder }) {
   return <Badge value={order.status}>{orderLabels[order.status]}</Badge>;
 }
 
-function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: () => void }) {
+function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: (order: AdminOrder) => void }) {
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [busy, setBusy] = useState<"proceed" | "cancel" | "">("");
   const [message, setMessage] = useState("");
@@ -159,7 +170,7 @@ function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: () 
         body: JSON.stringify({ status: target }),
       });
       setStatus(data.item.status);
-      onUpdated?.();
+      onUpdated?.(data.item);
     } catch (err) {
       setMessage((err as Error).message);
     } finally {
@@ -200,14 +211,20 @@ function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: () 
   </>;
 }
 
-export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments = true, canUpdateStatus = true, onOrderUpdated }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean; canUpdateStatus?: boolean; onOrderUpdated?: () => void }) {
+export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments = true, canUpdateStatus = true, onOrderUpdated }: { items: AdminOrder[]; hrefBase?: string; showCustomer?: boolean; checkPayments?: boolean; canUpdateStatus?: boolean; onOrderUpdated?: (order: AdminOrder) => void }) {
   const basePath = useAdminBasePath();
   const groups = useMenuGroups();
+  const [patches, setPatches] = useState<Record<string, AdminOrder>>({});
   const orderHrefBase = hrefBase ?? `${basePath}/orders`;
   const orderHeading = showCustomer ? "Order / customer" : "Order";
+  const rows = items.map((item) => {
+    const patch = patches[item.id];
+    if (!patch || item.updatedAt > patch.updatedAt) return item;
+    return patch;
+  });
   return <div className="admin-table-scroll"><table className="admin-table"><caption className="sr-only">Orders with separate payment and kitchen status</caption>
     <thead><tr><th className="admin-kind-heading">Type</th><th>{orderHeading}</th><th>Placed · Accra time</th><th>Payment</th><th>Kitchen status</th>{canUpdateStatus && <th>Actions</th>}<th className="admin-number">Total</th></tr></thead>
-    <tbody>{items.map((order) => {
+    <tbody>{rows.map((order) => {
       const placement = menuPlacement(order.lines[0]?.itemId, groups);
       const href = `${orderHrefBase}/${encodeURIComponent(order.id)}`;
       const label = placementLabel(placement);
@@ -217,7 +234,7 @@ export function OrderTable({ items, hrefBase, showCustomer = true, checkPayments
       <td><span className="admin-cell-label">Placed · Accra time</span>{dateLabel(order.createdAt)}<small>{order.fulfilment === "delivery" ? "Delivery" : "Pickup"}</small></td>
       <td><span className="admin-cell-label">Payment</span><PaymentCell key={order.paymentStatus} order={order} canCheck={checkPayments} /></td>
       <td><span className="admin-cell-label">Kitchen status</span><OrderStatusCell order={order} /></td>
-      {canUpdateStatus && <td><span className="admin-cell-label">Actions</span><OrderActions key={`${order.id}-${order.status}-${order.paymentStatus}`} order={order} onUpdated={onOrderUpdated} /></td>}
+      {canUpdateStatus && <td><span className="admin-cell-label">Actions</span><OrderActions key={`${order.id}-${order.status}-${order.paymentStatus}`} order={order} onUpdated={(updated) => { setPatches((current) => ({ ...current, [updated.id]: updated })); onOrderUpdated?.(updated); }} /></td>}
       <td className="admin-number"><span className="admin-cell-label">Total</span>{formatGhs(order.total)}</td>
     </tr>;
     })}</tbody>

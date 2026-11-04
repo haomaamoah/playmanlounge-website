@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SupportRequest } from "@/lib/admin/contracts";
 import { Badge, dateLabel } from "@/components/admin/admin-ui";
+import { streamMatches } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
 
@@ -17,6 +18,10 @@ export function CustomerSupport() {
     const data = await response.json().catch(() => null);
     if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Could not load your support requests.");
     return { items: data.items as SupportRequest[], total: Number(data.total ?? 0) };
+  }, {
+    table: "support_requests",
+    id: (item) => item.id,
+    accept: (row) => streamMatches(query, [row.subject, row.message, row.status]),
   });
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -36,10 +41,20 @@ export function CustomerSupport() {
         }),
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Your message could not be sent.");
+      if (!response.ok || data?.ok !== true || typeof data.id !== "string") throw new Error(data?.error ?? "Your message could not be sent.");
       form.reset();
       setNotice("Your message has been sent. Our team will get back to you.");
-      setRevision((value) => value + 1);
+      list.upsert({
+        id: data.id,
+        subject: String(values.get("subject") ?? ""),
+        message: String(values.get("message") ?? ""),
+        status: "open",
+        customerName: "",
+        customerEmail: "",
+        phone: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, (item) => item.id);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Your message could not be sent.");
     } finally {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { MapPin } from "lucide-react";
+import { streamMatches } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { PortalSearch } from "@/components/portal-search";
 import { MenuPlacementImage } from "@/components/orders/menu-placement-image";
@@ -34,6 +35,21 @@ const deliveryFilters = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+function visibleInQueue(queue: string, row: Record<string, unknown>) {
+  const status = String(row.status ?? "");
+  const payment = String(row.paymentStatus ?? "");
+  const delivery = row.riderDeliveryStatus;
+  const open = row.riderId == null && ["pending", "cooking", "ready"].includes(status) && ["paid", "cod"].includes(payment);
+  const claimed = row.riderId != null && (delivery === "assigned" || delivery === "picked_up") && status !== "cancelled";
+  const delivered = row.riderId != null && (delivery === "delivered" || status === "completed");
+  const cancelled = row.riderId != null && status === "cancelled";
+  if (queue === "open") return open;
+  if (queue === "claimed") return claimed;
+  if (queue === "delivered") return delivered;
+  if (queue === "cancelled") return cancelled;
+  return open || claimed;
+}
+
 function deliveryCopy(status: string | null) {
   if (status === "picked_up") return { tone: "riding", label: "Picked up · on the way", action: "Open delivery" };
   if (status === "delivered") return { tone: "done", label: "Delivered", action: "Open delivery" };
@@ -58,6 +74,10 @@ export function RiderOrders() {
     });
     return riderRequest<{ ok: true; items: RiderOrder[]; total: number }>(`/api/rider/orders?${params}`, { signal })
       .then((result) => ({ items: result.items, total: result.total }));
+  }, {
+    table: "orders",
+    id: (order) => order.id,
+    accept: (row) => visibleInQueue(queue, row) && streamMatches(query, [row.id, row.ref, row.customerName, row.customerPhone]),
   });
 
   return <section>

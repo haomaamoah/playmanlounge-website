@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { MapPin, Phone } from "lucide-react";
 import { RiderMissionMap } from "@/components/rider-tracking-map";
 import { riderRequest } from "./rider-api";
+import type { StreamChange } from "@/lib/live/apply";
 
 type RiderOrder = {
   id: string;
@@ -50,6 +51,22 @@ export function RiderOrderDetail() {
       .catch((reason: Error) => { if (active) setError(reason.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; controller.abort(); };
+  }, [id]);
+
+  useEffect(() => {
+    const onStream = (event: Event) => {
+      const change = (event as CustomEvent<StreamChange>).detail;
+      if (change.table === "orders" && change.id === id && change.row) {
+        setOrder((current) => current ? { ...current, ...(change.row as Partial<RiderOrder>) } : current);
+      }
+      if (change.table !== "rider_locations" || !change.row) return;
+      const latitude = Number(change.row.latitude);
+      const longitude = Number(change.row.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+      setLocation({ latitude, longitude, updatedAt: String(change.row.updatedAt ?? "") });
+    };
+    window.addEventListener("pml-stream", onStream);
+    return () => window.removeEventListener("pml-stream", onStream);
   }, [id]);
 
   useEffect(() => {

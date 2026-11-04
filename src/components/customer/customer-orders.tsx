@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { AdminOrder } from "@/lib/admin/contracts";
 import { OrderTable } from "@/components/admin/admin-ui";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
+import { streamMatches, type StreamChange } from "@/lib/live/apply";
 import { PortalSearch } from "@/components/portal-search";
 
 export function useCustomerResource<T>(url: string, errorMessage = "Could not load your orders.") {
@@ -20,6 +21,20 @@ export function useCustomerResource<T>(url: string, errorMessage = "Could not lo
       .catch((reason: Error) => { if (!controller.signal.aborted) setResult({ url, data: null, error: reason.message }); });
     return () => controller.abort();
   }, [url, errorMessage]);
+  useEffect(() => {
+    const onStream = (event: Event) => {
+      const change = (event as CustomEvent<StreamChange>).detail;
+      if (!change.row || (change.table !== "orders" && change.table !== "support_requests")) return;
+      setResult((previous) => {
+        if (!previous?.data || typeof previous.data !== "object") return previous;
+        const data = previous.data as { item?: { id?: string } };
+        if (!data.item?.id || data.item.id !== change.id) return previous;
+        return { ...previous, data: { ...data, item: { ...data.item, ...change.row } } as T };
+      });
+    };
+    window.addEventListener("pml-stream", onStream);
+    return () => window.removeEventListener("pml-stream", onStream);
+  }, []);
   const current = result?.url === url;
   return { data: current ? result.data : null, error: current ? result.error : "" };
 }
@@ -39,6 +54,10 @@ export function CustomerOrders() {
     const data = await response.json().catch(() => null);
     if (!response.ok || data?.ok !== true) throw new Error(data?.error ?? "Could not load your orders.");
     return { items: data.orders as AdminOrder[], total: Number(data.total ?? 0) };
+  }, {
+    table: "orders",
+    id: (order) => order.id,
+    accept: (row) => streamMatches(query, [row.id, row.ref, row.transactionId]),
   });
   return <section>
     <h1 className="font-display text-4xl">Your orders</h1>

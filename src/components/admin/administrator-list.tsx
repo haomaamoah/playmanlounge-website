@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Kitchen, ListResponse, ManagedAdmin } from "@/lib/admin/contracts";
+import { streamMatches } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { EmptyState, PageHeading, ResourceState, adminRequest, dateLabel } from "./admin-ui";
 
@@ -20,7 +21,11 @@ export function AdministratorList() {
     adminRequest<ListResponse<ManagedAdmin>>(
       `/api/admin/administrators?q=${encodeURIComponent(query)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`,
       { signal },
-    ).then((data) => ({ items: data.items, total: data.total })));
+    ).then((data) => ({ items: data.items, total: data.total })), {
+    table: "admin_profiles",
+    id: (admin) => admin.id,
+    accept: (row) => streamMatches(query, [row.email]),
+  });
 
   useEffect(() => {
     const controller = new AbortController();

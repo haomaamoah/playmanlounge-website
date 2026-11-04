@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { applyStreamList, type StreamChange } from "@/lib/live/apply";
 
 /** Each portal list asks the server for this many rows, then the next page only when the reader reaches the end. */
 export const LIST_PAGE_SIZE = 50;
@@ -9,7 +10,17 @@ type Page<T> = { items: T[]; total: number };
 type Phase = "loading" | "ready" | "more";
 type ListState<T> = { key: string; items: T[]; total: number; error: string; phase: Phase };
 
-export function useInfiniteList<T>(queryKey: string, load: (offset: number, signal: AbortSignal) => Promise<Page<T>>) {
+type StreamOptions<T> = {
+  table: string;
+  id: (item: T) => string;
+  accept?: (row: Record<string, unknown>) => boolean;
+};
+
+export function useInfiniteList<T>(
+  queryKey: string,
+  load: (offset: number, signal: AbortSignal) => Promise<Page<T>>,
+  stream?: StreamOptions<T>,
+) {
   const loadRef = useRef(load);
   const [tick, setTick] = useState(0);
   const requestKey = `${queryKey}:${tick}`;
@@ -24,26 +35,51 @@ export function useInfiniteList<T>(queryKey: string, load: (offset: number, sign
   useEffect(() => { loadRef.current = load; });
 
   const reload = useCallback(() => setTick((value) => value + 1), []);
+  const replace = useCallback((next: T, idOf: (item: T) => string) => {
+    setState((previous) => ({
+      ...previous,
+      items: previous.items.map((item) => idOf(item) === idOf(next) ? next : item),
+    }));
+  }, []);
+  const upsert = useCallback((next: T, idOf: (item: T) => string) => {
+    setState((previous) => {
+      const exists = previous.items.some((item) => idOf(item) === idOf(next));
+      return {
+        ...previous,
+        items: exists
+          ? previous.items.map((item) => idOf(item) === idOf(next) ? next : item)
+          : [next, ...previous.items],
+        total: exists ? previous.total : previous.total + 1,
+      };
+    });
+  }, []);
+  const remove = useCallback((id: string, idOf: (item: T) => string) => {
+    setState((previous) => {
+      if (!previous.items.some((item) => idOf(item) === id)) return previous;
+      return {
+        ...previous,
+        items: previous.items.filter((item) => idOf(item) !== id),
+        total: Math.max(0, previous.total - 1),
+      };
+    });
+  }, []);
+  const streamRef = useRef(stream);
+  useEffect(() => { streamRef.current = stream; });
 
   useEffect(() => {
-    const refresh = () => {
-      const id = generation.current;
-      const controller = new AbortController();
-      loadRef.current(0, controller.signal).then((page) => {
-        if (id !== generation.current) return;
-        seen.current = page.items.length;
-        setState((previous) => previous.key === requestKey ? {
-          ...previous,
-          items: page.items,
-          total: page.total,
-          error: "",
-          phase: "ready",
-        } : previous);
-      }).catch(() => {});
+    const onStream = (event: Event) => {
+      const spec = streamRef.current;
+      const change = (event as CustomEvent<StreamChange>).detail;
+      if (!spec || change.table !== spec.table) return;
+      setState((previous) => {
+        if (previous.phase === "loading") return previous;
+        const applied = applyStreamList(previous.items, previous.total, change, spec.id, spec.accept);
+        return { ...previous, items: applied.items, total: applied.total };
+      });
     };
-    window.addEventListener("pml-db-change", refresh);
-    return () => window.removeEventListener("pml-db-change", refresh);
-  }, [requestKey]);
+    window.addEventListener("pml-stream", onStream);
+    return () => window.removeEventListener("pml-stream", onStream);
+  }, []);
 
   useEffect(() => {
     if (current.phase !== "loading") return;
@@ -99,6 +135,9 @@ export function useInfiniteList<T>(queryKey: string, load: (offset: number, sign
     loading: current.phase === "loading",
     loadingMore: current.phase === "more",
     reload,
+    replace,
+    upsert,
+    remove,
     sentinel,
     hasMore,
   };

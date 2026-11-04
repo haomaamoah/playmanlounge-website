@@ -19,6 +19,14 @@ test("a kitchen admin hears orders for their kitchen only", () => {
   assert.equal(liveChangeVisible(admin, "menu_items", { id: "playboy" }), true);
 });
 
+test("a partial database event stays hidden when the owner column is missing", () => {
+  assert.equal(liveChangeVisible(admin, "orders", { id: "order-1", status: "cooking" }), false);
+  assert.equal(liveChangeVisible(customer, "orders", { id: "order-1", status: "cooking" }), false);
+  assert.equal(liveChangeVisible(rider, "orders", { id: "order-1", status: "ready", fulfilment: "delivery" }), false);
+  assert.equal(liveChangeVisible(customer, "rider_locations", { rider_id: "rider-1" }), false);
+  assert.equal(liveChangeVisible(admin, "rider_locations", { rider_id: "rider-1" }), false);
+});
+
 test("a rider hears open or assigned deliveries", () => {
   assert.equal(liveChangeVisible(rider, "orders", { fulfilment: "delivery", rider_id: null }), true);
   assert.equal(liveChangeVisible(rider, "orders", { fulfilment: "delivery", rider_id: "rider-1" }), true);

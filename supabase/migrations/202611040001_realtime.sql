@@ -1,4 +1,4 @@
--- Let every portal hear database changes. The browser only receives a table name and refetches through its own API.
+-- Publish portal tables and keep the full row on updates so each screen can apply the changed record.
 do $$
 declare
   table_name text;
@@ -25,6 +25,9 @@ begin
         where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = table_name
       ) then
       execute format('alter publication supabase_realtime add table public.%I', table_name);
+    end if;
+    if to_regclass(format('public.%I', table_name)) is not null then
+      execute format('alter table public.%I replica identity full', table_name);
     end if;
   end loop;
 end $$;

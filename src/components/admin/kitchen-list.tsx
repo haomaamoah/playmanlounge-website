@@ -49,7 +49,10 @@ export function KitchenList() {
   const [revision, setRevision] = useState(0);
   const list = useInfiniteList<Kitchen>(String(revision), (offset, signal) =>
     adminRequest<KitchenListResponse>(`/api/admin/kitchens?limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
-      .then((data) => ({ items: data.items, total: data.total })));
+      .then((data) => ({ items: data.items, total: data.total })), {
+    table: "kitchens",
+    id: (kitchen) => kitchen.id,
+  });
   const [busy,setBusy] = useState("");
   const [actionError,setActionError] = useState("");
   const [notice,setNotice] = useState("");

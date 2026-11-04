@@ -55,6 +55,7 @@ export function RiderDetails({
             ? { latitude: order.kitchen.latitude, longitude: order.kitchen.longitude }
             : null}
           locationUrl={locationUrl}
+          riderId={rider.id}
         />
       </DialogContent>
     </Dialog>}

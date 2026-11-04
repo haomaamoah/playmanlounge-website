@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "./google-location-picker";
 import { mapPinIcon } from "./map-pins";
+import type { StreamChange } from "@/lib/live/apply";
 
 type Point = { latitude: number; longitude: number };
 
@@ -15,11 +16,13 @@ export function RiderTrackingMap({
   destination = null,
   kitchen = null,
   locationUrl,
+  riderId,
 }: {
   initialLocation: Point | null;
   destination?: Point | null;
   kitchen?: Point | null;
   locationUrl: string;
+  riderId: string;
 }) {
   const node = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
@@ -46,9 +49,11 @@ export function RiderTrackingMap({
         const result = await response.json();
         if (!response.ok || result?.ok !== true) throw new Error(result?.error || "Could not refresh rider location.");
         const point = result.item?.riderLocation ?? result.location ?? result.item;
-        if (typeof point?.latitude === "number" && typeof point?.longitude === "number") {
+        const latitude = Number(point?.latitude);
+        const longitude = Number(point?.longitude);
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
           if (active) {
-            setLocation({ latitude: point.latitude, longitude: point.longitude });
+            setLocation({ latitude, longitude });
             setError("");
           }
         } else if (active) {
@@ -59,12 +64,22 @@ export function RiderTrackingMap({
       }
     };
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 5000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
+    return () => { active = false; };
   }, [locationUrl]);
+
+  useEffect(() => {
+    const onStream = (event: Event) => {
+      const change = (event as CustomEvent<StreamChange>).detail;
+      if (change.table !== "rider_locations" || change.id !== riderId || !change.row) return;
+      const latitude = Number(change.row.latitude);
+      const longitude = Number(change.row.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+      setLocation({ latitude, longitude });
+      setError("");
+    };
+    window.addEventListener("pml-stream", onStream);
+    return () => window.removeEventListener("pml-stream", onStream);
+  }, [riderId]);
 
   useEffect(() => {
     let active = true;

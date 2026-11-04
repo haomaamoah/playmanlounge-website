@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { ListResponse, SupportRequest } from "@/lib/admin/contracts";
+import type { ItemResponse, ListResponse, SupportRequest } from "@/lib/admin/contracts";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
+import { streamMatches } from "@/lib/live/apply";
 import { PortalSearch } from "@/components/portal-search";
 import { Badge, EmptyState, PageHeading, ResourceState, adminRequest, dateLabel } from "./admin-ui";
 
@@ -14,13 +15,19 @@ export function SupportDesk() {
   const [query, setQuery] = useState("");
   const list = useInfiniteList<SupportRequest>(`${filter}:${query}`, (offset, signal) =>
     adminRequest<ListResponse<SupportRequest>>(`/api/admin/support?status=${filter}&q=${encodeURIComponent(query)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
-      .then((data) => ({ items: data.items, total: data.total })));
+      .then((data) => ({ items: data.items, total: data.total })), {
+    table: "support_requests",
+    id: (item) => item.id,
+    accept: (row) => (!filter || row.status === filter) && streamMatches(query, [row.subject, row.message, row.customerName, row.customerEmail, row.phone]),
+  });
   async function toggle(item: SupportRequest) {
     setBusyId(item.id); setMutationError(""); setNotice("");
     const status = item.status === "open" ? "closed" : "open";
     try {
-      await adminRequest(`/api/admin/support/${encodeURIComponent(item.id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
-      setNotice(`“${item.subject}” marked ${status}.`); list.reload();
+      const saved = await adminRequest<ItemResponse<SupportRequest>>(`/api/admin/support/${encodeURIComponent(item.id)}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      setNotice(`“${item.subject}” marked ${status}.`);
+      if (filter && saved.item.status !== filter) list.remove(saved.item.id, (entry) => entry.id);
+      else list.replace(saved.item, (entry) => entry.id);
     } catch (err) { setMutationError((err as Error).message); }
     finally { setBusyId(""); }
   }

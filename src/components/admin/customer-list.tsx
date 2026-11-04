@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ListResponse } from "@/lib/admin/contracts";
+import { streamMatches } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { EmptyState, PageHeading, ResourceState, adminRequest, dateLabel } from "./admin-ui";
 
@@ -28,6 +29,10 @@ export function CustomerList() {
     );
     setCanManageAccounts(data.canManageAccounts);
     return { items: data.items, total: data.total };
+  }, {
+    table: "customer_profiles",
+    id: (customer) => customer.id,
+    accept: (row) => streamMatches(query, [row.name, row.email, row.phone]),
   });
 
   function searchCustomers(event: React.FormEvent<HTMLFormElement>) {
@@ -42,7 +47,7 @@ export function CustomerList() {
       await adminRequest(`/api/admin/customers/${encodeURIComponent(customer.id)}`, {
         method: "PATCH", body: JSON.stringify({ isBlocked: !customer.is_blocked }),
       });
-      list.reload();
+      list.replace({ ...customer, is_blocked: !customer.is_blocked }, (item) => item.id);
     } catch (reason) { setActionError((reason as Error).message); }
     finally { setBusyId(""); }
   }

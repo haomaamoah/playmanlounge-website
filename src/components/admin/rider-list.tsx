@@ -4,6 +4,7 @@ import { Bike, MapPin, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { ItemResponse, ListResponse } from "@/lib/admin/contracts";
+import { streamMatches } from "@/lib/live/apply";
 import { InfiniteScroll, LIST_PAGE_SIZE, useInfiniteList } from "@/components/infinite-list";
 import { adminRequest, EmptyState, PageHeading, ResourceState } from "./admin-ui";
 import { RiderTrackingMap } from "@/components/rider-tracking-map";
@@ -44,7 +45,11 @@ export function RiderList() {
   const [tracking, setTracking] = useState<RiderLocation | null>(null);
   const list = useInfiniteList<Rider>(`${search}:${revision}`, (offset, signal) =>
     adminRequest<ListResponse<Rider>>(`/api/admin/riders?q=${encodeURIComponent(search)}&limit=${LIST_PAGE_SIZE}&offset=${offset}`, { signal })
-      .then((response) => ({ items: response.items, total: response.total })));
+      .then((response) => ({ items: response.items, total: response.total })), {
+    table: "rider_profiles",
+    id: (rider) => rider.id,
+    accept: (row) => streamMatches(search, [row.name, row.email, row.phone]),
+  });
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -188,11 +193,12 @@ export function RiderList() {
             {tracking?.rider.name}{tracking?.activeOrder ? ` · ${tracking.activeOrder.ref} · ${destination?.address ?? ""}` : ""}
           </DialogDescription>
         </DialogHeader>
-        {location ? <RiderTrackingMap
+        {location && tracking ? <RiderTrackingMap
           initialLocation={{ latitude: location.latitude, longitude: location.longitude }}
           destination={target}
           kitchen={kitchenPoint}
-          locationUrl={`/api/admin/riders/${encodeURIComponent(tracking!.rider.id)}/location`}
+          locationUrl={`/api/admin/riders/${encodeURIComponent(tracking.rider.id)}/location`}
+          riderId={tracking.rider.id}
         /> : <p role="status">This rider has not shared a GPS location yet.</p>}
       </DialogContent>
     </Dialog>
