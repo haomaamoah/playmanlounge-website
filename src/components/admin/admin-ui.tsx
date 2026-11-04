@@ -150,7 +150,7 @@ function OrderStatusCell({ order }: { order: AdminOrder }) {
   return <Badge value={order.status}>{orderLabels[order.status]}</Badge>;
 }
 
-function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: (order: AdminOrder) => void }) {
+export function OrderActions({ order, onUpdated }: { order: AdminOrder; onUpdated?: (order: AdminOrder) => void }) {
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [busy, setBusy] = useState<"proceed" | "cancel" | "">("");
   const [message, setMessage] = useState("");

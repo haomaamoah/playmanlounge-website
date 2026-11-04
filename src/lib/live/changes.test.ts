@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { liveChangeVisible } from "./changes";
 
-const customer = { portal: "customer" as const, id: "cust-1" };
+const customer = { portal: "customer" as const, id: "cust-1", email: "one@example.com" };
 const admin = { portal: "admin" as const, id: "admin-1", kitchenId: "kitchen-a" };
 const rider = { portal: "rider" as const, id: "rider-1" };
 
 test("a customer hears their own order and the shared menu, not someone else's ticket", () => {
   assert.equal(liveChangeVisible(customer, "orders", { customer_id: "cust-1" }), true);
+  assert.equal(liveChangeVisible(customer, "orders", { customer_email: "one@example.com" }), true);
+  assert.equal(liveChangeVisible(customer, "orders", { customer_email: "two@example.com" }), false);
   assert.equal(liveChangeVisible(customer, "orders", { customer_id: "cust-2" }), false);
   assert.equal(liveChangeVisible(customer, "menu_items", { id: "fried-rice" }), true);
   assert.equal(liveChangeVisible(customer, "rider_locations", { rider_id: "rider-1" }), false);

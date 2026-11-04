@@ -101,7 +101,7 @@ async function viewerFor(portal: AuthPortal): Promise<LiveViewer | null> {
   if (error || !data.user) return null;
   if (portal === "customer") {
     const profile = await db().from("customer_profiles").select("id").eq("id", data.user.id).maybeSingle();
-    return profile.data ? { portal, id: data.user.id } : null;
+    return profile.data ? { portal, id: data.user.id, email: data.user.email ?? undefined } : null;
   }
   if (portal === "rider") {
     const rider = await findRider(data.user.id);

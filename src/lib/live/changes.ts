@@ -1,7 +1,7 @@
 export type LivePortal = "customer" | "admin" | "manager" | "rider";
 
 export type LiveViewer =
-  | { portal: "customer"; id: string }
+  | { portal: "customer"; id: string; email?: string }
   | { portal: "admin"; id: string; kitchenId: string | null }
   | { portal: "manager"; id: string }
   | { portal: "rider"; id: string };
@@ -25,7 +25,8 @@ export function liveChangeVisible(viewer: LiveViewer, table: string, row: Record
   if (viewer.portal === "customer") {
     if (table === "menu_items") return true;
     if (table === "rider_locations") return false;
-    return rowId(row, "customer_id") === viewer.id;
+    return rowId(row, "customer_id") === viewer.id
+      || (viewer.email != null && rowId(row, "customer_email") === viewer.email);
   }
   if (viewer.portal === "admin") {
     if (table === "rider_locations") return false;
