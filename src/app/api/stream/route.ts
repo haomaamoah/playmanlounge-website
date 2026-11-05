@@ -1,12 +1,15 @@
 import { createClient, type RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { authClient } from "@/lib/admin/server";
+import { ApiFailure } from "@/lib/admin/validation";
 import type { AuthPortal } from "@/lib/admin/session-scope";
 import { menuDTO } from "@/lib/db/catalog";
 import { orderDTO, supportDTO } from "@/lib/db/orders";
 import { db } from "@/lib/db/server";
 import type { StreamChange, StreamEventName } from "@/lib/live/apply";
+import { authenticateLiveViewer } from "@/lib/live/auth";
 import { liveChangeVisible, liveTables, type LivePortal, type LiveViewer } from "@/lib/live/changes";
-import { findRider } from "@/lib/riders/server";
+import { requireCustomer } from "@/lib/mobile/auth";
+import { findRider, requireRider } from "@/lib/riders/server";
 
 export const dynamic = "force-dynamic";
 
@@ -118,7 +121,20 @@ async function viewerFor(portal: AuthPortal): Promise<LiveViewer | null> {
 export async function GET(request: Request) {
   const portal = new URL(request.url).searchParams.get("portal");
   if (!portals.includes(portal as LivePortal)) return new Response("Unknown portal.", { status: 400 });
-  const viewer = await viewerFor(portal as AuthPortal);
+  let viewer: LiveViewer | null;
+  try {
+    viewer = await authenticateLiveViewer(request, portal as LivePortal, {
+      cookie: viewerFor,
+      customer: requireCustomer,
+      rider: requireRider,
+    });
+  } catch (error) {
+    if (error instanceof ApiFailure && error.status < 500) {
+      return new Response(error.message, { status: error.status });
+    }
+    console.error("[live-api] Could not authenticate stream viewer.", error instanceof ApiFailure ? error.status : "unexpected error");
+    return new Response("Live updates are unavailable.", { status: 503 });
+  }
   if (!viewer) return new Response("Sign in to continue.", { status: 401 });
 
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -161,16 +177,28 @@ export async function GET(request: Request) {
       for (const table of liveTables[viewer.portal]) {
         channel.on("postgres_changes", { event: "*", schema: "public", table }, onChange(table));
       }
-      void channel.subscribe();
-      send(": connected\n\n");
       const heartbeat = setInterval(() => send(": ping\n\n"), 25000);
+      const subscriptionTimeout = setTimeout(() => {
+        console.error("[live-api] Realtime subscription timed out.");
+        close();
+      }, 15000);
       const close = () => {
         if (closed) return;
         closed = true;
         clearInterval(heartbeat);
+        clearTimeout(subscriptionTimeout);
         void client.removeChannel(channel);
         try { controller.close(); } catch { /* already closed */ }
       };
+      void channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          clearTimeout(subscriptionTimeout);
+          send(": connected\n\n");
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error(`[live-api] Realtime subscription failed: ${status}.`);
+          close();
+        }
+      });
       request.signal.addEventListener("abort", close);
     },
   });

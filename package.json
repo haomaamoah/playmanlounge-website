@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test \"src/**/*.test.ts\"",
+    "test:mobile-stream": "tsx scripts/test-mobile-stream.mts",
     "db:bootstrap": "tsx --env-file=.env.local scripts/bootstrap.mts",
     "db:seed-demo-riders": "tsx scripts/seed-demo-riders.mts",
     "db:cleanup-demo": "tsx --env-file=.env.local scripts/cleanup-demo.mts",

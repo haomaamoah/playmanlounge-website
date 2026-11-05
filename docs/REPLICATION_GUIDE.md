@@ -480,6 +480,10 @@ Rider:
 Other supported surfaces:
 
 - `GET /api/stream?portal=customer|admin|manager|rider`.
+  Native customer and rider clients may send their existing mobile bearer token
+  for their respective portal. Staff clients use the existing scoped session
+  cookies. An invalid bearer token never falls back to a cookie session, and
+  bearer authentication cannot select a staff portal.
 - `GET /api/cron/notifications` with the configured server authorization.
 - `/api/mobile/config`; mobile customer auth signup/login/refresh/logout,
   `GET,PATCH,DELETE /me`, password, order list/create/detail/payment/directions,
@@ -591,6 +595,13 @@ npm run lint
 bash -n scripts/migrate.sh
 npm run build
 ```
+
+For native stream integration, start the isolated local backend and seed its
+guarded demo riders, then run `npm run test:mobile-stream`. It creates a local
+customer and support tickets, verifies actual customer/rider SSE insert delivery,
+and signs out both sessions. `PML_TEST_API_URL` may override the loopback API URL;
+non-local hosts are refused. This check requires local Supabase Realtime to be
+enabled, not merely a successful HTTP response from the stream endpoint.
 
 Use the configured test suite rather than installing a new test stack. A build
 needs access to the configured font downloads or a separately approved local-font
