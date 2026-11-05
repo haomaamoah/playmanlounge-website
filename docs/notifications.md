@@ -15,7 +15,11 @@ The customer app continues to poll order state as a fallback. Missing Firebase s
 
 ## Device endpoints
 
-- Customer: authenticated `POST` and `DELETE /api/mobile/notifications/devices` with `{ "token": "...", "platform": "ios|android", "appId": "playmanlounge_mobile" }`.
-- Staff: session-authenticated `POST` and `DELETE /api/admin/notifications/devices` with the same shape and `appId` set to `playman_admin` or `playman_manager`.
+- Customer: authenticated `POST /api/mobile/notifications/devices` with `{ "token": "...", "platform": "ios|android", "appId": "playmanlounge_mobile" }`.
+- Staff: session-authenticated `POST /api/admin/notifications/devices` with the same shape and `appId` set to `playman_admin` or `playman_manager`.
+- For either endpoint, `DELETE` needs `{ "token": "..." }` and revokes that owner's registration.
 
-Registration is scoped to the signed-in account. A token already owned by another account cannot be reassigned until it is revoked by its current owner.
+Registration is scoped to the signed-in account. A token already owned by
+another account returns `409`, even after revocation: revocation marks the
+registration inactive but does not transfer or remove its ownership. Switching
+accounts with the same FCM token is not currently supported by this endpoint.

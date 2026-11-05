@@ -6,11 +6,13 @@ This documents the shipped admin surface, not a development plan.
 
 The kitchen desk is for authorised Play Man Lounge staff to manage customer orders, the published menu and support requests. `/admin` shows database-backed all-time analytics. Navigation includes Home, Orders, Menu, Customers, Support and Settings. `/admin/orders/[id]` remains an order detail deep link; `/admin/payments` redirects to Orders.
 
-Managers sign in at `/man/login` and use their own `/man` portal URLs, including `/man/administrators`. They have the same operational workspace and also see Administrators. They can create, edit the sign-in email for, block/unblock and delete admin accounts, and block/unblock customer accounts. Blocking is stored on the account profile, prevents future sign-ins, denies existing sessions at protected endpoints and applies a Supabase Auth ban to revoke active sessions. A manager cannot manage manager accounts or their own account. The manager dashboard includes an administrator-account count.
+Managers sign in at `/man/login` and use their own `/man` portal URLs. In addition to the operational workspace, they manage administrators, kitchens and riders, and can block or unblock customer accounts. Administrators are assigned to a kitchen; the manager can oversee all permitted kitchens. Blocking is stored on the account profile, prevents future sign-ins, denies existing sessions at protected endpoints and applies a Supabase Auth ban to revoke active sessions. A manager cannot manage manager accounts or their own account. The manager dashboard includes an administrator-account count.
 
-To provision the initial manager, first create the user through Supabase Auth, then copy and run [`supabase/manager-setup.sql`](../../../supabase/manager-setup.sql) in the Supabase SQL Editor. It applies the account-role and block-status schema and allowlists the existing Auth user as a manager. Do not run it until `admin_profiles` and `customer_profiles` have been created by the project's existing migrations:
-
-Never put the manager password in a migration, source file or SQL statement.
+For initial manager provisioning, follow the
+[role/account bootstrap instructions](../../../docs/REPLICATION_GUIDE.md#roleaccount-bootstrap).
+The historical `supabase/manager-setup.sql` targets a fixed account and must
+not be run unreviewed. Never put a manager password in a migration, source file
+or SQL statement.
 
 Orders have independent payment (`pending`, `paid`, `cod`, `failed`) and fulfilment statuses. Kitchen updates never assert payment. Menu removal deactivates an item while preserving historical order details. Settings verifies the current password before changing it.
 
@@ -34,10 +36,15 @@ Orders have independent payment (`pending`, `paid`, `cod`, `failed`) and fulfilm
 
 ## Verification
 
+The following describes historical acceptance for the original admin build,
+not the current production data or a substitute for re-running the tests.
+Current verification commands and staging acceptance are in the
+[replication guide](../../../docs/REPLICATION_GUIDE.md#10-verification-and-deployment-acceptance).
+
 Real login was captured at desktop and mobile widths. Authenticated acceptance against Supabase verified Home totals, payment filters, menu creation, image uploads, updates and deactivation, support submission and closure, and password changes. Desktop and mobile layouts were checked for horizontal overflow. Legacy demo orders and support requests have been removed; the admin UI no longer shows demo labels or explanatory notes.
 
 The menu editor's Homepage placement selector supports Regular menu, Promotion and Combo deal. Available promotions and combos appear in the homepage carousel above Menu; deactivating all deals hides that section and its navigation link.
 
-The 37 logic/rendering tests, lint, type checking and production build passed. Authenticated acceptance after cleanup confirmed three real orders remain, the support desk is empty, no demo copy is displayed, and a Promotion item saves through the real admin API without changing its price. Security review found no actionable vulnerabilities; the available code-review substitute found no significant issues (the native Bugbot agent was unavailable). Anonymous admin requests return HTTP 401, cross-origin mutations return HTTP 403, and invalid support submissions return HTTP 400. No bypass or mock authentication was used for this authenticated acceptance.
+The 37 logic/rendering tests, lint, type checking and production build passed at that time. Authenticated acceptance after cleanup checked that no demo copy was displayed and a Promotion item saved through the real admin API without changing its price. Security review found no actionable vulnerabilities; the available code-review substitute found no significant issues (the native Bugbot agent was unavailable). Anonymous admin requests returned HTTP 401, cross-origin mutations returned HTTP 403, and invalid support submissions returned HTTP 400. No bypass or mock authentication was used for this authenticated acceptance.
 
 No real payment charges or receipt deliveries were performed during acceptance. Production deployment requires the Supabase environment values and the deployed HTTPS origin in `SITE_URL`.

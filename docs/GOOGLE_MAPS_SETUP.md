@@ -22,8 +22,18 @@ Restrict the key to the production and development website referrers and only th
 - The order detail route action is disabled when the kitchen or delivery coordinates are absent. When available, it requests a driving route through Routes API with a red kitchen pin, blue route line, and green delivery pin.
 - Location maps offer roadmap, satellite, and terrain types.
 
-The manager and admin mobile apps request driving-route polylines through the authenticated
-`/api/admin/orders/{id}/directions` endpoint. Configure a separate, server-only
-`GOOGLE_ROUTES_API_KEY` on the hosting environment, restricted to Routes API. Do not place this
-credential in a mobile build or browser bundle. The endpoint checks the signed-in administrator's
-kitchen access, requires both coordinate pairs, and rate limits route requests.
+The native apps fetch driving-route polylines through authenticated website
+endpoints: staff use `/api/admin/orders/{id}/directions` and the manager also
+uses `/api/admin/riders/{id}/directions`; customers and riders use their
+respective `/api/mobile/orders/{id}/directions` and
+`/api/rider/orders/{id}/directions` endpoints. Configure a separate,
+server-only `GOOGLE_ROUTES_API_KEY` on the hosting environment, restricted to
+Routes API. Do not put this credential in a mobile build or browser bundle.
+Route availability depends on the signed-in role, an eligible delivery and
+the required coordinates.
+
+Native Maps SDK keys are configured in each Flutter repository. Customer and
+manager address autocomplete additionally calls Places API (New) from Dart
+over HTTPS, so its client-visible API key has different restriction
+requirements from a native SDK key. See the Maps setup in those app
+repositories before building a release.

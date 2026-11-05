@@ -4,17 +4,28 @@ Marketing and ordering site for **Play Man Lounge** (signage: PLAYMAN LOUNGE) �
 
 Tagline: **Life is tasty.**
 
-For an agent rebuilding the frontend with a different design, use the
-[backend and functional replication guide](docs/REPLICATION_GUIDE.md). It covers
-shared-backend versus fresh-backend setup, every portal's behavior, state
-transitions, APIs, realtime, deployment dependencies, and the live-test scope.
+The public site is a single scrolling page with Home, Promotions + Combo deals
+(when available), Menu, Gallery, Meet The Team, Make an Order, and Contact Us.
+Hash links in the sticky header double as deep links. Orders are saved by the
+backend and receipts are emailed; the customer, kitchen admin, manager and rider
+portals share that backend.
 
-This is a single scrolling page with Home, Promotions + Combo deals (when available), Menu, Gallery, Meet The Team, Make an Order, and Contact Us. Hash links in the sticky header double as deep links. One page keeps the menu bag and the order form on the same document: see the board, send an email for delivery or arranged hub pickup.
+## Documentation and mobile apps
+
+- [Backend and functional replication guide](docs/REPLICATION_GUIDE.md):
+  setup, migrations, portal behavior, APIs, realtime and verification.
+- [Google Maps setup](docs/GOOGLE_MAPS_SETUP.md) and
+  [push notifications](docs/notifications.md).
+- Flutter apps: [Customer](https://github.com/haomaamoah/playmanlounge-mobile),
+  [Admin](https://github.com/haomaamoah/playman-admin),
+  [Manager](https://github.com/haomaamoah/playmanlounge-man), and
+  [Rider](https://github.com/haomaamoah/playmanlounge-rider). Each repository
+  documents its own setup, production API configuration and validation.
 
 ## Run it
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -190,9 +201,14 @@ The cocoa bar has **Terms and Conditions** and **Return Policy** buttons, then *
 
 ## Supabase backend setup
 
-The latest kitchen-routing migration is `supabase/migrations/202610190001_kitchens.sql`. Apply it after the existing migrations and before deploying this version: it seeds Adenta and Dansoman, assigns administrators and existing orders, and adds dedicated delivery address/GPS columns. Coordinate-bearing orders route to the nearest active kitchen; legacy requests without coordinates remain supported and use a random-kitchen fallback.
-
-Use a user-approved Supabase project; these scripts never create a project. The versioned migrations are `supabase/migrations/202610090001_backend.sql`, `202610090002_email_thumbnails.sql`, `202610090003_delivery_and_attempts.sql` (receipt delivery ledger, superseded payment attempts), `202610130001_customer_portal.sql` (website customer portal), `202610120001_mobile_customers.sql` (mobile order/support links), `202610130002_mobile_customer_phone.sql` (normalized phone lookup), and `202610140001_switch_payment_to_delivery.sql` (mobile-money retries and switching an existing order to pay on delivery). Apply each **once**, in that order, through that project's SQL editor, or use the idempotent CLI wrapper (requires `psql`):
+Use a user-approved Supabase project; these scripts never create a project.
+The migrations include manager accounts, notification delivery, kitchen routing,
+riders and Realtime as well as the original customer and payment schema. The
+latest is `supabase/migrations/202611040001_realtime.sql`. Apply them in the
+wrapper's **dependency order**, not filename order. The complete ordered list
+and precautions for an existing database are in the
+[replication guide](docs/REPLICATION_GUIDE.md#4-database-recreation-and-initialization).
+The migration wrapper requires `psql`:
 
 ```bash
 # Supply the database connection privately; do not paste it into chat or commit it.
@@ -231,7 +247,7 @@ The rider home page shows live statistic cards, an active/completed delivery cha
 
 Typed DTOs live in `src/lib/admin/contracts.ts`. Public `GET /api/menu` returns `{ok:true,items,groups}` using the existing `MenuItem` shape. Public `POST /api/support` accepts `customerName`, `customerEmail`, `phone`, `subject`, `message` and returns `{ok:true,id}`. Admin routes use `/api/admin/session`, `/login`, `/logout`, `/password`, `/dashboard`, `/orders`, `/orders/:id`, `/menu`, `/menu/:id`, `/uploads`, `/customers`, `/support`, and `/support/:id`. Customer routes use `/api/customer/signup`, `/login`, `/logout`, `/profile`, and `/orders`; login accepts email or a 10-digit phone number, and all customer-only reads validate the signed-in Auth user against `customer_profiles`. Signup uses the same peppered password derivation as the mobile API and does not enable public Supabase registrations. Lists return `{ok:true,items,total}`; detail/mutation responses return `{ok:true,item}`. Login/session return `{ok:true,admin}`; uploads accept one multipart `file` and return `imageUrl`, `path`, `width`, `height`. Failures return `{ok:false,error}` with non-success HTTP status.
 
-Admin requests validate Supabase `auth.getUser()` and the DB allowlist on **every** endpoint. Customer routes independently validate the signed-in customer and customer profile. The customer, admin, manager, and rider web portals each use a separate HttpOnly Supabase session cookie, so they can stay signed in concurrently in different tabs; signing out of one portal does not sign out the others. After this isolation is deployed, sign in to each portal again once. Cookies are SameSite=Lax and Secure in production (local HTTP development is the sole Secure exception). API calls refresh cookies via Supabase SSR. Password changes require the current password, at least 12 characters, and revoke other sessions. Mutations require an exact same-origin `Origin` header; unknown fields and unsupported state transitions are rejected. Image uploads have bounded streaming size, decoded-format/MIME matching and pixel limits, strip metadata, re-encode WebP, and generate server-side object names.
+Admin requests validate Supabase `auth.getUser()` and the DB allowlist on **every** endpoint. Customer routes independently validate the signed-in customer and customer profile. The customer, admin, manager, and rider web portals each use a separate HttpOnly Supabase session cookie, so they can stay signed in concurrently in different tabs; signing out of one portal does not sign out the others. After this isolation is deployed, sign in to each portal again once. Cookies are SameSite=Lax and Secure in production (local HTTP development is the sole Secure exception). API calls refresh cookies via Supabase SSR. Staff password changes require the current password, at least 12 characters, and revoke other sessions. Mutations require an exact same-origin `Origin` header; unknown fields and unsupported state transitions are rejected. Image uploads have bounded streaming size, decoded-format/MIME matching and pixel limits, strip metadata, re-encode WebP, and generate server-side object names.
 
 Atomic DB rate limits span all application instances. `TRUST_PROXY_IP=1` is appropriate only when trusted hosting overwrites `x-forwarded-for`; otherwise limits are deliberately shared across visitors rather than trusting spoofable client IP headers. Authentication accounts and payment wallet limits apply across IPs. Add ingress body-size limits and scheduled retention for `rate_limits` / `audit_events` according to operational requirements.
 
@@ -241,18 +257,28 @@ Focused validation: `npm test`, `npx eslint src/lib/admin src/lib/db src/app/api
 
 ## Mobile API
 
-The Flutter customer app (`playmanlounge-mobile` repo) talks to this backend only, through JSON routes under `/api/mobile/**`. It never sees Supabase URLs or keys, and pays on delivery (mobile money from the app is a later phase). The contract — paths, bodies, status codes, error codes — is `docs/API_CONTRACT.md` in the mobile repo; the code is `src/app/api/mobile/**` (thin routes) and `src/lib/mobile/**` (logic, validation, DTOs).
+The Flutter customer app talks to this backend through JSON routes under
+`/api/mobile/**` and the authenticated customer event stream. It never needs a
+Supabase URL or key. Checkout supports pay on delivery and, when configured,
+mobile money. The [mobile API contract](https://github.com/haomaamoah/playmanlounge-mobile/blob/main/docs/API_CONTRACT.md)
+describes the request and response shapes; implementation lives in
+`src/app/api/mobile/**` and `src/lib/mobile/**`.
 
 | Route | Purpose |
 | --- | --- |
 | `GET /api/mobile/config` | Hours, limits, payment methods, contact details (public) |
-| `POST /api/mobile/auth/signup` · `login` · `refresh` · `logout` | Customer session. Sign-up takes **only** `{email, password}` (4–128 characters) and answers already signed in |
+| `POST /api/mobile/auth/signup` · `login` · `refresh` · `logout` | Customer session. Sign-up requires `{name, email, phone, password}` (a 10-digit Ghana phone and a 6–128-character password) and signs the customer in; login accepts email or phone |
 | `GET` · `PATCH` · `DELETE /api/mobile/me`, `POST /api/mobile/me/password` | Profile, password change, account deletion (App Store 5.1.1(v)) |
 | `GET` · `POST /api/mobile/orders`, `GET /api/mobile/orders/:id` | Place orders paid on delivery or by mobile money (`Idempotency-Key` required), list and read the caller's own orders |
 | `GET` · `POST /api/mobile/orders/:id/payment` | Check a pending PaySwitch mobile-money payment, or retry a failed one / switch it to pay on delivery |
+| `GET /api/mobile/orders/:id/directions` | Authorized route for an active assigned rider delivery |
 | `GET` · `POST /api/mobile/support` | The caller's tickets; new tickets land in the admin Support desk |
+| `POST` · `DELETE /api/mobile/notifications/devices` | Register or revoke the signed-in customer's push device |
 
-The menu is the existing public `GET /api/menu`.
+The menu is the existing public `GET /api/menu`. Customer and rider apps use
+their mobile bearer tokens with `/api/stream?portal=customer|rider`; staff
+apps use their scoped session cookies. Streams have no durable replay, so the
+clients refetch after reconnection.
 
 **Customers are Supabase Auth users** created by the backend (`auth.admin.createUser`, which works with public sign-ups switched off, so keep **Allow new users to sign up** disabled) plus a `customer_profiles` row. Admins are still only the allowlisted `admin_profiles`; a customer can never become one, and every mobile route requires a profile, so an admin or a user minted directly in Supabase Auth is refused. An e-mail that already belongs to an admin or customer answers `409 email_taken`.
 
@@ -271,13 +297,20 @@ The menu is the existing public `GET /api/menu`.
 
 **Database.** `supabase/migrations/202610130001_customer_portal.sql` creates the shared customer profile table; `202610120001_mobile_customers.sql` adds `orders.customer_id` + `orders.source` (`web` | `mobile`), `support_requests.customer_id`, their indexes, an extended `create_order()` (same signature, so the website's own order route is untouched) and select-own-row policies for `authenticated`; `202610130002_mobile_customer_phone.sql` adds the normalized unique Ghana phone lookup. The idempotent migration wrapper applies these in dependency order after the first three database migrations. Mobile orders appear in `/admin/orders` and the dashboard like any other order (their notes start with `Delivery address:`); filter on `source = 'mobile'` in the database. Deleting an account removes the customer's tickets and unlinks their orders, which stay for bookkeeping.
 
-**Known limits (by product decision, "for now")**: no e-mail verification and no password reset. Treat the 4-character minimum as intentionally weak; the pepper and the per-account limits are what protect it.
+**Known limits (by product decision, "for now")**: no e-mail verification and
+no password reset. Existing legacy accounts with 4–5-character passwords can
+still sign in, but new passwords must have at least six characters.
 
-**Try it locally** — the mobile repo's `infra/` runs the whole thing in Docker with throw-away keys (`infra/scripts/up.sh`, `website.sh`, `smoke.sh`). The same smoke script can be run by hand against any **local** stack:
+**Try it locally** — the customer mobile repo's `infra/` provides an isolated
+Docker stack. With its local API, Realtime and demo rider configured:
 
 ```bash
 npm test
-SUPABASE_URL=http://127.0.0.1:54421 SUPABASE_ANON_KEY=<local anon key> npx tsx scripts/smoke-mobile-api.mts http://127.0.0.1:43123
+npm run test:mobile-stream
 ```
 
-It signs up throw-away customers, places and replays orders, checks cross-customer isolation, rate limits and Row Level Security over real HTTP, and deletes what it created. Never point it at production.
+The stream test refuses non-local API hosts but creates a local customer and
+support tickets that remain after the test; use a disposable backend and clean
+up only the test records. The older `scripts/smoke-mobile-api.mts` uses obsolete
+signup fixtures and is not a passing acceptance test for the current API. It
+does not enforce local hosts when invoked directly; never point it at production.

@@ -599,9 +599,11 @@ npm run build
 For native stream integration, start the isolated local backend and seed its
 guarded demo riders, then run `npm run test:mobile-stream`. It creates a local
 customer and support tickets, verifies actual customer/rider SSE insert delivery,
-and signs out both sessions. `PML_TEST_API_URL` may override the loopback API URL;
-non-local hosts are refused. This check requires local Supabase Realtime to be
-enabled, not merely a successful HTTP response from the stream endpoint.
+and signs out both sessions. The customer and tickets remain in the local
+database; use a disposable stack and remove only the test records if cleanup is
+needed. `PML_TEST_API_URL` may override the loopback API URL; non-local hosts
+are refused. This check requires local Supabase Realtime to be enabled, not
+merely a successful HTTP response from the stream endpoint.
 
 Use the configured test suite rather than installing a new test stack. A build
 needs access to the configured font downloads or a separately approved local-font
@@ -634,8 +636,11 @@ On a new staging backend, additionally:
 11. Remove only explicitly created test records and verify cleanup, including
     outbox/receipt side effects. Keep real orders/payments untouched.
 
-The existing `scripts/smoke-mobile-api.mts` is restricted to local Supabase and
-creates/deletes throwaway data. Do not point it at production.
+The older `scripts/smoke-mobile-api.mts` is intended for local use but does not
+enforce local API or Supabase hosts when invoked directly. Its signup fixtures
+also assume the retired four-character/email-only contract, so it is not a
+passing acceptance test until those fixtures are updated. Never point it at
+production.
 
 ### Live verification performed on 2026-11-04
 
