@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accountBlockInput, administratorCreateInput, availableOrderStatuses, canTransition, kitchenInput, menuInput, object, password, supportInput } from "./validation.ts";
+import { accountBlockInput, administratorCreateInput, availableOrderStatuses, canTransition, email, kitchenInput, menuInput, object, password, supportInput } from "./validation.ts";
 
 test("unknown fields, malformed objects and invalid support are rejected", () => {
   assert.throws(() => object({role:"admin"},["email"]));
@@ -8,6 +8,12 @@ test("unknown fields, malformed objects and invalid support are rejected", () =>
   assert.throws(() => supportInput({customerName:"Ama",customerEmail:"not-email",phone:"",subject:"Help",message:"Can I change my delivery?"}));
   assert.throws(() => supportInput({customerName:"Ama",customerEmail:"ama@example.com",phone:"",subject:"Help",message:"Can I change my delivery?",status:"closed"}));
   assert.equal(supportInput({customerName:" Ama ",customerEmail:"AMA@example.com",phone:"",subject:"Help",message:"Can I change my delivery?"}).customerEmail,"ama@example.com");
+});
+test("email input errors are actionable and valid addresses are normalized", () => {
+  assert.throws(() => email(null), /Enter a valid email address/);
+  assert.throws(() => email(""), /Enter a valid email address/);
+  assert.throws(() => email("not-an-email"), /Enter a valid email address/);
+  assert.equal(email(" Rider@example.com "), "rider@example.com");
 });
 test("menu fields validate cents, types and immutable id", () => {
   assert.throws(() => menuInput({price:1.001},true));

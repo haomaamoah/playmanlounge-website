@@ -125,6 +125,13 @@ Optional integrations needed for complete production parity:
 - `FIREBASE_SERVICE_ACCOUNT_JSON` and `CRON_SECRET` for notification delivery.
   See [notifications](./notifications.md). The web stream is independent of FCM.
 
+`THETELLER_FLOW=checkout` makes mobile order payments start the hosted checkout
+instead of first prompting the wallet directly, matching the website flow.
+`auto` remains prompt-first and falls back only after a definitive gateway
+refusal; timeouts and unreachable-provider responses remain unresolved so a
+second charge is not started. Unit tests cover routing and recovery without
+creating a real charge.
+
 Supabase Auth configuration:
 
 1. Keep public self-registration disabled; customer registration is performed by

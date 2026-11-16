@@ -15,8 +15,13 @@ export function text(value: unknown, min: number, max: number) {
   return value.trim();
 }
 export function email(value: unknown) {
-  const result = text(value, 3, 254).toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result)) throw new ApiFailure(400, "Invalid email address.");
+  if (typeof value !== "string" || value.trim().length < 3 || value.length > 254) {
+    throw new ApiFailure(400, "Enter a valid email address.");
+  }
+  const result = value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result)) {
+    throw new ApiFailure(400, "Enter a valid email address.");
+  }
   return result;
 }
 export function password(value: unknown, min = 1) {

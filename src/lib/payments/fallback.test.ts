@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { nextAfterCharge } from "./fallback";
+import { nextAfterCharge, requiresHostedCheckout } from "./fallback";
 import type { PaymentResult } from "./theteller";
 
 const result = (r: Partial<PaymentResult>): { result: PaymentResult } =>
   ({ result: { transactionId: "1", state: "failed", code: "999", message: "", retryable: false, gatewayIssue: true, ...r } });
 const timeout = Object.assign(new Error("timed out"), { name: "TimeoutError" });
+
+test("checkout-only mode skips the direct wallet prompt", () => {
+  assert.equal(requiresHostedCheckout("checkout"), true);
+  assert.equal(requiresHostedCheckout("auto"), false);
+  assert.equal(requiresHostedCheckout("prompt"), false);
+});
 
 test("a timed-out direct charge waits on the same reference, never a second charge", () => {
   assert.equal(nextAfterCharge("auto", { error: timeout }), "await");

@@ -14,11 +14,17 @@ export function RiderLogin() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
+    const email = String(values.get("email") ?? "").trim().toLowerCase();
+    const password = String(values.get("password") ?? "");
+    if (!email) {
+      setError("Enter your email address.");
+      return;
+    }
     setBusy(true); setError("");
     try {
       await riderRequest("/api/rider/login", {
         method: "POST",
-        body: JSON.stringify({ email: values.get("email"), password: values.get("password") }),
+        body: JSON.stringify({ email, password }),
       });
       const next = search.get("next");
       router.replace(next?.startsWith("/rider") && next !== "/rider/login" ? next : "/rider");
