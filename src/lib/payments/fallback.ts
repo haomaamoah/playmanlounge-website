@@ -1,4 +1,4 @@
-import type { PaymentFlow, PaymentResult } from "./theteller";
+import type { PaymentResult } from "./theteller";
 
 /**
  * What to do after a direct mobile-money charge. Hosted checkout is only a
@@ -7,10 +7,6 @@ import type { PaymentFlow, PaymentResult } from "./theteller";
  * waits on the original reference instead.
  */
 export type ChargeNext = "checkout" | "await" | "unreachable" | "result";
-
-export function requiresHostedCheckout(flow: PaymentFlow) {
-  return flow === "checkout";
-}
 
 export function nextAfterCharge(flow: string, outcome: { result: PaymentResult } | { error: unknown }): ChargeNext {
   if ("error" in outcome) {

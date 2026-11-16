@@ -2,7 +2,7 @@ import "server-only";
 import { site } from "../content";
 import { siteUrl } from "../mail/config";
 import { supersedePayment, updatePayment } from "../db/orders";
-import { nextAfterCharge, requiresHostedCheckout } from "../payments/fallback";
+import { nextAfterCharge } from "../payments/fallback";
 import {
   chargeMomo,
   fetchStatus,
@@ -10,7 +10,6 @@ import {
   initiateCheckout,
   isConfigured,
   newTransactionId,
-  type GatewayConfig,
   type PaymentResult,
 } from "../payments/theteller";
 import type { MomoNetwork } from "../payments/networks";
@@ -73,10 +72,6 @@ export async function chargeOrder(row: Row, wallet: { network: MomoNetwork; momo
   const total = Number(row.total);
   const description = `${site.name} order ${String(row.order_ref)}`;
 
-  if (requiresHostedCheckout(config.flow)) {
-    return startHostedCheckout(config, row, transactionId, false);
-  }
-
   let outcome: { result: PaymentResult } | { error: unknown };
   try {
     outcome = { result: await chargeMomo(config, { transactionId, total, network: wallet.network, subscriberNumber: wallet.momoNumber, description }) };
@@ -93,7 +88,19 @@ export async function chargeOrder(row: Row, wallet: { network: MomoNetwork; momo
   }
 
   if (next === "checkout") {
-    return startHostedCheckout(config, row, transactionId, true);
+    const redirectUrl = publicReturnUrl();
+    if (!redirectUrl) {
+      await updatePayment(transactionId, "failed");
+      return { state: "failed", message: "Mobile money is not available right now. Choose pay on delivery." };
+    }
+    const checkoutId = newTransactionId();
+    await supersedePayment(transactionId, checkoutId);
+    const started = await initiateCheckout(config, { transactionId: checkoutId, total, description, email: String(row.customer_email), redirectUrl });
+    if ("error" in started) {
+      await updatePayment(checkoutId, "failed");
+      return { state: "failed", message: "Mobile money is not switched on for this business yet. Choose pay on delivery, or call the kitchen." };
+    }
+    return { state: "pending", message: "Finish paying on the secure PaySwitch page.", checkoutUrl: started.checkoutUrl };
   }
 
   const result = outcome.result;
@@ -102,38 +109,6 @@ export async function chargeOrder(row: Row, wallet: { network: MomoNetwork; momo
   if (result.state === "failed") await updatePayment(transactionId, "failed");
   else await updatePayment(transactionId, result.state, result.gatewayIssue);
   return { state: result.state, message: result.message };
-}
-
-async function startHostedCheckout(
-  config: GatewayConfig,
-  row: Row,
-  transactionId: string,
-  replaceAttempt: boolean,
-): Promise<MobilePaymentView> {
-  const redirectUrl = publicReturnUrl();
-  if (!redirectUrl) {
-    await updatePayment(transactionId, "failed");
-    return { state: "failed", message: "Mobile money is not available right now. Choose pay on delivery." };
-  }
-
-  const checkoutId = replaceAttempt ? newTransactionId() : transactionId;
-  if (replaceAttempt) await supersedePayment(transactionId, checkoutId);
-  const started = await initiateCheckout(config, {
-    transactionId: checkoutId,
-    total: Number(row.total),
-    description: `${site.name} order ${String(row.order_ref)}`,
-    email: String(row.customer_email),
-    redirectUrl,
-  });
-  if ("error" in started) {
-    await updatePayment(checkoutId, "failed");
-    return { state: "failed", message: "Mobile money is not switched on for this business yet. Choose pay on delivery, or call the kitchen." };
-  }
-  return {
-    state: "pending",
-    message: "Finish paying on the secure PaySwitch page.",
-    checkoutUrl: started.checkoutUrl,
-  };
 }
 
 /** Asks PaySwitch about a pending attempt. Gateway hiccups keep it pending rather than inventing a failure. */
