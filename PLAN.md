@@ -8,7 +8,7 @@ A night-black page, condensed stall lettering, gold CTA, and a centered hero ove
 
 ## Pass 2 (building this)
 
-Ground the page in the actual mark `playman_lounge_transparent.png` (a painted bowl of fried rice in a cocoa ring) and in the owner’s claim: **hot fried rice with beef**. The characteristic first frame is the plate, not a slogan lockup.
+Ground the page in the customer Flutter app mark `playmanlounge-mobile-logo.webp` (a painted bowl of fried rice in a cocoa ring) and in the owner’s claim: **hot fried rice with beef**. The characteristic first frame is the plate, not a slogan lockup.
 
 ### Color (sampled from the logo PNG, then derived)
 

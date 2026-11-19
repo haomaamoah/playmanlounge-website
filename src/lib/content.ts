@@ -36,9 +36,9 @@ export const site = {
     tiktok: "https://www.tiktok.com/@playmanlounge",
   },
   logo: {
-    src: "/playman_lounge_transparent.png",
-    width: 994,
-    height: 984,
+    src: "/playmanlounge-mobile-logo.webp",
+    width: 640,
+    height: 640,
   },
 } as const;
 
@@ -275,11 +275,11 @@ export const team = [
     name: "Emmanuel Temeng",
     title: "Managing Director",
     bio: "Emmanuel runs the kitchen day to day — the rice, the delivery bag, and booked events at the hub. He built Play Man Lounge so Accra can get hot fried rice with beef without needing a walk-in counter.",
-    image: "/playman_lounge_transparent.png",
+    image: "/playmanlounge-mobile-logo.webp",
     imageAlt: "Play Man Lounge logo standing in for a portrait of Emmanuel Temeng",
     imageFit: "contain",
-    width: 994,
-    height: 984,
+    width: 640,
+    height: 640,
   },
   {
     id: "it",

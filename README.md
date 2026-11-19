@@ -59,7 +59,7 @@ Marked clearly so the owner can replace it:
 | Socials | `src/lib/content.ts` → `site.socials` | Guessed handles. The inbox (`amoahinfotech@gmail.com`), phone and street address are **real**. |
 | Dish photographs | `public/media/food-*.webp`, `public/media/drink-*.webp` | Generated stand-ins shot to match the poster’s look. Swap them for real plates when the kitchen shoots its own. |
 | Gallery photographs | `public/media/gallery-*.webp` | **Real**, sent by the Managing Director; originals kept in `assets/images/director-*.jpg`. |
-| Logo | `public/playman_lounge_transparent.png` | Also wired as favicon and apple-touch-icon. |
+| Logo | `public/playmanlounge-mobile-logo.webp` | Exact customer Flutter app artwork used in portal drawers; PNG and ICO favicons are generated from the same source. |
 
 Do **not** replace the real phone (`+233 54 753 9942`, set by the Managing Director and replacing the older AirtelTigo line on the Google listing), hours (12:00 PM – 11:00 PM, every day), or address (Nikoi Olai Street, off Amarboifio Avenue, Kaneshie; plus code HQH4+2M Accra).
 
