@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/app/app-shell";
 import { authClient } from "@/lib/admin/server";
 import { db } from "@/lib/db/server";
 import { loadMenuGroups } from "@/lib/db/catalog";
 import type { MenuGroup } from "@/lib/content";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  title: "Play Man Lounge | Customer Portal",
+};
 
 export default async function CustomerAppLayout({
   children,
